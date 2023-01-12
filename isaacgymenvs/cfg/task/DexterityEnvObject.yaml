@@ -1,0 +1,12 @@
+# See schema in factory_schema_config_env.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    - /dexterity_schema_config_env
+
+env:
+    env_name: 'DexterityEnvObject'
+    object_sets_asset_root: '../../../../assets/dexterity/object_sets'
+    object_sets:
+        ycb: [ '014_lemon' ]
+        egad: []

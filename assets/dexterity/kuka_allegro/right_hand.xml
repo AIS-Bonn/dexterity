@@ -1,0 +1,217 @@
+<mujoco model="allegro_hand_right-manipulator">
+  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+
+  <default>
+    <joint damping="0.1" armature="0.01" frictionloss="0.01" />
+    <!-- default visual and collision attributes -->
+    <default class="plastic">
+        <geom solimp="0.5 0.99 0.0001" solref="0.005 1"/>
+        <default class="plastic_visual">
+            <geom type="mesh" material="black" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="plastic_collision">
+            <geom group="3" material="gray"/>
+        </default>
+    </default>
+
+
+  </default>
+  <asset>
+    <material name="black" specular="0.5" shininess="0.25" rgba="0.2 0.2 0.2 1"/>
+    <material name="off_white" specular="0.5" shininess="0.25" rgba="0.9 0.9 0.9 1"/>
+    <material name="gray" specular="0.0" shininess="0.25" rgba="0.80848 0.80848 0.80848 1"/>
+
+    <mesh name="base_link" file="base_link.stl"/>
+    <mesh name="link_0.0" file="link_0_0.stl"/>
+    <mesh name="link_1.0" file="link_1_0.stl"/>
+    <mesh name="link_2.0" file="link_2_0.stl"/>
+    <mesh name="link_3.0" file="link_3_0.stl"/>
+    <mesh name="link_3.0_tip" file="link_3_0_tip.stl"/>
+    <mesh name="link_12.0_right" file="link_12_0_right.stl"/>
+    <mesh name="link_13.0" file="link_13_0.stl"/>
+    <mesh name="link_14.0" file="link_14_0.stl"/>
+    <mesh name="link_15.0" file="link_15_0.stl"/>
+    <mesh name="link_15.0_tip" file="link_15_0_tip.stl"/>
+  </asset>
+  <worldbody>
+    <body name="base_link" pos="0. -0.07 0.03" quat="0.5 0.5 -0.5 0.5">
+    <!-- attachment site for a vive tracker to visualize the tracker pose -->
+    <site name="attachment_site" pos="-0.04 0 -0.04" quat="-0.707 0 0 -0.707"/>
+    <geom class="plastic_visual" mesh="base_link"/>
+    <geom name="base_link_coll"  class="plastic_collision" size="0.0204 0.0565 0.0475" pos="-0.0093 0 -0.0475" type="box"/>
+
+    <!-- Index finger -->
+    <body name="link_0.0" pos="0 0.0435 -0.001542" quat="0.999048 -0.0436194 0 0">
+      <site name="teleop-rh_if_angle0" user="0 1 0 0 0"/>
+      <joint name="joint_0.0" pos="0 0 0" axis="0 0 1" range="-0.47 0.47"/>
+      <geom class="plastic_visual" mesh="link_0.0"/>
+      <geom class="plastic_collision" size="0.0098 0.01375 0.0082" pos="0 0 0.0082" type="box"/>
+      <body name="link_1.0" pos="0 0 0.0164">
+        <site name="keypoint-hand_bodies-if_proximal" pos="0.01 0 0.026"/>
+        <site name="teleop-rh_if_angle1" user="0 1 0 0 0"/>
+        <joint name="joint_1.0" pos="0 0 0" axis="0 1 0" range="-0.196 1.61"/>
+        <geom class="plastic_visual" mesh="link_1.0"/>
+        <geom class="plastic_collision" size="0.0098 0.01375 0.027" pos="0 0 0.027" type="box"/>
+        <body name="link_2.0" pos="0 0 0.054">
+          <site name="keypoint-hand_bodies-if_inter" pos="0.01 0 0.016"/>
+          <site name="teleop-rh_if_flexion" user="0 1.571 0 0 0"/>
+          <joint name="joint_2.0" pos="0 0 0" axis="0 1 0" range="-0.174 1.709"/>
+          <geom class="plastic_visual" mesh="link_2.0"/>
+          <geom class="plastic_collision" size="0.0098 0.01375 0.0192" pos="0 0 0.0192" type="box"/>
+
+          <!-- Fingertip of index finger -->
+          <body name="link_3.0" pos="0 0 0.0384">
+            <site name="keypoint-hand_bodies-if_distal" pos="0.0115 0 0.0275"/>
+            <site name="keypoint-fingertips-if" pos="0.0115 0 0.0275"/>
+            <site name="teleop-rh_if_flexion" user="0 1.571 0 0 0"/>
+            <joint name="joint_3.0" pos="0 0 0" axis="0 1 0" range="-0.227 1.618"/>
+            <geom class="plastic_visual" mesh="link_3.0"/>
+            <geom class="plastic_collision" size="0.0098 0.01375 0.01335" pos="0 0 0.01335" type="box"/>
+            <geom pos="0 0 0.0267" class="plastic_visual" material="off_white" mesh="link_3.0_tip"/>
+            <geom class="plastic_collision" size="0.012" pos="0 0 0.0267"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- Middle finger -->
+    <body name="link_4.0" pos="0 0 0.0007">
+      <site name="teleop-rh_mf_angle0" user="0 1 0 0 0"/>
+      <joint name="joint_4.0" pos="0 0 0" axis="0 0 1" range="-0.47 0.47"/>
+      <geom class="plastic_visual" mesh="link_0.0"/>
+      <geom class="plastic_collision" size="0.0098 0.01375 0.0082" pos="0 0 0.0082" type="box"/>
+      <body name="link_5.0" pos="0 0 0.0164">
+        <site name="keypoint-hand_bodies-mf_proximal" pos="0.01 0 0.026"/>
+        <site name="teleop-rh_mf_angle1" user="0 1 0 0 0"/>
+        <joint name="joint_5.0" pos="0 0 0" axis="0 1 0" range="-0.196 1.61"/>
+        <geom class="plastic_visual" mesh="link_1.0"/>
+        <geom class="plastic_collision" size="0.0098 0.01375 0.027" pos="0 0 0.027" type="box"/>
+        <body name="link_6.0" pos="0 0 0.054">
+          <site name="keypoint-hand_bodies-mf_inter" pos="0.01 0 0.016"/>
+          <site name="teleop-rh_mf_flexion" user="0 1.571 0 0 0"/>
+          <joint name="joint_6.0" pos="0 0 0" axis="0 1 0" range="-0.174 1.709"/>
+          <geom class="plastic_visual" mesh="link_2.0"/>
+          <geom class="plastic_collision" size="0.0098 0.01375 0.0192" pos="0 0 0.0192" type="box"/>
+
+          <!-- Fingertip of middle finger -->
+          <body name="link_7.0" pos="0 0 0.0384">
+            <site name="keypoint-hand_bodies-mf_distal" pos="0.0115 0 0.0275"/>
+            <site name="keypoint-fingertips-mf" pos="0.0115 0 0.0275"/>
+            <site name="teleop-rh_mf_flexion" user="0 1.571 0 0 0"/>
+            <joint name="joint_7.0" pos="0 0 0" axis="0 1 0" range="-0.227 1.618"/>
+            <geom class="plastic_visual" mesh="link_3.0"/>
+            <geom class="plastic_collision" size="0.0098 0.01375 0.01335" pos="0 0 0.01335" type="box"/>
+            <geom pos="0 0 0.0267" class="plastic_visual" material="off_white" mesh="link_3.0_tip"/>
+            <geom class="plastic_collision" size="0.012" pos="0 0 0.0267"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+
+    <!-- Ring finger -->
+    <body name="link_8.0" pos="0 -0.0435 -0.001542" quat="0.999048 0.0436194 0 0">
+      <site name="teleop-rh_rf_angle0" user="0 1 0 0 0"/>
+      <joint name="joint_8.0" pos="0 0 0" axis="0 0 1" range="-0.47 0.47"/>
+      <geom class="plastic_visual" mesh="link_0.0"/>
+      <geom class="plastic_collision" size="0.0098 0.01375 0.0082" pos="0 0 0.0082" type="box"/>
+      <body name="link_9.0" pos="0 0 0.0164">
+        <site name="keypoint-hand_bodies-rf_proximal" pos="0.01 0 0.026"/>
+        <site name="teleop-rh_rf_angle1" user="0 1 0 0 0"/>
+        <joint name="joint_9.0" pos="0 0 0" axis="0 1 0" range="-0.196 1.61"/>
+        <geom class="plastic_visual" mesh="link_1.0"/>
+        <geom class="plastic_collision" size="0.0098 0.01375 0.027" pos="0 0 0.027" type="box"/>
+        <body name="link_10.0" pos="0 0 0.054">
+          <site name="keypoint-hand_bodies-rf_inter" pos="0.01 0 0.016"/>
+          <site name="teleop-rh_rf_flexion" user="0 1.571 0 0 0"/>
+          <joint name="joint_10.0" pos="0 0 0" axis="0 1 0" range="-0.174 1.709"/>
+          <geom class="plastic_visual" mesh="link_2.0"/>
+          <geom class="plastic_collision" size="0.0098 0.01375 0.0192" pos="0 0 0.0192" type="box"/>
+
+          <!-- Fingertip of ring finger -->
+          <body name="link_11.0" pos="0 0 0.0384">
+            <site name="keypoint-hand_bodies-rf_distal" pos="0.0115 0 0.0275"/>
+            <site name="keypoint-fingertips-rf" pos="0.0115 0 0.0275"/>
+            <site name="teleop-rh_rf_flexion" user="0 1.571 0 0 0"/>
+            <joint name="joint_11.0" pos="0 0 0" axis="0 1 0" range="-0.227 1.618"/>
+            <geom class="plastic_visual" mesh="link_3.0"/>
+            <geom class="plastic_collision" size="0.0098 0.01375 0.01335" pos="0 0 0.01335" type="box"/>
+            <geom pos="0 0 0.0267" class="plastic_visual" material="off_white" mesh="link_3.0_tip"/>
+            <geom class="plastic_collision" size="0.012" pos="0 0 0.0267"/>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- Thumb -->
+    <body name="link_12.0" pos="-0.0182 0.019333 -0.045987" quat="0.477714 -0.521334 -0.521334 -0.477714">
+      <site name="teleop-rh_th_angle0" user="1.571 1 0 0 0"/>
+      <joint name="joint_12.0" pos="0 0 0" axis="-1 0 0" range="0.263 1.396"/>
+      <geom class="plastic_visual" mesh="link_12.0_right"/>
+      <geom name="link_12.0_coll"  class="plastic_collision" size="0.0179 0.017 0.02275" pos="-0.0179 0.009 0.0145" type="box"/>
+      <body name="link_13.0" pos="-0.027 0.005 0.0399">
+        <site name="keypoint-hand_bodies-th_proximal" pos="0.01 0 0.01"/>
+        <!-- No way of mapping senseglove data to this joint appropriately -->
+        <site name="teleop-rh_th_angle0" user="0 0 0 0 0"/>
+        <joint name="joint_13.0" pos="0 0 0" axis="0 0 1" range="-0.105 1.163"/>
+        <geom class="plastic_visual" mesh="link_13.0"/>
+        <geom name="link_13.0_coll" class="plastic_collision" size="0.0098 0.01375 0.00885" pos="0 0 0.00885" type="box"/>
+        <body name="link_14.0" pos="0 0 0.0177">
+          <site name="keypoint-hand_bodies-th_inter" pos="0.01 0 0.025"/>
+          <site name="teleop-rh_th_angle1" user="0 1 0 0 0"/>
+          <joint name="joint_14.0" pos="0 0 0" axis="0 1 0" range="-0.189 1.644"/>
+          <geom class="plastic_visual" mesh="link_14.0"/>
+          <geom class="plastic_collision" size="0.0098 0.01375 0.0257" pos="0 0 0.0257" type="box"/>
+
+          <!-- Fingertip of thumb -->
+          <body name="link_15.0" pos="0 0 0.0514">
+            <site name="keypoint-hand_bodies-th_distal" pos="0.012 0 0.0425"/>
+            <site name="keypoint-fingertips-th" pos="0.012 0 0.0425"/>
+            <site name="teleop-rh_th_angle0" user="0 0 0 0 0"/>
+            <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
+            <joint name="joint_15.0" pos="0 0 0" axis="0 1 0" range="-0.162 1.719"/>
+            <geom class="plastic_visual" mesh="link_15.0"/>
+            <geom class="plastic_collision" size="0.0098 0.01375 0.02115" pos="0 0 0.02115" type="box"/>
+            <geom pos="0 0 0.0423" class="plastic_visual" material="off_white" mesh="link_15.0_tip"/>
+            <geom class="plastic_collision" size="0.012" pos="0 0 0.0423"/>
+          </body>
+        </body>
+      </body>
+    </body>
+    </body>
+  </worldbody>
+
+  <!-- exclude some problematic self-collisions -->
+    <contact>
+      <!-- disable contact of proximal thumb bodies with the palm -->
+      <pair geom1="base_link_coll" geom2="link_12.0_coll" condim="1"/>
+      <pair geom1="base_link_coll" geom2="link_13.0_coll" condim="1"/>
+      <pair geom1="link_12.0_coll" geom2="link_13.0_coll" condim="1"/>
+      <exclude body1="base_link" body2="link_12.0"/>
+      <exclude body1="base_link" body2="link_13.0"/>
+    </contact>
+
+  <actuator>
+    <position name="a_joint_0.0" joint="joint_0.0"/>
+    <position name="a_joint_1.0" joint="joint_1.0"/>
+    <position name="a_joint_2.0" joint="joint_2.0"/>
+    <position name="a_joint_3.0" joint="joint_3.0"/>
+    <position name="a_joint_4.0" joint="joint_4.0"/>
+    <position name="a_joint_5.0" joint="joint_5.0"/>
+    <position name="a_joint_6.0" joint="joint_6.0"/>
+    <position name="a_joint_7.0" joint="joint_7.0"/>
+    <position name="a_joint_8.0" joint="joint_8.0"/>
+    <position name="a_joint_9.0" joint="joint_9.0"/>
+    <position name="a_joint_10.0" joint="joint_10.0"/>
+    <position name="a_joint_11.0" joint="joint_11.0"/>
+    <position name="a_joint_12.0" joint="joint_12.0"/>
+    <position name="a_joint_13.0" joint="joint_13.0"/>
+    <position name="a_joint_14.0" joint="joint_14.0"/>
+    <position name="a_joint_15.0" joint="joint_15.0"/>
+  </actuator>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+    <key name="initial" qpos="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

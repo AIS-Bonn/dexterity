@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="050_medium_clamp">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/050_medium_clamp/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

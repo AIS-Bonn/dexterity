@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<robot name="nail">
+  <link name="base"/>
+  <link name="head">
+    <visual>
+      <geometry>
+        <cylinder length="0.003" radius="0.015"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.003" radius="0.015"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+    </collision>
+  </link>
+
+  <link name="tip">
+    <visual>
+      <geometry>
+        <cylinder length="0.1" radius="0.003"/>
+      </geometry>
+      <origin xyz="0 0 -0.05"/>
+    </visual>
+  </link>
+
+  <joint name="base_to_tip" type="prismatic">
+    <parent link="base"/>
+    <child link="tip"/>
+    <axis xyz="0 0 1"/>
+    <dynamics damping="1" friction="1000"/>
+    <limit effort="30" velocity="0.1" lower="-0.095" upper="0.0" />
+  </joint>
+
+  <joint name="tip_to_head" type="fixed">
+    <parent link="tip"/>
+    <child link="head"/>
+  </joint>
+
+</robot>

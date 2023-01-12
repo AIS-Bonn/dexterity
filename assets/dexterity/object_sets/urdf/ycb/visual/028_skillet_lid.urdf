@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="028_skillet_lid">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/028_skillet_lid/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

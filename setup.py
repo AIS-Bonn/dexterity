@@ -8,6 +8,7 @@ from setuptools import setup, find_packages
 
 import os
 
+
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -24,6 +25,29 @@ INSTALL_REQUIRES = [
     ]
 
 
+# Build extension to create Cython interface to OpenVR and SGCore and SGConnect required for teleoperation
+
+# Find libraries
+openvr_lib_dir = os.path.expanduser("~/.steam/steam/steamapps/common/SteamVR/bin/linux64")
+sgcore_lib_dir = os.path.abspath("./isaacgymenvs/tasks/dexterity/demo/contrib/SenseGlove-API/Core/SGCoreCpp/lib/linux/Release")
+sgconnect_lib_dir = os.path.abspath("./isaacgymenvs/tasks/dexterity/demo/contrib/SenseGlove-API/Core/SGConnect/lib/linux/Release")
+
+# If OpenVR is found: install with teleoperation functionality
+if os.path.isdir(openvr_lib_dir):
+    from Cython.Build import cythonize
+    from distutils.core import Extension
+    EXTENSIONS = cythonize(
+        [Extension(
+            "dexterityvr",
+            ["./isaacgymenvs/tasks/dexterity/demo/src/dexterityvr.pyx"],
+            libraries=["openvr_api", "SGCoreCpp", "SGConnect", "GL", "GLEW", "glut"],
+            library_dirs=[openvr_lib_dir, sgcore_lib_dir, sgconnect_lib_dir],
+            runtime_library_dirs=[openvr_lib_dir, sgcore_lib_dir, sgconnect_lib_dir],
+        )])
+else:
+    EXTENSIONS = []
+    warnings.warn("Path to OpenVR not found. Installing dexterity without teleoperation functionality.")
+
 
 # Installation operation
 setup(
@@ -38,6 +62,7 @@ setup(
     packages=find_packages("."),
     classifiers=["Natural Language :: English", "Programming Language :: Python :: 3.7, 3.8"],
     zip_safe=False,
+    ext_modules=EXTENSIONS,
 )
 
 # EOF

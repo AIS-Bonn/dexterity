@@ -1,0 +1,84 @@
+# See schema in factory_schema_config_base.py for descriptions of parameters.
+
+defaults:
+    - _self_
+    - /dexterity_schema_config_base
+
+mode:
+    export_scene: False
+    export_states: False
+
+sim:
+    dt: 0.016667
+    num_substeps: 4  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
+    num_pos_iters: 16
+    num_vel_iters: 0
+    gravity_mag: 9.81
+    add_damping: False
+    aggregate_mode: 2  # Whether to create aggregate groups 0: don't aggregate; 1: aggregate only task-specific actors; >1: aggregate all actors
+    
+env:
+    env_spacing: 1.0
+    robot: [ 'franka_emika_panda/panda_limited.xml', 'schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml']
+    robot_depth: 0.6
+    robot_friction: 1.0
+    has_table: False
+    table_height: 0.2
+    table_friction: 0.3
+
+ctrl:
+    ctrl_type: gym_default  # {gym_default, joint_space_id}
+    ik_body: tracker
+    add_pose_actions_to: pose # {target, pose}
+    neglect_attached_weights: True  # Whether to ignore the weights of rigid bodies attached to the robot arm, such as fingers of a robotic hand. This drastically improves the inverse kinematics.
+
+    all:
+        jacobian_type: geometric
+        residual_prop_gain: 5
+        residual_deriv_gain: 1
+    gym_default:
+        ik_method: dls
+        ik_prop_gain:  120
+        ik_deriv_gain: 25
+        residual_prop_gain: 10
+        residual_deriv_gain: 2
+    joint_space_id:
+        ik_method: dls
+        ik_prop_gain: 40
+        ik_deriv_gain: 8
+        #residual_prop_gain: 0.05
+        #residual_deriv_gain: 1
+        residual_stiffness: 0.0
+        residual_damping: 5.0
+        uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
+
+    pos_action_scale: [ 0.1, 0.1, 0.1 ]
+    rot_action_scale: [ 0.2, 0.2, 0.2 ]
+    torque_action_scale: [ 1.0, 1.0, 1.0 ]
+
+    clamp_rot: True
+    clamp_rot_thresh: 1.0e-6
+
+debug:
+    override_target_pose: False
+    # target poses are specified as [[x, y, z], [x, y, z, w], duration (ts)]
+    target_poses: [
+        [[0, 0, 0.6], [0, 0, 0, 1], 200], # base pose
+        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.5], [0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [0.707, 0., 0., 0.707], 200], [[0, 0, 0.5], [0.924, 0., 0., 0.383], 200], [[0, 0, 0.5], [0.707, 0., 0., 0.707], 200], [[0, 0, 0.6], [0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [-0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [-0.707, 0., 0., 0.707], 200], [[0, 0, 0.6], [-0.924, 0., 0., 0.383], 200],   # x-axis rotation
+        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0.383, 0., 0.924], 200], [[0, 0, 0.6], [0., 0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., 0.924, 0., 0.383], 200], [[0, 0, 0.6], [0., 0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., 0.383, 0., 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., -0.383, 0., 0.924], 200], [[0, 0, 0.6], [0., -0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., -0.924, 0., 0.383], 200],   # y-axis rotation
+        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0., 0.383, 0.924], 200], [[0, 0, 0.6], [0., 0., 0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., 0.924, 0.383], 200], [[0, 0, 0.6], [0., 0., 0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., 0.383, 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0., -0.383, 0.924], 200], [[0, 0, 0.6], [0., 0., -0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., -0.924, 0.383], 200],   # z-axis rotation
+    ]
+
+    override_residual_dof_target: False
+    # residual dof targets are specified as [[q0, ..., qn], duration (ts)]
+
+    residual_dof_targets: [
+        [[-1, -1., 0., 0., 0.], 350],
+        [[1, -1., 0., 0., 0.], 200],
+        [[1, -1., 1., 0., 0.], 200]
+    ]
+
+    save_videos: True  # Saves all camera observations to mp4 if cameras are used in the environment
+
+    verbose: True
+    visualize: []

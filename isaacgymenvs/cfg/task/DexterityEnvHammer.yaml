@@ -1,0 +1,10 @@
+# See schema in factory_schema_config_env.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    - /dexterity_schema_config_env
+
+env:
+    env_name: 'DexterityEnvHammer'
+    hammers: ['canonical/canonical.urdf']
+    nail_color: [1, 0, 0]

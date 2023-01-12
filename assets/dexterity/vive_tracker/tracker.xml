@@ -1,0 +1,18 @@
+<mujoco model="vive_tracker-visual_asset">
+    <compiler angle="radian" meshdir="assets"/>
+
+    <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+    </default>
+
+    <asset>
+        <material name="htc_vive_blue" specular="0.5" shininess="0.25" rgba="0.698 0.89 1 1"/>
+        <mesh file="vive_tracker.stl"/>
+    </asset>
+
+    <worldbody>
+        <body name="tracker" quat="0.5 -0.5 -0.5 -0.5">
+            <geom mesh="vive_tracker" material="htc_vive_blue" class="visual" quat="0.5 0.5 -0.5 -0.5"/>
+        </body>
+    </worldbody>
+</mujoco>

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="016_pear">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/016_pear/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

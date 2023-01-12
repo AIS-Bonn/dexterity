@@ -1,0 +1,160 @@
+<mujoco model="left_schunk_sih_hand-manipulator">
+    <compiler angle="radian" meshdir="assets/left" autolimits="true"/>
+
+    <default>
+    <default class="left_hand">
+      <mesh scale="0.001 0.001 0.001"/>
+      <joint axis="1 0 0" damping="0.05" armature="0.0002" frictionloss="0.01"/>
+      <position forcerange="-1 1"/>
+
+      <default class="wrist">
+        <joint damping="0.5"/>
+        <default class="wrist_y">
+          <joint axis="0 -1 0" range="-0.523599 0.174533"/>
+          <position kp="10" ctrlrange="-0.523599 0.174533" forcerange="-10 10"/>
+        </default>
+        <default class="wrist_x">
+          <joint range="-0.698132 0.488692"/>
+          <position kp="8" ctrlrange="-0.698132 0.488692" forcerange="-5 5"/>
+        </default>
+      </default>
+
+      <default class="thumb">
+        <default class="thbase">
+          <joint axis="0 0 1" range="-1.0472 1.0472"/>
+          <position kp="0.4" ctrlrange="-1.0472 1.0472" forcerange="-3 3"/>
+        </default>
+        <default class="thproximal">
+          <joint axis="-1 0 0" range="0 1.22173"/>
+          <position ctrlrange="0 1.22173" forcerange="-2 2"/>
+        </default>
+        <default class="thhub">
+          <joint axis="-1 0 0" range="-0.20944 0.20944"/>
+          <position kp="0.5" ctrlrange="-0.20944 0.20944"/>
+        </default>
+        <default class="thmiddle">
+          <joint axis="0 -1 0" range="-0.698132 0.698132"/>
+          <position kp="1.5" ctrlrange="-0.698132 0.698132"/>
+        </default>
+        <default class="thdistal">
+          <joint range="-0.261799 1.5708"/>
+          <position ctrlrange="-0.261799 1.5708"/>
+        </default>
+      </default>
+
+      <default class="metacarpal">
+        <joint axis="0.573576 0 0.819152" range="0 0.785398"/>
+        <position ctrlrange="0 0.785398"/>
+      </default>
+      <default class="knuckle">
+        <joint axis="0 -1 0" range="-0.349066 0.349066"/>
+        <position ctrlrange="-0.349066 0.349066"/>
+      </default>
+      <default class="proximal">
+        <joint range="-0.261799 1.5708"/>
+        <position ctrlrange="-0.261799 1.5708"/>
+      </default>
+      <default class="middle_distal">
+        <joint range="0 1.5708"/>
+        <position kp="0.5" ctrlrange="0 3.1415"/>
+      </default>
+
+      <default class="plastic">
+        <geom solimp="0.5 0.99 0.0001" solref="0.005 1"/>
+        <default class="plastic_visual">
+          <geom type="mesh" material="black" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="plastic_collision">
+          <geom group="3"/>
+        </default>
+      </default>
+    </default>
+  </default>
+
+    <asset>
+        <mesh name="palm" file="palm.stl" scale="0.001 0.001 0.001" />
+        <mesh name="if_proximal" file="if_proximal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="if_distal" file="if_distal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="mf_proximal" file="mf_proximal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="mf_distal" file="mf_distal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="rf_proximal" file="rf_proximal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="rf_distal" file="rf_distal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="lf_proximal" file="lf_proximal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="lf_distal" file="lf_distal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="th_proximal" file="th_proximal.stl" scale="0.001 0.001 0.001" />
+        <mesh name="th_inter" file="th_inter.stl" scale="0.001 0.001 0.001" />
+        <mesh name="th_inter_cvx" file="th_inter_cvx.stl" scale="0.001 0.001 0.001" />
+        <mesh name="th_distal" file="th_distal.stl" scale="0.001 0.001 0.001" />
+    </asset>
+
+    <worldbody>
+        <geom type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="palm" />
+        <geom type="mesh" rgba="0.75 0.75 0.75 1" mesh="palm" />
+        <body name="if_proximal" pos="0.0435 0 0.141">
+            <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+            <joint name="palm_to_if_proximal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+            <geom pos="-0.0435 0 -0.141" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="if_proximal" />
+            <geom pos="-0.0435 0 -0.141" type="mesh" rgba="0.75 0.75 0.75 1" mesh="if_proximal" />
+            <body name="if_distal" pos="0 0 0.048">
+                <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="if_proximal_to_if_distal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+                <geom pos="-0.0435 0 -0.189" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="if_distal" />
+                <geom pos="-0.0435 0 -0.189" type="mesh" rgba="0.75 0.75 0.75 1" mesh="if_distal" />
+            </body>
+        </body>
+        <body name="mf_proximal" pos="0.0187 0 0.141">
+            <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+            <joint name="palm_to_mf_proximal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+            <geom pos="-0.0187 0 -0.141" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="mf_proximal" />
+            <geom pos="-0.0187 0 -0.141" type="mesh" rgba="0.75 0.75 0.75 1" mesh="mf_proximal" />
+            <body name="mf_distal" pos="0 0 0.0525">
+                <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="mf_proximal_to_mf_distal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+                <geom pos="-0.0187 0 -0.1935" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="mf_distal" />
+                <geom pos="-0.0187 0 -0.1935" type="mesh" rgba="0.75 0.75 0.75 1" mesh="mf_distal" />
+            </body>
+        </body>
+        <body name="rf_proximal" pos="-0.0069 0 0.134">
+            <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+            <joint name="palm_to_rf_proximal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+            <geom pos="0.0069 0 -0.134" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="rf_proximal" />
+            <geom pos="0.0069 0 -0.134" type="mesh" rgba="0.75 0.75 0.75 1" mesh="rf_proximal" />
+            <body name="rf_distal" pos="0 0 0.048">
+                <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="rf_proximal_to_rf_distal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+                <geom pos="0.0069 0 -0.182" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="rf_distal" />
+                <geom pos="0.0069 0 -0.182" type="mesh" rgba="0.75 0.75 0.75 1" mesh="rf_distal" />
+            </body>
+        </body>
+        <body name="lf_proximal" pos="-0.032 0 0.1254">
+            <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+            <joint name="palm_to_lf_proximal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+            <geom pos="0.032 0 -0.1254" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="lf_proximal" />
+            <geom pos="0.032 0 -0.1254" type="mesh" rgba="0.75 0.75 0.75 1" mesh="lf_proximal" />
+            <body name="lf_distal" pos="0 0 0.0401">
+                <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="lf_proximal_to_lf_distal" pos="0 0 0" axis="1 0 0" limited="true" range="-1.571 0" damping="0.1" />
+                <geom pos="0.032 0 -0.1655" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="lf_distal" />
+                <geom pos="0.032 0 -0.1655" type="mesh" rgba="0.75 0.75 0.75 1" mesh="lf_distal" />
+            </body>
+        </body>
+        <body name="th_proximal" pos="0.034 0.019 0.08">
+            <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+            <joint name="palm_to_th_proximal" pos="0 0 0" axis="0 0 1" limited="true" range="0 1.571" damping="0.1" />
+            <geom pos="-0.034 -0.019 -0.08" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="th_proximal" />
+            <geom pos="-0.034 -0.019 -0.08" type="mesh" rgba="0.75 0.75 0.75 1" mesh="th_proximal" />
+            <body name="th_inter" pos="0.024 0.005 0.001">
+                <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                <joint name="th_proximal_to_th_inter" pos="0 0 0" axis="0 1 0" limited="true" range="-1.571 0" damping="0.1" />
+                <geom pos="-0.058 -0.024 -0.081" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="th_inter" />
+                <geom pos="-0.058 -0.024 -0.081" type="mesh" rgba="0.75 0.75 0.75 1" mesh="th_inter_cvx" />
+                <body name="th_distal" pos="0.0391 0 0">
+                    <inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" />
+                    <joint name="th_inter_to_th_distal" pos="0 0 0" axis="0 1 0" limited="true" range="-1.571 0" damping="0.1" />
+                    <geom pos="-0.0971 -0.024 -0.081" type="mesh" contype="0" conaffinity="0" group="1" rgba="0.75 0.75 0.75 1" mesh="th_distal" />
+                    <geom pos="-0.0971 -0.024 -0.081" type="mesh" rgba="0.75 0.75 0.75 1" mesh="th_distal" />
+                </body>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>

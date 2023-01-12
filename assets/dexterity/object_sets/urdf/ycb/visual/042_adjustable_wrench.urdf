@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="042_adjustable_wrench">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/042_adjustable_wrench/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

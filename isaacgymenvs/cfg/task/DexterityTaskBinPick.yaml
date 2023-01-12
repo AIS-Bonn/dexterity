@@ -1,0 +1,54 @@
+# See schema in factory_schema_config_task.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    # - /factory_schema_config_task
+
+name: DexterityTaskBinPick
+physics_engine: ${..physics_engine}
+full_experiment_name: ${.name}
+
+sim:
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    up_axis: "z"
+    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
+
+    disable_gravity: False
+
+env:
+    numEnvs: ${resolve_default:2,${...num_envs}}
+    numObservations: 0  # overwritten depending on observations
+    observations: ['ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'fingertips_quat', 'frontview']
+    numActions: 0  # overwritten depending on robot configuration
+
+cameras:
+    frontview:
+        fovx: 75  # Horizontal field of view
+        pos: [0.75, 0, 0.5]  # Position of the camera
+        quat: [0, 0, 1, 0]  # Quaternion orientation of the camera {x, y, z, w}
+        resolution: [512, 512]
+        type: 'rgb'  # {rgb, rgba, rgbd }
+
+randomize:
+    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
+    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
+    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+    fingertip_midpoint_rot_noise: [0.0, 0.0, 0.0]  # noise on rotation
+    object_pos_drop: [0.0, 0.0, 0.5]  # position from which object is dropped
+    object_pos_drop_noise: [0.2, 0.2, 0.0]  # noise on object drop position
+    num_object_drop_steps: 100  # number of steps to drop objects
+
+rl:
+    reward:
+        action_penalty: 0.0  # scale on action penalty
+        fingertips_dist_penalty: 0.05  # scale on fingertip distance penalty
+        object_lift_off_reward: 0.25  # scale on object lift-off progress reward
+        object_target_reward: 0.25  # scale on object target progress reward
+        success_bonus: 1000.0  # reward received upon reaching target height
+    lift_off_height: 0.125  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+    target_height: 0.4  # target height for the object in meters
+    max_episode_length: 450
+

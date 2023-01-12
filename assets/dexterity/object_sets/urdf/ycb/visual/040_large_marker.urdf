@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="040_large_marker">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/040_large_marker/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

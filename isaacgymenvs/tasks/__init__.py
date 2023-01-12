@@ -31,7 +31,11 @@ from .ant import Ant
 from .anymal import Anymal
 from .anymal_terrain import AnymalTerrain
 from .ball_balance import BallBalance
-from .cartpole import Cartpole 
+from .cartpole import Cartpole
+from .dexterity.task.bin_pick import DexterityTaskBinPick
+from .dexterity.task.drill_pick_and_place import DexterityTaskDrillPickAndPlace
+from.dexterity.task.hammer_drive_nail import DexterityTaskHammerDriveNail
+from .dexterity.task.object_lift import DexterityTaskObjectLift
 from .factory.factory_task_gears import FactoryTaskGears
 from .factory.factory_task_insertion import FactoryTaskInsertion
 from .factory.factory_task_nut_bolt_pick import FactoryTaskNutBoltPick
@@ -47,6 +51,7 @@ from .shadow_hand import ShadowHand
 from .allegro_hand import AllegroHand
 from .trifinger import Trifinger
 
+
 # Mappings from strings to environments
 isaacgym_task_map = {
     "AllegroHand": AllegroHand,
@@ -55,6 +60,10 @@ isaacgym_task_map = {
     "AnymalTerrain": AnymalTerrain,
     "BallBalance": BallBalance,
     "Cartpole": Cartpole,
+    "DexterityTaskBinPick": DexterityTaskBinPick,
+    "DexterityTaskDrillPickAndPlace": DexterityTaskDrillPickAndPlace,
+    "DexterityTaskHammerDriveNail": DexterityTaskHammerDriveNail,
+    "DexterityTaskObjectLift": DexterityTaskObjectLift,
     "FactoryTaskGears": FactoryTaskGears,
     "FactoryTaskInsertion": FactoryTaskInsertion,
     "FactoryTaskNutBoltPick": FactoryTaskNutBoltPick,

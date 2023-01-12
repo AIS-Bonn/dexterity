@@ -1,0 +1,53 @@
+# See schema in factory_schema_config_task.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    # - /factory_schema_config_task
+
+name: DexterityTaskDrillPickAndPlace
+physics_engine: ${..physics_engine}
+full_experiment_name: ${.name}
+
+
+# needed for headless VR
+enableCameraSensors: True
+
+sim:
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    up_axis: "z"
+    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
+
+    disable_gravity: False
+
+env:
+    numEnvs: ${resolve_default:16384,${...num_envs}}
+    numObservations: 0  # overwritten depending on observations
+    observations: ['ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_pos_demo']
+    numActions: 0  # overwritten depending on robot configuration
+
+randomize:
+    drill_pos_drop: [ 0.0, 0.0, 0.5 ]  # position from which drill is dropped
+    drill_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on drill drop position
+    num_drill_drop_steps: 150  # number of steps to drop drills
+
+    drill_pos_target: [ 0.0, 0.0, 0.5 ]  # position from which drill is dropped
+    drill_pos_target_noise: [ 0.05, 0.05, 0.05 ]  # noise on drill drop position
+
+    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
+    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
+    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+
+rl:
+    reward:
+        action_penalty: 0.0  # scale on action penalty
+        #fingertips_imitation_dist_penalty: 0.0  # scale on fingertips distance penalty to the pre-recorded pose.
+        hand_bodies_imitation_dist_penalty: 5.0  # scale on hand_bodies distance penalty to the pre-recorded pose.
+        target_pos_dist_penalty: 1.0  # scale on distance penalty between drill pos and drill target pos
+        target_quat_dist_penalty: 1.0  # scale on min angle distance penalty between drill quat and drill target quat
+        success_bonus: 1000.0  # reward received upon reaching target pose
+    target_pos_threshold: 0.05  # maximum distance in meters to target pos to count as reached
+    target_angle_threshold: 0.1  # maximum angle in rad to target quat to count as reached
+    max_episode_length: 450

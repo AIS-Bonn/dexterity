@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<robot name="milwaukee">
+  <link name="base">
+    <visual>
+      <geometry>
+        <mesh filename="assets/base.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/base.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="trigger">
+    <visual>
+      <geometry>
+        <mesh filename="assets/trigger.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/trigger.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_to_trigger" type="prismatic">
+    <parent link="base"/>
+    <child link="trigger"/>
+    <axis xyz="1 0 0" />
+    <limit effort="30" velocity="0.1" lower="-0.008" upper="0." />
+  </joint>
+  <link name="chuck">
+    <visual>
+      <geometry>
+        <mesh filename="assets/chuck.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/chuck.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_to_chuck" type="continuous">
+    <parent link="base"/>
+    <child link="chuck"/>
+    <axis xyz="1 0 0" />
+    <dynamics damping="1" friction="0.001"/>
+  </joint>
+</robot>

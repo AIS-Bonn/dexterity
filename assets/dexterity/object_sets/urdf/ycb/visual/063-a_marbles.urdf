@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="063-a_marbles">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/063-a_marbles/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

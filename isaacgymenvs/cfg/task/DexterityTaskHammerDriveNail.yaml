@@ -1,0 +1,52 @@
+# See schema in factory_schema_config_task.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    # - /factory_schema_config_task
+
+name: DexterityTaskHammerDriveNail
+physics_engine: ${..physics_engine}
+full_experiment_name: ${.name}
+
+
+# needed for headless VR
+enableCameraSensors: True
+
+sim:
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    up_axis: "z"
+    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
+
+    disable_gravity: False
+
+env:
+    numEnvs: ${resolve_default:16384,${...num_envs}}
+    numObservations: 0  # overwritten depending on observations
+    observations: ['ik_body_pos', 'ik_body_quat', 'hammer_pos', 'hammer_quat', 'hand_bodies_pos', 'hand_bodies_pos_demo']
+    numActions: 0  # overwritten depending on robot configuration
+
+randomize:
+    hammer_pos_drop: [ 0.0, 0.0, 0.5 ]  # position from which hammer is dropped
+    hammer_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on hammer drop position
+    num_hammer_drop_steps: 150  # number of steps to drop hammers
+    workspace_extent_xy: [ [ -0.25, -0.25 ], [ 0.25, 0.25 ] ] # hammers that land outside the workspace will be dropped again
+
+    nail_pos_xy_initial: [ 0.4, 0.0 ]  # initial xy position of the hammer
+    nail_pos_xy_initial_noise: [ 0.05, 0.05 ]  # noise on initial hammer position
+
+    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
+    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
+    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+
+rl:
+    reward:
+        action_penalty: 0.0  # scale on action penalty
+        #fingertips_imitation_dist_penalty: 0.0  # scale on fingertips distance penalty to the pre-recorded pose.
+        hand_bodies_imitation_dist_penalty: 1.0  # scale on hand_bodies distance penalty to the pre-recorded pose.
+        nail_depth_reward: 10.0  # reward that scales with depth of the nail
+        success_bonus: 1000.0  # reward received upon reaching target depth
+    target_nail_depth: -0.09  # target depth that the nail should be driven to
+    max_episode_length: 450

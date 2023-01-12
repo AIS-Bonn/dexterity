@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<robot name="028_skillet_lid">
+  <link name="base_link">
+    <inertial>
+      <mass value="1.0" />
+      <origin xyz="0 0 0" />
+      <inertia  ixx="0.0002" ixy="0.0"  ixz="0.0"  iyy="0.0002"  iyz="0.0" izz="0.0002" />
+    </inertial>
+    <visual>
+      <geometry>
+        <mesh filename="../../meshes/ycb_video_models/centered/028_skillet_lid/textured.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../../meshes/ycb_video_models/centered/028_skillet_lid/textured.obj" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
+
+

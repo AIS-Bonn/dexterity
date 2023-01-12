@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="003_cracker_box">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/003_cracker_box/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="073-d_lego_duplo">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/073-d_lego_duplo/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

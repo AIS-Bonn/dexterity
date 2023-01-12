@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="010_potted_meat_can">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/010_potted_meat_can/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

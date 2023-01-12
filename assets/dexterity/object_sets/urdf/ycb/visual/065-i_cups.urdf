@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="065-i_cups">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/065-i_cups/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

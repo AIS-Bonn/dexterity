@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="071_nine_hole_peg_test">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/071_nine_hole_peg_test/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

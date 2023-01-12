@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="E4">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../../meshes/egad/eval/E4.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

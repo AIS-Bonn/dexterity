@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="036_wood_block">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/036_wood_block/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

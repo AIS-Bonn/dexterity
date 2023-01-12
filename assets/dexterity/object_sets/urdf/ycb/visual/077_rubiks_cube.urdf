@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="077_rubiks_cube">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/077_rubiks_cube/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

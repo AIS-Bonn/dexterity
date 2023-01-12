@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<robot name="071_nine_hole_peg_test">
+  <link name="base_link">
+    <inertial>
+      <mass value="0.15" />
+      <origin xyz="0 0 0" />
+      <inertia  ixx="0.0002" ixy="0.0"  ixz="0.0"  iyy="0.0002"  iyz="0.0" izz="0.0002" />
+    </inertial>
+    <visual>
+      <geometry>
+        <mesh filename="../../meshes/ycb_video_models/centered/071_nine_hole_peg_test/textured.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../../meshes/ycb_video_models/centered/071_nine_hole_peg_test/textured.obj" />
+      </geometry>
+    </collision>
+  </link>
+</robot>
+
+

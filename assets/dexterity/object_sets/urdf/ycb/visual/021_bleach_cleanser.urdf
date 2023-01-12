@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="021_bleach_cleanser">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/021_bleach_cleanser/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

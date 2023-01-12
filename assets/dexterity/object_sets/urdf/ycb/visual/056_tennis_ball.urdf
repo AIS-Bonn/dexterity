@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="056_tennis_ball">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/056_tennis_ball/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

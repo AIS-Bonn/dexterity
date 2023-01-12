@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="006_mustard_bottle">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/006_mustard_bottle/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

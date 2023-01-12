@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="002_master_chef_can">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/002_master_chef_can/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

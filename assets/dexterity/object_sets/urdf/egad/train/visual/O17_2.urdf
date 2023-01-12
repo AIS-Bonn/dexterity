@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="O17_2">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../../meshes/egad/train/O17_2.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

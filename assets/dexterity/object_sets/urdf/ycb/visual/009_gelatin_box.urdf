@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<robot name="009_gelatin_box">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../../../meshes/ycb_video_models/centered/009_gelatin_box/textured.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>
