@@ -46,6 +46,7 @@ if os.path.isdir(openvr_lib_dir):
         )])
 else:
     EXTENSIONS = []
+    import warnings
     warnings.warn("Path to OpenVR not found. Installing dexterity without teleoperation functionality.")
 
 
