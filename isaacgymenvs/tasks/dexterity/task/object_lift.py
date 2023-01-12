@@ -144,7 +144,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
                     1, keypoint_pos.shape[1], 1)
                 keypoint_dist = torch.norm(
                     keypoint_pos - object_pos_expanded, dim=-1).mean(1)
-                reward = hyperbole_rew(scale, keypoint_dist, c=0.1, pow=1)
+                reward = hyperbole_rew(scale, keypoint_dist, c=0.04, pow=1)
 
             # Penalize large actions
             elif reward_term == 'action_penalty':
@@ -155,19 +155,14 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
             elif reward_term == 'object_lift_off_reward':
                 reward = \
                     hyperbole_rew(
-                        scale, delta_lift_off_height, c=0.02, pow=1) - \
+                        scale, delta_lift_off_height, c=0.04, pow=1) - \
                     hyperbole_rew(
                         scale, torch.ones_like(delta_lift_off_height) *
-                               self.cfg_task.rl.lift_off_height, c=0.02, pow=1)
+                               self.cfg_task.rl.lift_off_height, c=0.04, pow=1)
 
             # Reward the height progress of the object towards target height
             elif reward_term == 'object_target_reward':
-                reward = \
-                    hyperbole_rew(
-                        scale, delta_target_height, c=0.05, pow=1) - \
-                    hyperbole_rew(
-                        scale, torch.ones_like(delta_target_height) *
-                               self.cfg_task.rl.target_height, c=0.05, pow=1)
+                reward = scale * (object_height - object_height_initial)
 
             # Reward reaching the target height
             elif reward_term == 'success_bonus':

@@ -46,9 +46,9 @@ rl:
         action_penalty: 0.0  # scale on action penalty
         fingertips_dist_penalty: 0.05  # scale on fingertip distance penalty
         object_lift_off_reward: 0.25  # scale on object lift-off progress reward
-        object_target_reward: 0.25  # scale on object target progress reward
+        object_target_reward: 25  # scale on object target progress reward
         success_bonus: 1000.0  # reward received upon reaching target height
-    lift_off_height: 0.125  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+    lift_off_height: 0.1  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_height: 0.4  # target height for the object in meters
     max_episode_length: 450
 
