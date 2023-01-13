@@ -30,3 +30,5 @@ runs/
 outputs/
 *.hydra*
 /isaacgymenvs/wandb
+/build
+*.so
