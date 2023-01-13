@@ -215,7 +215,8 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
 
                 keypoint_dist_demo = torch.sum(torch.norm(
                     keypoint_pos - keypoint_pos_demo, dim=2), dim=1)
-                reward = -keypoint_dist_demo * scale
+                reward = hyperbole_rew(
+                        scale, keypoint_dist_demo, c=0.05, pow=1)
 
             # Penalize large actions
             elif reward_term == 'action_penalty':
@@ -248,7 +249,6 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
             self.rew_buf[:] += reward
             reward_dict[reward_term] = reward.mean()
         self.log(reward_dict)
-        #print("reward_dict:", reward_dict)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
