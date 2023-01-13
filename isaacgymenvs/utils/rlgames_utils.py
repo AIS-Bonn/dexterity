@@ -147,6 +147,51 @@ class RLGPUAlgoObserver(AlgoObserver):
             self.writer.add_scalar('scores/iter', mean_scores, epoch_num)
             self.writer.add_scalar('scores/time', mean_scores, total_time)
 
+        if hasattr(self.algo.vec_env.env, "log_data"):
+            for k, v in self.algo.vec_env.env.log_data.items():
+                self.log(k + '/frame', v, frame)
+                self.log(k + '/iter', v, epoch_num)
+                self.log(k + '/time', v, total_time)
+
+            # clear dict of values to log
+            self.algo.vec_env.env.log_data = {}
+
+    def log(self, k, v, step):
+        if isinstance(v, torch.Tensor):
+            v = v.cpu().numpy()
+
+        if self.isscalar(v):
+            self.writer.add_scalar(k, v, step)
+        elif self.ishistogram(v):
+            self.writer.add_histogram(k, v, step)
+        elif self.isimage(v):
+            self.writer.add_image(k, v, step)
+        elif self.isvideo(v):
+            self.writer.add_video(k, np.expand_dims(v, 1), step)
+
+    def isscalar(self, v) -> bool:
+        if isinstance(v, float) or isinstance(v, int):
+            return True
+        elif isinstance(v, np.ndarray):
+            if len(v.shape) == 0 or (len(v.shape) == 1 and v.shape[0] == 1):
+                return True
+        return False
+
+    def ishistogram(self, v) -> bool:
+        if isinstance(v, np.ndarray) and len(v.shape) == 1:
+            return True
+        return False
+
+    def isimage(self, v) -> bool:
+        if isinstance(v, np.ndarray) and len(v.shape) == 3:
+            return True
+        return False
+
+    def isvideo(self, v) -> bool:
+        if isinstance(v, np.ndarray) and len(v.shape) == 4:
+            return True
+        return False
+
 
 class RLGPUEnv(vecenv.IVecEnv):
     def __init__(self, config_name, num_actors, **kwargs):
