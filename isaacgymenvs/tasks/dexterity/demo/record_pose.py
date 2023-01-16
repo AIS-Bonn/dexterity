@@ -142,14 +142,22 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
     obs = env.reset()
     act = torch.zeros((1, env.cfg["env"]["numActions"])).to(env.device)
     relative_keypoints = {}
-    while not done:
+    while True:
         global space_pressed
         if space_pressed:
+            relative_ik_body_pos_in_world_coordinates = env.ik_body_pos[0] - getattr(env, tool_name + "_pos").clone()[0]
+            relative_ik_body_pos_in_tool_coordinates = quat_rotate_inverse(
+                getattr(env, tool_name + '_quat'),
+                relative_ik_body_pos_in_world_coordinates)
+
+            relative_ik_body_quat = quat_mul(quat_conjugate(getattr(env, tool_name + '_quat')), env.ik_body_quat)
+
             np_save_dict = {
-                f"{tool_name}_pos": getattr(env, tool_name + "_pos").cpu().numpy(),
-                f"{tool_name}_quat": getattr(env, tool_name + "_quat").cpu().numpy(),
-                "ik_body_pos": env.ik_body_pos.cpu().numpy(),
-                "ik_body_quat": env.ik_body_quat.cpu().numpy()
+                f"{tool_name}_pos": getattr(env, tool_name + "_pos").cpu().numpy()[0],
+                f"{tool_name}_quat": getattr(env, tool_name + "_quat").cpu().numpy()[0],
+                "ik_body_pos": relative_ik_body_pos_in_tool_coordinates.cpu().numpy()[0],
+                "ik_body_quat": relative_ik_body_quat.cpu().numpy()[0],
+                "residual_actuated_dof_pos": env.dof_pos[0, env.residual_actuated_dof_indices]
             }
 
             for keypoint_group in env.keypoint_dict.keys():

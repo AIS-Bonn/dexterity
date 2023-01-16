@@ -37,7 +37,7 @@ Configuration defined in DexterityEnvDrill.yaml.
 import hydra
 import numpy as np
 import os
-import torch
+from isaacgym.torch_utils import *
 from typing import *
 
 from isaacgym import gymapi
@@ -45,6 +45,153 @@ from isaacgymenvs.tasks.dexterity.base.base import DexterityBase
 from isaacgymenvs.tasks.dexterity.env.schema_class_env import DexterityABCEnv
 from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
     DexteritySchemaConfigEnv
+
+from urdfpy import URDF
+import trimesh
+
+
+class DexterityTool:
+    """Helper class that wraps tool assets to make information about the
+    geometry, etc. more easily available."""
+    def __init__(self, gym, sim, asset_root, asset_file,
+                 cfg_robot: List[str]) -> None:
+        self._gym = gym
+        self._asset_root = asset_root
+        self._asset_file = asset_file
+        self._cfg_robot = cfg_robot
+
+        # Load default asset options
+        self._asset_options = gymapi.AssetOptions()
+        self._asset_options.override_com = True
+        self._asset_options.override_inertia = True
+        self._asset_options.vhacd_enabled = True  # Enable convex decomposition
+        self._asset_options.vhacd_params = gymapi.VhacdParams()
+        self._asset_options.vhacd_params.resolution = 1000000
+
+        # Create IsaacGym asset
+        self._asset = gym.load_asset(sim, asset_root, asset_file,
+                                     self._asset_options)
+
+        # Set object name based on asset file name
+        self.name = asset_file.split('/')[-1].split('.')[0]
+
+        # Initialize information about geometry
+        self._urdf = URDF.load(os.path.join(asset_root, asset_file))
+        self._collision_mesh = trimesh.util.concatenate(
+            [link.collision_mesh for link in self._urdf.links])
+
+        # Initialize corresponding demo_pose
+        self._demo_pose = self._generalize_demo_pose(keypoints='hand_bodies')
+
+        import time
+        time.sleep(1000)
+
+    def _generalize_demo_pose(self, keypoints: str):
+        # Load manipulator model and canonical demo pose
+        manipulator_model = self._load_manipulator_model()
+        canonical_demo_pose_dict = np.load(
+            os.path.join(
+                self._asset_root, 'canonical',
+                manipulator_model.manipulator.model_name + '_demo_pose.npz'))
+        canonical_demo_pose = canonical_demo_pose_dict[keypoints + '_pos'][0]
+        canonical_ik_body_pos = canonical_demo_pose_dict['ik_body_pos']
+        canonical_ik_body_quat = canonical_demo_pose_dict['ik_body_quat']
+
+
+        ik_body_quat = torch.from_numpy(canonical_ik_body_quat).unsqueeze(0)
+        to_mujoco = torch.Tensor([[0.707, 0.707, 0, 0]])
+        to_mujoco = torch.Tensor([[0, 0, 0.707, 0.707]])
+        to_mujoco = torch.Tensor([[0.707, -0.707, 0, 0]])
+
+        ik_body_quat_mujoco = quat_mul(ik_body_quat, to_mujoco)[0].numpy()
+
+        canonical_ik_body_pos_mujoco = np.array(
+            [canonical_ik_body_pos[1], canonical_ik_body_pos[0], canonical_ik_body_pos[2]]
+        )
+
+        canonical_ik_body_quat_mujoco = np.array(
+            [ik_body_quat_mujoco[3], ik_body_quat_mujoco[0],
+             ik_body_quat_mujoco[1], ik_body_quat_mujoco[2]])
+
+        print("canonocal_demo_pose:", canonical_demo_pose)
+
+        print("canonical_ik_body_pos:", canonical_ik_body_pos)
+        print("canonical_ik_body_quat:", canonical_ik_body_quat)
+
+        print("canonical_ik_body_quat_mujoco:", canonical_ik_body_quat_mujoco)
+
+        print("drill_quat:", canonical_demo_pose_dict['drill_quat'])
+
+
+
+        manipulator_model.model.add_sites(canonical_demo_pose)
+        manipulator_model.model.add_mocap()
+        manipulator_model.model.add_freejoint()
+
+        # Create MuJoCo simulation
+        import mujoco
+        import mujoco_viewer
+        with manipulator_model.model.as_xml('./robot_drill_test.xml'):
+            model = mujoco.MjModel.from_xml_path('./robot_drill_test.xml')
+
+
+        data = mujoco.MjData(model)
+        viewer = mujoco_viewer.MujocoViewer(model, data)
+        print(dir(data))
+
+        while True:
+            if viewer.is_alive:
+                print("data.mocap_pos:", data.mocap_pos)
+                print("data.mocap_quat:", data.mocap_quat)
+                data.mocap_pos[0] = canonical_ik_body_pos_mujoco
+                data.mocap_quat[0] = canonical_ik_body_quat_mujoco
+                mujoco.mj_step(model, data)
+                viewer.render()
+            else:
+                break
+
+        # IK BODY POSE AND QUAT MUST ALSO BE RECORDED RELATIVE TO THE TOOL!!!
+        viewer.close()
+
+        import time
+        time.sleep(1000)
+
+    def _load_manipulator_model(self):
+        from isaacgymenvs.tasks.dexterity.xml.robot import DexterityRobot
+        model_root = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), '../..', '..', '..',
+                         'assets', 'dexterity'))
+        return DexterityRobot(model_root, self._cfg_robot[1:])
+
+    @property
+    def asset(self):
+        return self._asset
+
+    @property
+    def asset_options(self) -> gymapi.AssetOptions:
+        return self._asset_options
+
+    @asset_options.setter
+    def asset_options(self, asset_options: gymapi.AssetOptions) -> None:
+        self._asset_options = asset_options
+
+    @property
+    def rigid_body_count(self) -> int:
+        return self._gym.get_asset_rigid_body_count(self._asset)
+
+    @property
+    def rigid_shape_count(self) -> int:
+        return self._gym.get_asset_rigid_shape_count(self._asset)
+
+    @property
+    def start_pose(self) -> gymapi.Transform:
+        start_pose = gymapi.Transform()
+        start_pose.p = gymapi.Vec3(0, 0, 0.5)
+        return start_pose
+
+    def sample_pointcloud(self, count: int = 1024) -> np.ndarray:
+        return np.ndarray(trimesh.sample.sample_surface(
+            self._collision_mesh, count=count)[0]).astype(np.float)
 
 
 class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
@@ -115,6 +262,7 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
 
         drill_assets, drill_site_assets = [], []
         for asset_file in asset_files:
+            drill = DexterityTool(self.gym, self.sim, asset_root, asset_file, self.cfg_base.env.robot)
             drill_asset = self.gym.load_asset(self.sim, asset_root, asset_file,
                                               asset_options)
             drill_assets.append(drill_asset)

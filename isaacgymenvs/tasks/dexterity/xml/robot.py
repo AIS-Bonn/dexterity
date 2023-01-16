@@ -30,8 +30,8 @@ class DexterityRobot(DexterityABCRobot):
         self.robot_types = [m.robot_type for m in self.xml_assets]
         assert len(set(self.robot_types)) == len(self.robot_types), \
             f"Duplicate robot types in {self.robot_types}."
-        assert "arm" in self.robot_types, \
-            f"'arm' should be in robot types {self.robot_types}."
+        #assert "arm" in self.robot_types, \
+        #    f"'arm' should be in robot types {self.robot_types}."
 
         # Set robot models as class attributes for easier access to properties
         for i, robot_type in enumerate(self.robot_types):

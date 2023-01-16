@@ -532,3 +532,38 @@ class DexterityXML(DexterityABCXML):
 
             # Set file path to local copy
             asset_node.set("file", local_file_name)
+
+    def add_sites(self, site_pos: List, rgba: str = '1 1 0 0.8') -> None:
+        for pos in site_pos:
+            site = ET.SubElement(self.worldbody, 'site')
+            with np.printoptions(precision=8):
+                site.set('name', str(pos))
+                site.set('pos', str(pos)[1:-1])
+            site.set('rgba', rgba)
+
+    def add_mocap(self, name: str = 'mocap', target_body: str = 'tracker') -> None:
+        mocap_body = ET.SubElement(self.worldbody, 'body')
+        mocap_body.set('name', name)
+        mocap_body.set('mocap', 'true')
+        mocap_body.set('pos', '0 0 0')
+
+        weld_equality = ET.SubElement(self.equality, 'weld')
+        weld_equality.set('body1', name)
+        weld_equality.set('body2', target_body)
+        weld_equality.set('solimp', '0.9 0.95 0.001')
+        weld_equality.set('solref', '0.02 1')
+
+    def add_freejoint(self) -> None:
+        bodies = [body for body in self.worldbody.iter('body')]
+        root_body = bodies[0]
+        freejoint = ET.SubElement(root_body, 'freejoint')
+
+        home_qpos = self._findall_rec(
+            node=self.keyframe, tags="key",
+            attribs={"name": "home"}, return_first=True)
+        home_qpos.set('qpos', "0 0 0 1 0 0 0 " + home_qpos.attrib["qpos"])
+
+        initial_qpos = self._findall_rec(
+            node=self.keyframe, tags="key",
+            attribs={"name": "initial"}, return_first=True)
+        initial_qpos.set('qpos', "0 0 0 1 0 0 0 " + initial_qpos.attrib["qpos"])
