@@ -383,11 +383,18 @@ class VRVecTask:
             dtype=torch.float32).unsqueeze(0)
 
         # unscale residual_dof_actions as they are scaled when generating the control targets
-        residual_dof_actions = unscale(
+        residual_dof_actions = torch.clamp(unscale(
             residual_dof_actions, self.residual_dof_lower_limits,
-            self.residual_dof_upper_limits)
+            self.residual_dof_upper_limits), min=-1, max=1)
 
-        return torch.clamp(residual_dof_actions, -1, 1)
+        #print("residual_dof_actions:", residual_dof_actions)
+
+        if self.cfg_base.ctrl.relative_residual_actions:
+            residual_dof_actions = torch.clamp(
+                (residual_dof_actions - self.ctrl_target_residual_actuated_dof_pos) /
+                (self.cfg_base.sim.dt * self.cfg_base.ctrl.relative_residual_target_change_scale),
+            min=-1, max=1)
+        return residual_dof_actions
 
 
 

@@ -121,8 +121,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def _update_observation_num(self, cfg):
         self.keypoint_dict = self.robot.model.get_keypoints()
-        num_observations = 0
 
+        num_observations = 0
         for observation in cfg['env']['observations']:
             # Infer general type of observation (e.g. position or quaternion)
             if observation.endswith('_pos') or \
@@ -135,6 +135,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 obs_dim = 3
             elif observation.endswith('_angvel'):
                 obs_dim = 3
+            # Previous action can be included in the observation. obs_dim is
+            # then the dimension of the action-space of the robot.
+            elif observation == 'previous_action':
+                obs_dim = cfg["env"]["numActions"]
             else:
                 # Assume other observations must be camera sensors and can
                 # therefore be skipped
@@ -447,6 +451,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
             actions = torch.clamp(actions, -1, 1)
 
+            actions[:, 6] = 0.05
+
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(env_ids) > 0:
             self.reset_idx(env_ids)
@@ -503,6 +509,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             # Flatten body dimension for keypoint observations
             if observation.startswith(tuple(self.keypoint_dict.keys())):
                 obs_tensors.append(getattr(self, observation).flatten(1, 2))
+            elif observation == "previous_action":
+                obs_tensors.append(self.actions)
             else:
                 obs_tensors.append(getattr(self, observation))
 
@@ -816,6 +824,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.ctrl_target_dof_pos[env_ids] = \
             self.dof_pos[env_ids, :self.robot_dof_count]
 
+        # Reset target joint pos of residual joints. Necessary when relative
+        # control is used for those joints.
+        self.ctrl_target_residual_actuated_dof_pos[env_ids, :] = 0.
+
         if apply_reset:
             multi_env_ids_int32 = self.robot_actor_ids_sim[env_ids].flatten()
             self.gym.set_dof_state_tensor_indexed(
@@ -890,7 +902,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         else:
             assert False
 
-        self.ctrl_target_residual_actuated_dof_pos = residual_dof_actions
+        # Action refers to relative change in target joint angles: j_{t+1}^{target} = j_{t}^{target} + a+t * \delta t * c_{rel_change_scale}.
+        # Note that j_t refers to the joint control space in the [-1, 1] interval and is not in
+        # rad yet. Conversion to the proper bounds happens later.
+        if self.cfg_base.ctrl.relative_residual_actions:
+            self.ctrl_target_residual_actuated_dof_pos += \
+                residual_dof_actions * self.cfg_base.sim.dt * \
+                self.cfg_base.ctrl.relative_residual_target_change_scale
+
+            self.ctrl_target_residual_actuated_dof_pos = torch.clamp(
+                self.ctrl_target_residual_actuated_dof_pos, min=-1, max=1)
+
+        # Action refers to absolute target joint angles: j_{t+1}^{target} = a_t
+        else:
+            self.ctrl_target_residual_actuated_dof_pos = residual_dof_actions
 
         # Target poses can be set in base config, i.e., to test inv. kinematics
         if self.cfg_base.debug.override_target_pose:
@@ -935,9 +960,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             while start_time[current_dof_pos_idx] > elapsed_time_steps:
                 current_dof_pos_idx -= 1
 
-            self.ctrl_target_residual_actuated_dof_pos = torch.Tensor(
-                target_dof_pos[current_dof_pos_idx]).unsqueeze(0).repeat(
-                self.num_envs, 1).to(self.device)
+            if self.cfg_base.ctrl.relative_residual_actions:
+                self.ctrl_target_residual_actuated_dof_pos += \
+                    torch.Tensor(target_dof_pos[current_dof_pos_idx]).unsqueeze(
+                        0).repeat(self.num_envs, 1).to(self.device) * \
+                    self.cfg_base.sim.dt * \
+                    self.cfg_base.ctrl.relative_residual_target_change_scale
+
+                self.ctrl_target_residual_actuated_dof_pos = torch.clamp(
+                    self.ctrl_target_residual_actuated_dof_pos, min=-1, max=1)
+
+            else:
+                self.ctrl_target_residual_actuated_dof_pos = torch.Tensor(
+                    target_dof_pos[current_dof_pos_idx]).unsqueeze(0).repeat(
+                    self.num_envs, 1).to(self.device)
 
         self.generate_ctrl_signals()
 

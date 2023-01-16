@@ -10,7 +10,7 @@ mode:
 
 sim:
     dt: 0.016667
-    num_substeps: 4  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
+    num_substeps: 2  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
     num_pos_iters: 16
     num_vel_iters: 0
     gravity_mag: 9.81
@@ -38,7 +38,7 @@ ctrl:
         residual_deriv_gain: 1
     gym_default:
         ik_method: dls
-        ik_prop_gain:  120
+        ik_prop_gain: 120
         ik_deriv_gain: 25
         residual_prop_gain: 10
         residual_deriv_gain: 2
@@ -58,6 +58,9 @@ ctrl:
 
     clamp_rot: True
     clamp_rot_thresh: 1.0e-6
+
+    relative_residual_actions: True  # Whether the actions for the hand joint targets (e.g. finger movements) refer to the absolute target or are added to the current target.
+    relative_residual_target_change_scale: 5.0
 
 debug:
     override_target_pose: False
