@@ -5,7 +5,7 @@
         <default class="right_hand">
             <mesh scale="0.001 0.001 0.001"/>
             <joint axis="1 0 0" damping="0.1" armature="0.01"/>
-            <position kp="200" forcerange="-5 5"/>
+            <position kp="5" forcerange="-5 5"/>
 
             <!-- default joint and actuator attributes -->
             <default class="thumb_rotating">
