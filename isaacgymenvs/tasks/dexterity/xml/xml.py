@@ -88,6 +88,78 @@ class DexterityXML(DexterityABCXML):
             node=self.worldbody, tags="body", return_first=False)
         return [b.attrib['name'] for b in bodies]
 
+    def bodies_as_trimesh(self) -> Dict[str, Any]:
+        import trimesh
+        with self.as_xml('tmp_trimesh_collision_mesh_export.xml'):
+            tmp_tree = ET.parse('tmp_trimesh_collision_mesh_export.xml')
+            tmp_root = tmp_tree.getroot()
+            tmp_worldbody = tmp_root.find('worldbody')
+            tmp_asset = tmp_root.find('asset')
+            geoms = self._findall_rec(
+                node=tmp_worldbody, tags="geom",
+                attribs={"type": "mesh"},
+                return_first=False)
+
+            visual_geoms, collision_geoms = [], []
+            for geom in geoms:
+                if all(k in geom.keys() for k in ["conaffinity", "contype"]):
+                    if geom.attrib["contype"] == "0" and \
+                            geom.attrib["conaffinity"] == "0":
+                        visual_geoms.append(geom)
+                        continue
+
+                collision_geoms.append(geom)
+
+            body_trimeshes = {}
+            for geom in visual_geoms:
+                parent_body = tmp_worldbody.find(
+                    f".//geom[@mesh='{geom.attrib['mesh']}']..")
+                if parent_body.attrib['name'] not in body_trimeshes.keys():
+                    body_trimeshes[parent_body.attrib['name']] = \
+                        {"visual": [], "collision": []}
+                mesh = self._findall_rec(
+                    node=tmp_asset, tags="mesh",
+                    attribs={"name": geom.attrib['mesh']}, return_first=True)
+                body_trimesh = trimesh.load_mesh(
+                        ".dexterity_xml_model_meshes/" + mesh.attrib['file'])
+                if "scale" in mesh.keys():
+                    body_trimesh.apply_scale(
+                        [float(x) for x in mesh.attrib['scale'].split(" ")])
+
+                if "pos" in geom.keys():
+                    pos_offset = np.array(
+                        [float(x) for x in geom.attrib['pos'].split(" ")])
+                else:
+                    pos_offset = np.array([0, 0, 0])
+                body_trimeshes[parent_body.attrib['name']]['visual'].append(
+                    {"trimesh": body_trimesh,
+                     "pos_offset": pos_offset})
+
+            for geom in collision_geoms:
+                parent_body = tmp_worldbody.find(
+                    f".//geom[@mesh='{geom.attrib['mesh']}']..")
+                if parent_body.attrib['name'] not in body_trimeshes.keys():
+                    body_trimeshes[parent_body.attrib['name']] = \
+                        {"visual": [], "collision": []}
+                mesh = self._findall_rec(
+                    node=tmp_asset, tags="mesh",
+                    attribs={"name": geom.attrib['mesh']}, return_first=True)
+                body_trimesh = trimesh.load_mesh(
+                    ".dexterity_xml_model_meshes/" + mesh.attrib['file'])
+                if "scale" in mesh.keys():
+                    body_trimesh.apply_scale(
+                        [float(x) for x in mesh.attrib['scale'].split(" ")])
+
+                if "pos" in geom.keys():
+                    pos_offset = np.array(
+                        [float(x) for x in geom.attrib['pos'].split(" ")])
+                else:
+                    pos_offset = np.array([0, 0, 0])
+                body_trimeshes[parent_body.attrib['name']]['collision'].append(
+                    {"trimesh": body_trimesh,
+                     "pos_offset": pos_offset})
+        return body_trimeshes
+
     def get_keypoints(self):
         parent_map = {c: p for p in self.worldbody.iter() for c in p}
         sites = self._findall_rec(
@@ -541,11 +613,25 @@ class DexterityXML(DexterityABCXML):
                 site.set('pos', str(pos)[1:-1])
             site.set('rgba', rgba)
 
-    def add_mocap(self, name: str = 'mocap', target_body: str = 'tracker') -> None:
+    def add_mocap(self, pos, quat, name: str = '__mocap__', target_body: str = 'tracker') -> None:
+        tracker_body = self._findall_rec(
+            node=self.worldbody, tags="body",
+            attribs={"name": "tracker"}, return_first=True)
+
         mocap_body = ET.SubElement(self.worldbody, 'body')
         mocap_body.set('name', name)
         mocap_body.set('mocap', 'true')
-        mocap_body.set('pos', '0 0 0')
+        with np.printoptions(precision=8):
+            mocap_body.set('pos', str(pos)[1:-1])
+            mocap_body.set('quat', str(quat)[1:-1])
+
+        mocap_visual = ET.SubElement(mocap_body, 'geom')
+        mocap_visual.set('type', 'box')
+        mocap_visual.set('size', '0.02 0.02 0.04')
+        mocap_visual.set('group', '2')
+        mocap_visual.set('rgba', '1 0.7 0 0.8')
+        mocap_visual.set('contype', '0')
+        mocap_visual.set('conaffinity', '0')
 
         weld_equality = ET.SubElement(self.equality, 'weld')
         weld_equality.set('body1', name)

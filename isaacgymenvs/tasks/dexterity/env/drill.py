@@ -48,6 +48,9 @@ from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
 
 from urdfpy import URDF
 import trimesh
+import mujoco
+import mujoco_viewer
+from scipy.spatial.transform import Rotation as R
 
 
 class DexterityTool:
@@ -75,83 +78,165 @@ class DexterityTool:
         # Set object name based on asset file name
         self.name = asset_file.split('/')[-1].split('.')[0]
 
-        # Initialize information about geometry
+        # Initialize information about tool geometry and canonical geometry
         self._urdf = URDF.load(os.path.join(asset_root, asset_file))
         self._collision_mesh = trimesh.util.concatenate(
             [link.collision_mesh for link in self._urdf.links])
 
+        self._canonical_urdf = URDF.load(
+            os.path.join(asset_root, 'canonical/canonical.urdf'))
+        self._canonical_collision_mesh = trimesh.util.concatenate(
+            [link.collision_mesh for link in self._canonical_urdf.links])
+
         # Initialize corresponding demo_pose
         self._demo_pose = self._generalize_demo_pose(keypoints='hand_bodies')
 
-        import time
-        time.sleep(1000)
-
     def _generalize_demo_pose(self, keypoints: str):
-        # Load manipulator model and canonical demo pose
+        # Load manipulator model
         manipulator_model = self._load_manipulator_model()
-        canonical_demo_pose_dict = np.load(
-            os.path.join(
+
+        # Load the demonstration (for the manipulator used) for the canonical
+        # tool
+        canonical_demo_path = os.path.join(
                 self._asset_root, 'canonical',
-                manipulator_model.manipulator.model_name + '_demo_pose.npz'))
-        canonical_demo_pose = canonical_demo_pose_dict[keypoints + '_pos'][0]
-        canonical_ik_body_pos = canonical_demo_pose_dict['ik_body_pos']
-        canonical_ik_body_quat = canonical_demo_pose_dict['ik_body_quat']
+                manipulator_model.manipulator.model_name + '_demo_pose.npz')
+        assert os.path.isfile(canonical_demo_path), \
+            f"Tried to load canonical demo pose for " \
+            f"{manipulator_model.manipulator.model_name}, but " \
+            f"{canonical_demo_path} was not found."
+        canonical_demo_pose_dict = np.load(canonical_demo_path)
+
+        canonical_keypoint_pos = canonical_demo_pose_dict[keypoints + '_pos'][0]
+        canonical_keypoint_quat = canonical_demo_pose_dict[keypoints + '_quat'][0]
+        canonical_ik_body_pos = canonical_demo_pose_dict['ik_body_pos'][0]
+        canonical_ik_body_quat = canonical_demo_pose_dict['ik_body_quat'][0]
+        canonical_ctrl = canonical_demo_pose_dict['residual_actuated_dof_pos'][
+            0]
+
+        # No need to generalize pose for canonical model, for which the original
+        # demonstration has been recorded
+        if self._asset_file == 'canonical/canonical.urdf':
+            return canonical_keypoint_pos
 
 
-        ik_body_quat = torch.from_numpy(canonical_ik_body_quat).unsqueeze(0)
-        to_mujoco = torch.Tensor([[0.707, 0.707, 0, 0]])
-        to_mujoco = torch.Tensor([[0, 0, 0.707, 0.707]])
-        to_mujoco = torch.Tensor([[0.707, -0.707, 0, 0]])
-
-        ik_body_quat_mujoco = quat_mul(ik_body_quat, to_mujoco)[0].numpy()
-
-        canonical_ik_body_pos_mujoco = np.array(
-            [canonical_ik_body_pos[1], canonical_ik_body_pos[0], canonical_ik_body_pos[2]]
-        )
-
+        # Convert pose of ik_body to MuJoCo
+        canonical_ik_body_pos_mujoco = canonical_ik_body_pos
+        # Reorder to match [w, x, y, z] quaternion convention of MuJoCo
         canonical_ik_body_quat_mujoco = np.array(
-            [ik_body_quat_mujoco[3], ik_body_quat_mujoco[0],
-             ik_body_quat_mujoco[1], ik_body_quat_mujoco[2]])
+            [canonical_ik_body_quat[3], canonical_ik_body_quat[0],
+             canonical_ik_body_quat[1], canonical_ik_body_quat[2]])
 
-        print("canonocal_demo_pose:", canonical_demo_pose)
+        mj_model = self._create_mujoco_model(manipulator_model,
+                                             canonical_keypoint_pos)
+        data = mujoco.MjData(mj_model)
+        viewer = mujoco_viewer.MujocoViewer(mj_model, data)
 
-        print("canonical_ik_body_pos:", canonical_ik_body_pos)
-        print("canonical_ik_body_quat:", canonical_ik_body_quat)
+        sim_step = 0
+        # Move to canonical pose first
+        while sim_step < 512:
+            self._set_ik_body_pose(data, canonical_ik_body_pos_mujoco,
+                                   canonical_ik_body_quat_mujoco)
+            # Set control pose to canonical control pose
+            data.ctrl = canonical_ctrl
+            mujoco.mj_step(mj_model, data)
+            sim_step += 1
+            viewer.render()
 
-        print("canonical_ik_body_quat_mujoco:", canonical_ik_body_quat_mujoco)
-
-        print("drill_quat:", canonical_demo_pose_dict['drill_quat'])
-
-
-
-        manipulator_model.model.add_sites(canonical_demo_pose)
-        manipulator_model.model.add_mocap()
-        manipulator_model.model.add_freejoint()
-
-        # Create MuJoCo simulation
-        import mujoco
-        import mujoco_viewer
-        with manipulator_model.model.as_xml('./robot_drill_test.xml'):
-            model = mujoco.MjModel.from_xml_path('./robot_drill_test.xml')
-
-
-        data = mujoco.MjData(model)
-        viewer = mujoco_viewer.MujocoViewer(model, data)
-        print(dir(data))
-
-        while True:
-            if viewer.is_alive:
-                print("data.mocap_pos:", data.mocap_pos)
-                print("data.mocap_quat:", data.mocap_quat)
-                data.mocap_pos[0] = canonical_ik_body_pos_mujoco
-                data.mocap_quat[0] = canonical_ik_body_quat_mujoco
-                mujoco.mj_step(model, data)
-                viewer.render()
-            else:
-                break
-
-        # IK BODY POSE AND QUAT MUST ALSO BE RECORDED RELATIVE TO THE TOOL!!!
         viewer.close()
+
+        # Export coordinates of rigid bodies, so the corresponding meshes can be
+        # loaded in trimesh
+        manipulator_rigid_body_poses = {}
+        for body_name in manipulator_model.model.body_names:
+            manipulator_rigid_body_poses[body_name] = {}
+            manipulator_rigid_body_poses[body_name]["pos"] = data.body(body_name).xpos
+            manipulator_rigid_body_poses[body_name]["quat"] = data.body(
+                body_name).xquat
+
+        # Sample point clouds for this tool and the canonical tool
+        canonical_points = self.sample_canonical_pointcloud()
+        tool_points = self.sample_pointcloud()
+
+        # Create trimesh scene
+        scene = trimesh.scene.Scene()
+
+        # Add canonical and tool point cloud to scene
+        scene.add_geometry(canonical_points)
+        scene.add_geometry(tool_points)
+
+        # Add manipulator meshes to scene
+        for body_name, body_meshes in self._manipulator_bodies_trimesh.items():
+            for body_collision_mesh in body_meshes["collision"]:
+                body_offset_torch = torch.from_numpy(body_collision_mesh['pos_offset']).unsqueeze(0).to(torch.float32)
+                body_quat = torch.Tensor(
+                    [[manipulator_rigid_body_poses[body_name]['quat'][1],
+                      manipulator_rigid_body_poses[body_name]['quat'][2],
+                      manipulator_rigid_body_poses[body_name]['quat'][3],
+                      manipulator_rigid_body_poses[body_name]['quat'][0]]])
+                body_offset = quat_apply(body_quat, body_offset_torch)[
+                    0].numpy()
+
+                transform = self.transformation_matrix(
+                    manipulator_rigid_body_poses[body_name][
+                        'pos'] + body_offset,
+                    manipulator_rigid_body_poses[body_name]['quat'])
+                scene.add_geometry(body_collision_mesh["trimesh"], transform=transform)
+
+        # Add markers for the keypoints to the scene
+        for keypoint_idx in range(canonical_keypoint_pos.shape[0]):
+            pos = canonical_keypoint_pos[keypoint_idx]
+            quat = canonical_keypoint_quat[keypoint_idx]
+            transform = self.transformation_matrix(pos, quat)
+            axis_marker = trimesh.creation.axis(
+                transform=transform, origin_size=0.002,
+                axis_radius=0.001, axis_length=0.025)
+            scene.add_geometry(axis_marker)
+
+        from trimesh import viewer
+        viewer = viewer.SceneViewer(scene)
+
+        # Deform template (canonical) point cloud to match the data (point cloud
+        # of this tool)
+        def registration_callback(**kwargs):
+            print("iteration:", kwargs['iteration'])
+            print("error:", kwargs['error'])
+            count = 4096
+            colors = np.array([[255, 0, 100, 255]]).repeat(count, axis=0)
+            deformed_canonical_points = trimesh.points.PointCloud(kwargs['Y'], colors=colors)
+
+            scene = trimesh.scene.Scene()
+
+            # Add canonical and tool point cloud to scene
+            scene.add_geometry(canonical_points)
+            scene.add_geometry(tool_points)
+            scene.add_geometry(deformed_canonical_points)
+            from trimesh import viewer
+            viewer = viewer.SceneViewer(scene)
+
+        from pycpd import DeformableRegistration, RigidRegistration
+
+        use_rigid_registration = False
+        if use_rigid_registration:
+            reg = RigidRegistration(X=np.array(tool_points.vertices),
+                                    Y=np.array(canonical_points.vertices))
+        else:
+            reg = DeformableRegistration(X=np.array(tool_points.vertices),
+                                         Y=np.array(canonical_points.vertices))
+
+        registration_callback(iteration=0, error=0,
+                              Y=np.array(canonical_points.vertices))
+
+        TY, registration_params = reg.register(callback=registration_callback)
+
+        # TODO: Adjust parameters for non-rigid registration
+
+        # TODO: Apply the same transformation that the point-cloud undergoes to the canonical demo keypoints and visualize them in the callback
+
+        # TODO: Write an optimizer that adjusts the ik_body pose and controls to best match these new keypoints
+
+        # TODO: Take the keypoints from the MuJoCo model after the last optimization step as the generalized grasp pose
+
+        # TODO: Potentially add regularizers, such as point cloud intersection, etc.
 
         import time
         time.sleep(1000)
@@ -161,7 +246,66 @@ class DexterityTool:
         model_root = os.path.normpath(
             os.path.join(os.path.dirname(__file__), '../..', '..', '..',
                          'assets', 'dexterity'))
-        return DexterityRobot(model_root, self._cfg_robot[1:])
+        assert self._cfg_robot[-1] == 'vive_tracker/tracker.xml', \
+            f"Generalization of grasp poses relies on VIVE tracker as the " \
+            f"ik_body, which is not present in the robot configuration " \
+            f"{self._cfg_robot}."
+        manipulator_model = DexterityRobot(model_root, self._cfg_robot[1:])
+
+        # Save trimesh meshes of manipulator bodies, as they are required in
+        # the visualization later
+        self._manipulator_bodies_trimesh = \
+            manipulator_model.model.bodies_as_trimesh()
+        return manipulator_model
+
+    def _create_mujoco_model(self, manipulator_model,
+                             canonical_keypoint_demo_pos):
+        with manipulator_model.model.as_xml('./robot_drill_test.xml'):
+            tmp_model = mujoco.MjModel.from_xml_path('./robot_drill_test.xml')
+
+        data = mujoco.MjData(tmp_model)
+        mujoco.mj_step(tmp_model, data)
+        tracker_pos_offset = data.body('tracker').xpos.copy()
+        tracker_quat_offset = data.body('tracker').xquat.copy()
+
+        manipulator_model.model.add_sites(canonical_keypoint_demo_pos)
+        manipulator_model.model.add_mocap(
+            pos=tracker_pos_offset, quat=tracker_quat_offset)
+        manipulator_model.model.add_freejoint()
+        #manipulator_model.model.add_coordinate_system()
+
+        with manipulator_model.model.as_xml('./robot_drill_test.xml'):
+            mj_model = mujoco.MjModel.from_xml_path('./robot_drill_test.xml')
+        return mj_model
+
+    def _set_ik_body_pose(self, data, target_pos, target_quat):
+        data.mocap_pos[0] = target_pos
+        '''
+        target_quat_torch = torch.Tensor(
+            [[target_quat[1], target_quat[2], target_quat[3], target_quat[0]]])
+        tracker_quat_offset_torch = torch.Tensor(
+            [[self._tracker_quat_offset[1], self._tracker_quat_offset[2],
+              self._tracker_quat_offset[3], self._tracker_pos_offset[0]]])
+        corrected_target_quat_torch = quat_mul(
+            target_quat_torch, quat_conjugate(tracker_quat_offset_torch))[0]
+        corrected_target_quat = np.array(
+            [corrected_target_quat_torch[3], corrected_target_quat_torch[0],
+             corrected_target_quat_torch[1], corrected_target_quat_torch[2]])
+        '''
+        data.mocap_quat[0] = target_quat
+
+    def transformation_matrix(self, pos, quat, reorder_quat: bool = True) -> np.array:
+        t = np.zeros((4, 4))
+        t[0, 3] = pos[0]
+        t[1, 3] = pos[1]
+        t[2, 3] = pos[2]
+        t[3, 3] = 1
+        if reorder_quat:
+            r = R.from_quat(np.array([quat[1], quat[2], quat[3], quat[0]]))
+        else:
+            r = R.from_quat(quat)
+        t[0:3, 0:3] = r.as_matrix()
+        return t
 
     @property
     def asset(self):
@@ -189,9 +333,17 @@ class DexterityTool:
         start_pose.p = gymapi.Vec3(0, 0, 0.5)
         return start_pose
 
-    def sample_pointcloud(self, count: int = 1024) -> np.ndarray:
-        return np.ndarray(trimesh.sample.sample_surface(
+    def sample_pointcloud(self, count: int = 4096) -> np.ndarray:
+        points = np.array(trimesh.sample.sample_surface(
             self._collision_mesh, count=count)[0]).astype(np.float)
+        colors = np.array([[255, 255, 0, 255]]).repeat(count, axis=0)
+        return trimesh.points.PointCloud(points, colors=colors)
+
+    def sample_canonical_pointcloud(self, count: int = 4096) -> np.ndarray:
+        points = np.array(trimesh.sample.sample_surface(
+            self._canonical_collision_mesh, count=count)[0]).astype(np.float)
+        colors = np.array([[255, 0, 255, 255]]).repeat(count, axis=0)
+        return trimesh.points.PointCloud(points, colors=colors)
 
 
 class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
@@ -262,7 +414,7 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
 
         drill_assets, drill_site_assets = [], []
         for asset_file in asset_files:
-            drill = DexterityTool(self.gym, self.sim, asset_root, asset_file, self.cfg_base.env.robot)
+            #drill = DexterityTool(self.gym, self.sim, asset_root, asset_file, self.cfg_base.env.robot)
             drill_asset = self.gym.load_asset(self.sim, asset_root, asset_file,
                                               asset_options)
             drill_assets.append(drill_asset)
