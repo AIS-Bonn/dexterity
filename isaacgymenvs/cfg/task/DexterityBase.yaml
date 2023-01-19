@@ -1,4 +1,4 @@
-# See schema in factory_schema_config_base.py for descriptions of parameters.
+# See schema in dexterity_schema_config_base.py for descriptions of parameters.
 
 defaults:
     - _self_
@@ -74,7 +74,6 @@ debug:
 
     override_residual_dof_target: False
     # residual dof targets are specified as [[q0, ..., qn], duration (ts)]
-
     residual_dof_targets: [
         [[-1, -1., 0., 0., 0.], 350],
         [[1, -1., 0., 0., 0.], 200],
@@ -85,3 +84,14 @@ debug:
 
     verbose: True
     visualize: []
+
+# Specifies data to be logged in addition the data logged by default through
+# rl-games. dexterity environments check for the keys in logging (e.g.
+# 'reward_components', 'success_rate_ewma') to decide what has to be logged.
+# Parameters that influence the logging behavior, such as the weight alpha in
+# the EWMA of the success rate can be specified in a sub-dictionary of that
+# logging key.
+logging:
+    reward_terms: ""
+    success_rate_ewma:
+        alpha: 0.05

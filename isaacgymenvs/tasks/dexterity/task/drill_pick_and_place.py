@@ -191,7 +191,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         target_pose_reached = torch.logical_and(
             target_pos_reached, target_angle_reached)
 
-        reward_dict = {}
+        reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
             # Penalize distance of keypoint groups to pre-recorded pose
             if reward_term.startswith(tuple(self.keypoint_dict.keys())):
@@ -247,8 +247,9 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                 assert False, f"Unknown reward term {reward_term}."
 
             self.rew_buf[:] += reward
-            reward_dict[reward_term] = reward.mean()
-        self.log(reward_dict)
+            reward_terms["reward_terms/" + reward_term] = reward.mean()
+        if "reward_terms" in self.cfg_base.logging.keys():
+            self.log(reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""

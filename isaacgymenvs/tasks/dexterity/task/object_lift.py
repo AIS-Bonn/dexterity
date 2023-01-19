@@ -110,6 +110,21 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
                                         torch.ones_like(self.reset_buf),
                                         self.reset_buf)
 
+        # Log exponentially weighted moving average (EWMA) of the success rate
+        if "success_rate_ewma" in self.cfg_base.logging.keys():
+            if not hasattr(self, "success_rate_ewma"):
+                self.success_rate_ewma = 0.
+            num_resets = torch.sum(self.reset_buf)
+            # Update success rate if resets have actually occurred
+            if num_resets > 0:
+                num_successes = torch.sum(object_lifted)
+                curr_success_rate = num_successes / num_resets
+                alpha = (num_resets / self.num_envs) * \
+                    self.cfg_base.logging.success_rate_ewma.alpha
+                self.success_rate_ewma = alpha * curr_success_rate + (
+                        1 - alpha) * self.success_rate_ewma
+                self.log({"success_rate_ewma": self.success_rate_ewma})
+
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
         self._compute_object_lifting_reward(
@@ -130,7 +145,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
         object_lifted = (object_height - object_height_initial) > \
                         self.cfg_task.rl.target_height
 
-        reward_dict = {}
+        reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
             # Penalize distance of keypoint groups to object
             if reward_term.startswith(tuple(self.keypoint_dict.keys())):
@@ -177,8 +192,9 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
                 assert False, f"Unknown reward term {reward_term}."
 
             self.rew_buf[:] += reward
-            reward_dict[reward_term] = reward.mean()
-        self.log(reward_dict)
+            reward_terms["reward_terms/" + reward_term] = reward.mean()
+        if "reward_terms" in self.cfg_base.logging.keys():
+            self.log(reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
