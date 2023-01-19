@@ -88,6 +88,12 @@ class DexterityXML(DexterityABCXML):
             node=self.worldbody, tags="body", return_first=False)
         return [b.attrib['name'] for b in bodies]
 
+    @property
+    def site_names(self) -> List[str]:
+        sites = self._findall_rec(
+            node=self.worldbody, tags="site", return_first=False)
+        return [s.attrib['name'] for s in sites]
+
     def bodies_as_trimesh(self) -> Dict[str, Any]:
         import trimesh
         with self.as_xml('tmp_trimesh_collision_mesh_export.xml'):
@@ -605,13 +611,14 @@ class DexterityXML(DexterityABCXML):
             # Set file path to local copy
             asset_node.set("file", local_file_name)
 
-    def add_sites(self, site_pos: List, rgba: str = '1 1 0 0.8') -> None:
-        for pos in site_pos:
+    def add_sites(self, site_pos: np.array, site_group_name: str,
+                  rgba: str = '1 1 0 0.8') -> None:
+        for i in range(site_pos.shape[0]):
             site = ET.SubElement(self.worldbody, 'site')
-            with np.printoptions(precision=8):
-                site.set('name', str(pos))
-                site.set('pos', str(pos)[1:-1])
+            site.set('name', site_group_name + str(i))
             site.set('rgba', rgba)
+            with np.printoptions(precision=8):
+                site.set('pos', str(site_pos[i])[1:-1])
 
     def add_mocap(self, pos, quat, name: str = '__mocap__', target_body: str = 'tracker') -> None:
         tracker_body = self._findall_rec(

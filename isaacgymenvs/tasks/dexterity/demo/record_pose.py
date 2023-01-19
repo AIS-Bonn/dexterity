@@ -152,23 +152,21 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
             relative_ik_body_quat = quat_mul(quat_conjugate(getattr(env, tool_name + '_quat')), env.ik_body_quat)
 
             np_save_dict = {
-                f"{tool_name}_pos": getattr(env, tool_name + "_pos").cpu().numpy(),
-                f"{tool_name}_quat": getattr(env, tool_name + "_quat").cpu().numpy(),
-                "ik_body_pos": relative_ik_body_pos_in_tool_coordinates.cpu().numpy(),
-                "ik_body_quat": relative_ik_body_quat.cpu().numpy(),
-                "residual_actuated_dof_pos": env.dof_pos[:, env.residual_actuated_dof_indices]
+                "ik_body_demo_pos": relative_ik_body_pos_in_tool_coordinates.cpu().numpy(),
+                "ik_body_demo_quat": relative_ik_body_quat.cpu().numpy(),
+                "residual_actuated_demo_dofs": env.dof_pos[:, env.residual_actuated_dof_indices]
             }
 
             for keypoint_group in env.keypoint_dict.keys():
                 relative_pos_in_world_coordinates = getattr(env, keypoint_group + "_pos")[0] - getattr(env, tool_name + "_pos").clone()[0]
                 relative_pos_in_tool_coordinates = quat_rotate_inverse(getattr(env, tool_name + '_quat').unsqueeze(1).repeat(1, getattr(env, keypoint_group + "_pos").shape[1], 1)[0], relative_pos_in_world_coordinates).unsqueeze(0)
                 relative_keypoints[keypoint_group] = relative_pos_in_tool_coordinates
-                np_save_dict[keypoint_group + "_pos"] = relative_pos_in_tool_coordinates.cpu().numpy()
+                np_save_dict[keypoint_group + "_demo_pos"] = relative_pos_in_tool_coordinates.cpu().numpy()
 
                 relative_quat = quat_mul(
                     quat_conjugate(getattr(env, tool_name + '_quat').unsqueeze(0).repeat(1, getattr(env, keypoint_group + "_quat").shape[1], 1)),
                     getattr(env, keypoint_group + "_quat"))
-                np_save_dict[keypoint_group + "_quat"] = relative_quat.cpu().numpy()
+                np_save_dict[keypoint_group + "_demo_quat"] = relative_quat.cpu().numpy()
 
             asset_root = os.path.normpath(
                 os.path.join(os.path.dirname(__file__), '..', '..', '..', '..',

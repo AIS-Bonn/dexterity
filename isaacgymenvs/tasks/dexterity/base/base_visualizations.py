@@ -10,14 +10,9 @@ class DexterityBaseVisualizations:
                 if visualization.startswith(tuple(self.keypoint_dict.keys())):
                     split_visualization = visualization.split('_')
                     assert split_visualization[-1] == 'pose'
-                    if split_visualization[-2] == 'demo':
-                        keypoint_group_name = '_'.join(split_visualization[:-2])
-                        self.visualize_demo_keypoint_pose(
-                            keypoint_group_name, env_id)
-                    else:
-                        keypoint_group_name = '_'.join(split_visualization[:-1])
-                        self.visualize_keypoint_body_pose(
-                            keypoint_group_name, env_id)
+                    keypoint_group_name = '_'.join(split_visualization[:-1])
+                    self.visualize_keypoint_body_pose(
+                        keypoint_group_name, env_id)
 
                 # For none-keypoint visualizations call the regular functions
                 else:

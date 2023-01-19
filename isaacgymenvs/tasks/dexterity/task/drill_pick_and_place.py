@@ -96,24 +96,52 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                          'drills', 'canonical',
                          self.robot.manipulator.model_name + '_demo_pose.npz'))
         if os.path.isfile(demo_path):
-            demo_pose_npz = np.load(demo_path)
+            self.demo_pose_npz = np.load(demo_path)
             self.demo_pose = {}
-            for k, v in demo_pose_npz.items():
+            for k, v in self.demo_pose_npz.items():
+                # Store demo pose of keypoints relative to the drill
+                # (shape: [num_envs, num_keypoints, 3 or 4]
                 if k.startswith(tuple(self.keypoint_dict.keys())):
-                    self.demo_pose[k + '_demo_relative'] = \
-                        torch.from_numpy(v).to(self.device)
-                    setattr(self, k + '_demo',
-                            torch.from_numpy(v).to(self.device).repeat(
-                                self.num_envs, 1, 1))
+                    self.demo_pose[k] = torch.from_numpy(v).to(
+                        self.device, dtype=torch.float32).repeat(
+                        self.num_envs, 1, 1)
+                    setattr(self, k, self.demo_pose[k].clone())
+                # Store ik_body pose and residual dof pos
+                # (shape: [num_envs, 3 or 4 or num_residual_actuated_dofs]
+                else:
+                    self.demo_pose[k] = torch.from_numpy(v).to(
+                        self.device, dtype=torch.float32).repeat(
+                        self.num_envs, 1)
+                    setattr(self, k, self.demo_pose[k].clone())
 
     def _refresh_demo_pose(self):
         if hasattr(self, "demo_pose"):
             for k, v in self.demo_pose.items():
-                getattr(self, k[:-9])[:] = \
-                    self.drill_pos.unsqueeze(1).repeat(1, v.shape[1], 1) + \
-                    quat_apply(
-                    self.drill_quat.unsqueeze(1).repeat(1, v.shape[1], 1),
-                    v.repeat(self.num_envs, 1, 1))
+                # Transform values relative to the drill to absolute values via
+                # the current drill pose
+
+                # Transform keypoint poses
+                if k.startswith(tuple(self.keypoint_dict.keys())):
+                    num_keypoints = v.shape[1]
+                    if "_pos" in k:
+                        getattr(self, k)[:] = \
+                            self.drill_pos.unsqueeze(1).repeat(
+                                1, num_keypoints, 1) + quat_apply(
+                                self.drill_quat.unsqueeze(1).repeat(
+                                    1,  num_keypoints, 1), v)
+                    elif "_quat" in k:
+                        getattr(self, k)[:] = quat_mul(
+                            self.drill_quat.unsqueeze(1).repeat(
+                                1, num_keypoints, 1), v)
+
+                # Transform ik_body pose
+                elif k.startswith("ik_body"):
+                    if "_pos" in k:
+                        getattr(self, k)[:] = self.drill_pos + quat_apply(
+                            self.drill_quat, v)
+                    elif "_quat" in k:
+                        getattr(self, k)[:] = quat_mul(
+                            self.drill_quat, v)
 
     def compute_observations(self):
         """Compute observations."""
@@ -211,10 +239,11 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                     f"observations."
 
                 keypoint_pos = getattr(self, keypoint_group_name + '_pos')
-                keypoint_pos_demo = getattr(self, keypoint_group_name + '_pos_demo')
+                keypoint_demo_pos = getattr(
+                    self, keypoint_group_name + '_demo_pos')
 
                 keypoint_dist_demo = torch.sum(torch.norm(
-                    keypoint_pos - keypoint_pos_demo, dim=2), dim=1)
+                    keypoint_pos - keypoint_demo_pos, dim=2), dim=1)
                 reward = hyperbole_rew(
                         scale, keypoint_dist_demo, c=0.05, pow=1)
 
