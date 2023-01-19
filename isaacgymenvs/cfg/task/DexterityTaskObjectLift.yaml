@@ -6,7 +6,7 @@ defaults:
 
 name: DexterityTaskObjectLift
 physics_engine: ${..physics_engine}
-full_experiment_name: ${.name}
+full_experiment_name: ${..experiment}
 
 enableCameraSensors: True  # Set to true to test visual observations
 

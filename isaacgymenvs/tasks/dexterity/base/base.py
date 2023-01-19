@@ -389,9 +389,11 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             return
         # Iterate through all keypoint groups found in robot model
         for group_name, body_ids_env, pos, quat in self.keypoint_specs:
-            # If this group is used in the observations
+            # If this group is used in the observations or rewards
             if any(observation.startswith(group_name)
-                   for observation in self.cfg['env']['observations']):
+                   for observation in self.cfg['env']['observations']) or \
+                    any(reward_term.startswith(group_name)
+                        for reward_term in self.cfg['rl']['reward']):
 
                 keypoint_group_quat, keypoint_group_pos = \
                     torch_jit_utils.tf_combine(

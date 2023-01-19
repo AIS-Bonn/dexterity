@@ -6,7 +6,7 @@ defaults:
 
 name: DexterityTaskDrillPickAndPlace
 physics_engine: ${..physics_engine}
-full_experiment_name: ${.name}
+full_experiment_name: ${..experiment}
 
 
 # needed for headless VR
@@ -23,7 +23,7 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_pos_demo']
+    observations: ['ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:

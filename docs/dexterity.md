@@ -1,11 +1,11 @@
-Dexterity
+dexterity
 =======
 
 This document explains the environments and functionalities added to IsaacGymEnvs by dexterity.
 
 Overview
 --------
-Dexterity environments make use of the same underlying structure as the factory tasks. Specifically, dexterity uses an underlying [base](../isaacgymenvs/tasks/dexterity/base/base.py) class. [environment](../isaacgymenvs/tasks/dexterity/env/) classes (e.g. hammer) are derived from the base class to create different scenes. From each environment, multiple [tasks](../isaacgymenvs/tasks/dexterity/task/) can be created that specify the objective for this setting.
+dexterity environments make use of the same underlying structure as the factory tasks. Specifically, dexterity uses an underlying [base](../isaacgymenvs/tasks/dexterity/base/base.py) class. [environment](../isaacgymenvs/tasks/dexterity/env/) classes (e.g. hammer) are derived from the base class to create different scenes. From each environment, multiple [tasks](../isaacgymenvs/tasks/dexterity/task/) can be created that specify the objective for this setting.
 
 The tasks included so far are: **DexterityTaskBinPick**, **DexterityTaskDrillPickAndPlace**, **DexterityTaskHammerDriveNail**, and **DexterityTaskObjectLift**.
 
@@ -30,6 +30,119 @@ in the [DexterityBase.yaml](../isaacgymenvs/cfg/task/DexterityBase.yaml) config 
 Teleoperation and Imitation Learning
 ------
 dexterity provides an interface to teleoperate the Isaac Gym environments in virtual reality. Related code can be found in the [demo](../isaacgymenvs/tasks/dexterity/demo) directory. The teleoperation interface is restricted to specific hardware (Vive VR Headset and Tracker and SenseGlove) and can be used to operate any combination of the robot arm and hand models.
+
+Log data with `self.log(dict)`
+------
+A simple logging interface is provided, whereby all classes derived from the 
+[DexterityBase](../isaacgymenvs/tasks/dexterity/base/base.py) class are able to 
+log information by calling `self.log(dict)`. All data is logged to the same 
+tensorboard instance that rl-games is using.
+
+### Example Usage
+```python
+self.log({"loss": 0.792384, 
+          "action_norm": np.linalg.norm(actions_np)}
+```
+
+Tune Hyperparameters with W&B Sweeps
+------
+The basic training interface of 
+[IsaacGymEnvs](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs) is compatible 
+with [W&B Sweeps](https://wandb.ai/site/sweeps). An example of how a sweep 
+configuration for dexterity can be set up is shown below.
+
+### Example Configuration
+
+```yaml
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args_no_hyphens}  # for compatibility with hydra's command line interface
+program: train.py
+method: random  # method for choosing the next hparam configuration ['grid', 'random', 'bayes']
+
+parameters:
+  ###### set fixed parameters ######
+  wandb_activate:
+    value: True  # runs that the sweep starts should always be logged to wandb
+  task:
+    value: DexterityTaskObjectLift
+  experiment:
+    value: dexterity_test_sweep
+  headless: 
+    value: False  # headless should be set to False when the capture_video function is being used and should be True otherwise
+  max_iterations:
+    value: 1024  # number of epochs to train for
+  seed:
+    distribution: int_uniform  # choose a random seed for each run
+    max: 1000000
+    min: 1
+  capture_video:
+    value: True  # whether to periodically capture videos
+  capture_video_freq:
+    value: 524288
+  capture_video_len:
+    value: 450
+  force_render:
+    value: False
+
+  ###### tune reward parameters ######
+  task.rl.reward.action_penalty:
+    distribution: log_uniform
+    min: -5
+    max: 2
+  task.rl.reward.fingertips_dist_penalty:
+    distribution: log_uniform
+    min: -5
+    max: 2
+  task.rl.reward.object_lift_off_reward: 
+    distribution: log_uniform
+    min: -5
+    max: 2
+  task.rl.reward.success_bonus:
+    distribution: log_uniform
+    min: 4
+    max: 9
+  task.rl.lift_off_height:
+    distribution: uniform
+    min: 0.025
+    max: 0.2
+
+  task.rl.target_height:
+    distribution: uniform
+    min: 0.05
+    max: 0.4
+
+  ###### tune training parameters ######
+  train.params.config.learning_rate:
+    distribution: log_uniform
+    min: -9
+    max: -6
+
+  ###### tune observation-space ######
+  task.env.observations:
+    distribution: categorical
+    values:
+      - - ik_body_pos
+        - ik_body_quat
+        - object_pos
+      - - ik_body_pos
+        - ik_body_quat
+        - object_pos
+        - object_quat
+      - - ik_body_pos
+        - ik_body_quat
+        - object_pos
+        - object_quat
+        - fingertips_pos
+      - - ik_body_pos
+        - ik_body_quat
+        - object_pos
+        - object_quat
+        - fingertips_pos
+        - fingertips_quat
+```
 
 Contact and Citation
 ------

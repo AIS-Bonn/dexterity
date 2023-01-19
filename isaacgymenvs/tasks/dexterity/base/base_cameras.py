@@ -149,7 +149,7 @@ class DexterityBaseCameras:
             experiment_dir = os.path.join('runs', self.cfg['full_experiment_name'])
             self.videos_dir = os.path.join(experiment_dir, 'videos')
             if not os.path.exists(self.videos_dir):
-                os.mkdir(self.videos_dir)
+                os.makedirs(self.videos_dir)
             self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             self._videos = {}
             self._episodes = [0 for _ in range(self.num_envs)]
