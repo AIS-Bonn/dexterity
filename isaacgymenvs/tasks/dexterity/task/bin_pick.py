@@ -55,7 +55,6 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         self.cfg = cfg
         self._get_task_yaml_params()
         self._acquire_task_tensors()
-        self.parse_camera_spec()
         self.parse_controller_spec()
 
         if self.cfg_task.sim.disable_gravity:

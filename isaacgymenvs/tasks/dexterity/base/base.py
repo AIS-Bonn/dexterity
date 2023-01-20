@@ -504,8 +504,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         obs_tensors = []
         for observation in self.cfg_task.env.observations:
             # Camera observations are computed separately
-            if "cameras" in self.cfg_task.keys():
-                if observation in self.cfg_task.cameras.keys():
+            if "cameras" in self.cfg_env.keys():
+                if observation in self.cfg_env.cameras.keys():
                     continue
 
             # Flatten body dimension for keypoint observations

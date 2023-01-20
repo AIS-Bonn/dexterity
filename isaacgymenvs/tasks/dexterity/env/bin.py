@@ -160,12 +160,14 @@ class DexterityEnvBin(DexterityEnvObject):
                     objects_rigid_body_count + \
                     bin_rigid_body_count + \
                     self.robot.rigid_body_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_body_count
                 max_rigid_shapes = \
                     objects_rigid_shape_count + \
                     bin_rigid_shape_count + \
                     self.robot.rigid_shape_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_shape_count
                 self.gym.begin_aggregate(env_ptr, max_rigid_bodies,
                                          max_rigid_shapes, True)
 
@@ -198,6 +200,11 @@ class DexterityEnvBin(DexterityEnvObject):
                 self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
                                                           table_shape_props)
                 self.table_handles.append(table_handle)
+
+            # Create camera actors
+            if "cameras" in self.cfg_env.keys():
+                self.create_camera_actors(env_ptr, i)
+                actor_count += self.camera_count
 
             # Aggregate task-specific actors (objects and bin)
             if self.cfg_base.sim.aggregate_mode == 1:

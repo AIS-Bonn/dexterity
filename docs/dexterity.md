@@ -18,7 +18,7 @@ robot: [ 'franka_emika_panda/panda.xml', 'schunk_sih/right_hand.xml', 'vive_trac
 ```
 in the [DexterityBase.yaml](../isaacgymenvs/cfg/task/DexterityBase.yaml) config file.
 
-### Dexterity robot models
+### Included Models
 | Robot                                            | Preview                                                                         |
 |--------------------------------------------------|---------------------------------------------------------------------------------|
 | [UR5e](../assets/dexterity/ur5e)                 | <img src="images/dexterity/ur5e.png" align="center" width="300"/>               |
@@ -26,6 +26,29 @@ in the [DexterityBase.yaml](../isaacgymenvs/cfg/task/DexterityBase.yaml) config 
 | [KUKA Allegro](../assets/dexterity/kuka_allegro) | <img src="images/dexterity/kuka_allegro.png" align="center" width="300"/>       |
 | [Schunk SIH](../assets/dexterity/schunk_sih)     | <img src="images/dexterity/schunk_sih.png" align="center" width="300"/>         |
 | [Shadow Hand](../assets/dexterity/shadow_hand)   | <img src="images/dexterity/shadow_hand.png" align="center" width="300"/>        |
+
+
+Camera Sensors
+------
+dexterity enables the use of camera sensors and visual observations directly through the config files. Cameras can be added to an environment via the `cameras` keyword. Under the camera name, the pose and model, or detailed camera properties are specified.
+
+### Example Camera
+```yaml
+cameras:
+    frontview:
+        model: 'realsense_d405'
+        pos: [0.5, 0, 0.5]
+        quat: [0, 0, 1, 0]
+```
+
+The camera will only be used, if it is actually included in a tasks observations of the task. Hence, any camera that might be of interest can be specified in the environment config, but will not be created and create overhead unless it is actually used in the task config.
+```yaml
+observations: ['ik_body_pos', 'ik_body_quat', 'frontview']
+```
+
+If `save_videos: True` is set in the `debug:` section of the [DexterityBase.yaml](../isaacgymenvs/cfg/task/DexterityBase.yaml) file, all camera observations will be written to mp4 file stored in a /videos subdirectory of the current run.
+
+The canonical [vec_task.py](../isaacgymenvs/tasks/base/vec_task.py) class returns observation as a `dict`, where the *obs* key holds state-space observation. We add visual observations under a new *image* key and then separate the observations by the inidvidual cameras. So, the image of the camera in the example above can be found under `obs_dict["image"]["frontview"]`.
 
 Teleoperation and Imitation Learning
 ------

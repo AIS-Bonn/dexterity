@@ -532,6 +532,7 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
         Acquire tensors."""
 
         self._get_env_yaml_params()
+        self.parse_camera_spec(cfg)
 
         super().__init__(cfg, rl_device, sim_device, graphics_device_id,
                          headless, virtual_screen_capture, force_render)
@@ -650,12 +651,14 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
                     self.gym.get_asset_rigid_body_count(used_drill) + \
                     self.gym.get_asset_rigid_body_count(used_drill_site) + \
                     self.robot.rigid_body_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_body_count
                 max_rigid_shapes = \
                     self.gym.get_asset_rigid_shape_count(used_drill) + \
                     self.gym.get_asset_rigid_shape_count(used_drill_site) + \
                     self.robot.rigid_shape_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_shape_count
                 self.gym.begin_aggregate(env_ptr, max_rigid_bodies,
                                          max_rigid_shapes, True)
 
@@ -689,7 +692,12 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
                                                           table_shape_props)
                 self.table_handles.append(table_handle)
 
-            # Aggregate task-specific actors (objects)
+            # Create camera actors
+            if "cameras" in self.cfg_env.keys():
+                self.create_camera_actors(env_ptr, i)
+                actor_count += self.camera_count
+
+            # Aggregate task-specific actors (drills and drill target sites)
             if self.cfg_base.sim.aggregate_mode == 1:
                 max_rigid_bodies = \
                     self.gym.get_asset_rigid_body_count(used_drill) + \

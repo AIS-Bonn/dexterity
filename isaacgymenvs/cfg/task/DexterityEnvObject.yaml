@@ -10,3 +10,10 @@ env:
     object_sets:
         ycb: [ '014_lemon' ]
         egad: []
+
+# Example frontview camera
+cameras:
+    frontview:
+        model: 'realsense_d405'
+        pos: [0.5, 0, 0.5]
+        quat: [0, 0, 1, 0]

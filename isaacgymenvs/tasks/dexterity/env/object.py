@@ -105,6 +105,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         Acquire tensors."""
 
         self._get_env_yaml_params()
+        self.parse_camera_spec(cfg)
 
         super().__init__(cfg, rl_device, sim_device, graphics_device_id,
                          headless, virtual_screen_capture, force_render)
@@ -229,11 +230,13 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 max_rigid_bodies = \
                     used_object.rigid_body_count + \
                     self.robot.rigid_body_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_body_count
                 max_rigid_shapes = \
                     used_object.rigid_shape_count + \
                     self.robot.rigid_shape_count + \
-                    int(self.cfg_base.env.has_table)
+                    int(self.cfg_base.env.has_table) + \
+                    self.camera_rigid_body_count
                 self.gym.begin_aggregate(env_ptr, max_rigid_bodies,
                                          max_rigid_shapes, True)
 
@@ -266,6 +269,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
                                                           table_shape_props)
                 self.table_handles.append(table_handle)
+
+            # Create camera actors
+            if "cameras" in self.cfg_env.keys():
+                self.create_camera_actors(env_ptr, i)
+                actor_count += self.camera_count
 
             # Aggregate task-specific actors (objects)
             if self.cfg_base.sim.aggregate_mode == 1:

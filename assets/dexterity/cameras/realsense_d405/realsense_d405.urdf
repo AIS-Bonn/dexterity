@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<robot name="realsense_d405">
+  <material name="silver">
+     <color rgba="0.75 0.75 0.75 1"/>
+  </material>
+  <material name="black">
+     <color rgba="0.1 0.1 0.1 1"/>
+  </material>
+  <material name="gold">
+     <color rgba="0.9 0.84 0.7 1"/>
+  </material>
+
+
+  <link name="case">
+    <visual>
+      <origin rpy="1.57075 0 1.57075" xyz="0 0 0"/>
+      <material name="silver"/>
+      <geometry>
+        <mesh filename="assets/case.stl" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="1.57075 0 1.57075" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="assets/case.stl" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="front_glass">
+    <visual>
+      <origin rpy="1.57075 0 1.57075" xyz="0 0 0"/>
+      <material name="black"/>
+      <geometry>
+        <mesh filename="assets/front_glass.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="case_to_front_glass" type="fixed">
+    <parent link="case"/>
+    <child link="front_glass"/>
+  </joint>
+  <link name="connector">
+    <visual>
+      <origin rpy="1.57075 0 1.57075" xyz="0 0 0"/>
+      <material name="gold"/>
+      <geometry>
+        <mesh filename="assets/connector.stl" />
+      </geometry>
+    </visual>
+  </link>
+  <joint name="case_to_connector" type="fixed">
+    <parent link="case"/>
+    <child link="connector"/>
+  </joint>
+</robot>
