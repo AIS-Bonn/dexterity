@@ -232,9 +232,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         if self.cfg_base.mode.export_scene:
             robot_options.mesh_normal_mode = gymapi.COMPUTE_PER_FACE
 
-        increase_performance = False
-        if increase_performance:
-            robot_options.replace_cylinder_with_capsule = True
+        if self.cfg_base.sim.override_robot_com_and_inertia:
+            robot_options.override_com = True
+            robot_options.override_inertia = True
 
         table_options = gymapi.AssetOptions()
         table_options.flip_visual_attachments = False  # default = False

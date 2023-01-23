@@ -9,12 +9,13 @@ mode:
     export_states: False
 
 sim:
-    dt: 0.016667
-    num_substeps: 2  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
+    dt: 0.03333333333
+    num_substeps: 4  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
     num_pos_iters: 16
     num_vel_iters: 0
     gravity_mag: 9.81
     add_damping: False
+    override_robot_com_and_inertia: True  # Whether to recompute the center of mass and inertia based on the robot body's geometry and override the values given in the XML file
     aggregate_mode: 2  # Whether to create aggregate groups 0: don't aggregate; 1: aggregate only task-specific actors; >1: aggregate all actors
     
 env:

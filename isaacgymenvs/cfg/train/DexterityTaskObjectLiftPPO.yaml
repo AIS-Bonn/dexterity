@@ -45,7 +45,7 @@ params:
     value_bootstrap: True
     num_actors: ${....task.env.numEnvs}
     reward_shaper:
-      scale_value: 0.01
+      scale_value: 1.0
     normalize_advantage: True
     gamma: 0.99
     tau: 0.95
@@ -61,11 +61,11 @@ params:
     grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: True
-    e_clip: 0.2
-    horizon_length: 32
+    e_clip: 0.1
+    horizon_length: 8
     minibatch_size: 32768
-    mini_epochs: 5
+    mini_epochs: 8
     critic_coef: 4
     clip_value: True
-    seq_len: 4
+    seq_len: 4  # only for RNN
     bounds_loss_coef: 0.0001

@@ -13,7 +13,7 @@ enableCameraSensors: True  # Set to true to test visual observations
 sim:
     use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
     up_axis: "z"
-    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    dt: 0.033333333  # required, but overridden in DexterityBase.yaml
     gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
     disable_gravity: False
 
@@ -37,12 +37,12 @@ randomize:
 
 rl:
     reward:
-        action_penalty: 0.0  # scale on action penalty
-        fingertips_dist_penalty: 0.05  # scale on fingertip distance penalty
-        object_lift_off_reward: 0.25  # scale on object lift-off progress reward
-        object_target_reward: 0.25  # scale on object target progress reward
-        success_bonus: 1000.0  # reward received upon reaching target height
-    lift_off_height: 0.125  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
-    target_height: 0.4  # target height for the object in meters
-    max_episode_length: 450
+        action_penalty: 0.01  # scale on action penalty
+        fingertips_dist_penalty: 0.1  # scale on fingertip distance penalty
+        object_lift_off_reward: 0.05  # scale on object lift-off progress reward
+        #object_target_reward: 0.0  # scale on object target progress reward
+        success_bonus: 800  # reward received upon reaching target height
+    lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+    target_height: 0.3  # target height for the object in meters
+    max_episode_length: 300
 
