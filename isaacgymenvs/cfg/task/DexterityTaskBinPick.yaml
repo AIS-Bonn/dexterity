@@ -17,18 +17,10 @@ sim:
     disable_gravity: False
 
 env:
-    numEnvs: ${resolve_default:2,${...num_envs}}
+    numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
     observations: ['ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'fingertips_quat', 'frontview']
     numActions: 0  # overwritten depending on robot configuration
-
-cameras:
-    frontview:
-        fovx: 75  # Horizontal field of view
-        pos: [0.75, 0, 0.5]  # Position of the camera
-        quat: [0, 0, 1, 0]  # Quaternion orientation of the camera {x, y, z, w}
-        resolution: [512, 512]
-        type: 'rgb'  # {rgb, rgba, rgbd }
 
 randomize:
     ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
@@ -43,12 +35,12 @@ randomize:
 
 rl:
     reward:
-        action_penalty: 0.0  # scale on action penalty
-        fingertips_dist_penalty: 0.05  # scale on fingertip distance penalty
-        object_lift_off_reward: 0.25  # scale on object lift-off progress reward
-        object_target_reward: 0.25  # scale on object target progress reward
-        success_bonus: 1000.0  # reward received upon reaching target height
-    lift_off_height: 0.125  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
-    target_height: 0.4  # target height for the object in meters
-    max_episode_length: 450
+        action_penalty: 0.01  # scale on action penalty
+        fingertips_dist_penalty: 0.1  # scale on fingertip distance penalty
+        object_lift_off_reward: 0.05  # scale on object lift-off progress reward
+        #object_target_reward: 0.0  # scale on object target progress reward
+        success_bonus: 800  # reward received upon reaching target height
+    lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+    target_height: 0.3  # target height for the object in meters
+    max_episode_length: 300
 

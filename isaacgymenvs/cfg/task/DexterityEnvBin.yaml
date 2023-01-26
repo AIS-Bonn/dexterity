@@ -20,3 +20,16 @@ env:
 
     highlight_target_object: True
     target_object_color: [0, 1, 0]
+
+
+cameras:
+    frontview:
+        model: 'realsense_d405'
+        pos: [0.75, 0, 0.5]
+        quat: [-0.131, 0, 0.991, 0]
+
+    palmview:
+        model: 'realsense_d405'
+        pos: [ 0.0125, 0.038, 0.081 ]
+        quat: [ -0.271, -0.653, 0.271, 0.653 ]  # 45 deg inclined downwards with the connector facing the wrist
+        attach_to_body: 'palm'

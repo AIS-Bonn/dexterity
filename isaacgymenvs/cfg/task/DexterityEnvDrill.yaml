@@ -6,5 +6,5 @@ defaults:
 
 env:
     env_name: 'DexterityEnvDrill'
-    drills: ['canonical/canonical.urdf', 'drill_00/drill_00.urdf']
+    drills: ['canonical/canonical.urdf']
     drill_target_color: [0, 1, 0]

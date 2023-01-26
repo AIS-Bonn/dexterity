@@ -19,12 +19,6 @@
         <mesh filename="assets/case.stl" />
       </geometry>
     </visual>
-    <collision>
-      <origin rpy="1.57075 0 1.57075" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="assets/case.stl" />
-      </geometry>
-    </collision>
   </link>
   <link name="front_glass">
     <visual>

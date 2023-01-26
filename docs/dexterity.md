@@ -50,6 +50,17 @@ If `save_videos: True` is set in the `debug:` section of the [DexterityBase.yaml
 
 The canonical [vec_task.py](../isaacgymenvs/tasks/base/vec_task.py) class returns observation as a `dict`, where the *obs* key holds state-space observation. We add visual observations under a new *image* key and then separate the observations by the inidvidual cameras. So, the image of the camera in the example above can be found under `obs_dict["image"]["frontview"]`.
 
+
+The available camera / image types are currently `'d'` (depth image), `'rgb'` (color image), `'rgbd'` (concatenated color and depth image), `'pc'` (point cloud generated from depth image), and `'cpc'` (colored point cloud generated from color and depth image).
+
+### Point clouds
+Cameras of type `'pc'`, or `'cpc'` will automatically output point cloud observations, like the ones shown below. We compensate for the offset of the view-matrices in Isaac Gym, such that all point cloud data is in the environment-specific coordinate systems.
+
+| Camera transformation                        | Env 1                                                                                                   | Env 2                                                                                                   | Env 3                                                                                                   | Env 4                                                                                                   |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| **static** <br/>frontview on the environment | <img src="images/dexterity/point_clouds/static_cameras/frontview_env_1_episode_0.gif" align="center"/>  | <img src="images/dexterity/point_clouds/static_cameras/frontview_env_2_episode_0.gif" align="center"/>  | <img src="images/dexterity/point_clouds/static_cameras/frontview_env_3_episode_0.gif" align="center"/>  | <img src="images/dexterity/point_clouds/static_cameras/frontview_env_4_episode_0.gif" align="center"/>  |
+| **attached** <br/>camera mounted to the palm | <img src="images/dexterity/point_clouds/attached_cameras/palmview_env_1_episode_0.gif" align="center"/> | <img src="images/dexterity/point_clouds/attached_cameras/palmview_env_2_episode_0.gif" align="center"/> | <img src="images/dexterity/point_clouds/attached_cameras/palmview_env_3_episode_0.gif" align="center"/> | <img src="images/dexterity/point_clouds/attached_cameras/palmview_env_4_episode_0.gif" align="center"/> |
+
 Teleoperation and Imitation Learning
 ------
 dexterity provides an interface to teleoperate the Isaac Gym environments in virtual reality. Related code can be found in the [demo](../isaacgymenvs/tasks/dexterity/demo) directory. The teleoperation interface is restricted to specific hardware (Vive VR Headset and Tracker and SenseGlove) and can be used to operate any combination of the robot arm and hand models.

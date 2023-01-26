@@ -623,19 +623,13 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
         drill_site_pose = gymapi.Transform()
 
         self.env_ptrs = []
-        self.robot_handles = []
-        self.table_handles = []
         self.drill_handles = []
         self.drill_site_handles = []
-        self.shape_ids = []
-        self.robot_actor_ids_sim = []  # within-sim indices
-        self.table_actor_ids_sim = []  # within-sim indices
         self.drill_actor_ids_sim = []  # within-sim indices
         self.drill_site_actor_ids_sim = []  # within-sim indices
+
         actor_count = 0
-
         drill_count = len(self.cfg_env['env']['drills'])
-
         for i in range(self.num_envs):
             # Create new env
             env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
@@ -647,55 +641,19 @@ class DexterityEnvDrill(DexterityBase, DexterityABCEnv):
 
             # Aggregate all actors
             if self.cfg_base.sim.aggregate_mode > 1:
-                max_rigid_bodies = \
+                max_rigid_bodies = self.base_rigid_bodies + \
                     self.gym.get_asset_rigid_body_count(used_drill) + \
-                    self.gym.get_asset_rigid_body_count(used_drill_site) + \
-                    self.robot.rigid_body_count + \
-                    int(self.cfg_base.env.has_table) + \
-                    self.camera_rigid_body_count
-                max_rigid_shapes = \
+                    self.gym.get_asset_rigid_body_count(used_drill_site)
+                max_rigid_shapes = self.base_rigid_shapes + \
                     self.gym.get_asset_rigid_shape_count(used_drill) + \
-                    self.gym.get_asset_rigid_shape_count(used_drill_site) + \
-                    self.robot.rigid_shape_count + \
-                    int(self.cfg_base.env.has_table) + \
-                    self.camera_rigid_shape_count
+                    self.gym.get_asset_rigid_shape_count(used_drill_site)
                 self.gym.begin_aggregate(env_ptr, max_rigid_bodies,
                                          max_rigid_shapes, True)
 
-            # Create robot actor
-            # collision_filter=-1 to use asset collision filters in XML model
-            robot_handle = self.gym.create_actor(
-                env_ptr, robot_asset, robot_pose, 'robot', i, -1, 0)
-            self.robot_actor_ids_sim.append(actor_count)
-            self.robot_handles.append(robot_handle)
-            # Enable force sensors for robot
-            self.gym.enable_actor_dof_force_sensors(env_ptr, robot_handle)
-            actor_count += 1
-
-            # Create table actor
-            if self.cfg_base.env.has_table:
-                table_handle = self.gym.create_actor(
-                    env_ptr, table_asset, table_pose, 'table', i, 0, 1)
-                self.table_actor_ids_sim.append(actor_count)
-                actor_count += 1
-
-                # Set table shape properties
-                table_shape_props = self.gym.get_actor_rigid_shape_properties(
-                    env_ptr, table_handle)
-                table_shape_props[0].friction = self.cfg_base.env.table_friction
-                table_shape_props[0].rolling_friction = 0.0  # default = 0.0
-                table_shape_props[0].torsion_friction = 0.0  # default = 0.0
-                table_shape_props[0].restitution = 0.0  # default = 0.0
-                table_shape_props[0].compliance = 0.0  # default = 0.0
-                table_shape_props[0].thickness = 0.0  # default = 0.0
-                self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
-                                                          table_shape_props)
-                self.table_handles.append(table_handle)
-
-            # Create camera actors
-            if "cameras" in self.cfg_env.keys():
-                self.create_camera_actors(env_ptr, i)
-                actor_count += self.camera_count
+            # Create common actors (robot, table, cameras)
+            actor_count = self.create_base_actors(
+                env_ptr, i, actor_count, robot_asset, robot_pose,
+                table_asset, table_pose)
 
             # Aggregate task-specific actors (drills and drill target sites)
             if self.cfg_base.sim.aggregate_mode == 1:

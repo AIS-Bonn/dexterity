@@ -263,6 +263,75 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         return robot_asset, table_asset
 
+    def create_base_actors(
+            self, env_ptr: int, i: int, actor_count: int, robot_asset,
+            robot_pose, table_asset, table_pose) -> int:
+        """Create common actors (robot, table, cameras)."""
+        if not hasattr(self, "robot_actor_ids_sim"):
+            self.robot_actor_ids_sim = []  # within-sim indices
+            self.robot_handles = []
+        if not hasattr(self, "table_actor_ids_sim"):
+            self.table_actor_ids_sim = []  # within-sim indices
+            self.table_handles = []
+
+        # Create robot actor
+        self._create_robot_actor(env_ptr, i, actor_count, robot_asset,
+                                 robot_pose)
+        actor_count += 1
+        if i == 0:
+            self.robot_actor_id_env = self.gym.find_actor_index(
+                env_ptr, 'robot', gymapi.DOMAIN_ENV)
+
+        # Create table actor
+        if self.cfg_base.env.has_table:
+            self._create_table_actor(env_ptr, i, actor_count, table_asset,
+                                     table_pose)
+            actor_count += 1
+
+        # Create camera actors
+        if "cameras" in self.cfg_env.keys():
+            self.create_camera_actors(env_ptr, i, actor_count, self.device,
+                                      self.num_envs)
+            actor_count += self.camera_count
+            # Store camera actor env_ids to set the root pose of attached
+            # cameras later
+            if i == 0:
+                for camera_name, dexterity_camera in self._camera_dict.items():
+                    setattr(self, f"{camera_name}_actor_id_env",
+                            self.gym.find_actor_index(
+                                env_ptr, camera_name, gymapi.DOMAIN_ENV))
+        return actor_count
+
+    def _create_robot_actor(self, env_ptr: int, i: int, actor_count: int,
+                            robot_asset, robot_pose) -> None:
+        # collision_filter=-1 to use asset collision filters in XML model
+        robot_handle = self.gym.create_actor(
+            env_ptr, robot_asset, robot_pose, 'robot', i, -1, 1)
+        self.robot_actor_ids_sim.append(actor_count)
+        self.robot_handles.append(robot_handle)
+        # Enable force sensors for robot
+        self.gym.enable_actor_dof_force_sensors(env_ptr, robot_handle)
+
+    def _create_table_actor(self, env_ptr: int, i: int, actor_count: int,
+                            table_asset, table_pose):
+        # Segmentation id set to 0. Table is viewed as background.
+        table_handle = self.gym.create_actor(
+            env_ptr, table_asset, table_pose, 'table', i, 0, 0)
+        self.table_actor_ids_sim.append(actor_count)
+
+        # Set table shape properties
+        table_shape_props = self.gym.get_actor_rigid_shape_properties(
+            env_ptr, table_handle)
+        table_shape_props[0].friction = self.cfg_base.env.table_friction
+        table_shape_props[0].rolling_friction = 0.0  # default = 0.0
+        table_shape_props[0].torsion_friction = 0.0  # default = 0.0
+        table_shape_props[0].restitution = 0.0  # default = 0.0
+        table_shape_props[0].compliance = 0.0  # default = 0.0
+        table_shape_props[0].thickness = 0.0  # default = 0.0
+        self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
+                                                  table_shape_props)
+        self.table_handles.append(table_handle)
+
     def acquire_base_tensors(self):
         """Acquire and wrap tensors. Create views."""
 
@@ -478,8 +547,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.refresh_base_tensors()
         self.refresh_env_tensors()
         self._refresh_task_tensors()
+        self.gym.fetch_results(self.sim, True)
         self.compute_observations()
         self.compute_reward()
+
 
         if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
             self.gym.clear_lines(self.viewer)
