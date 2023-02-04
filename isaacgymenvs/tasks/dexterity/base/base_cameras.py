@@ -83,11 +83,9 @@ class DexterityVideoRecordingProperties:
         rgb_image = torch.zeros_like(seg_image)
 
         for seg_id in range(torch.max(seg_image) + 1):
-            print("seg_image.shape:", seg_image.shape)
             color = 255 * torch.Tensor(
                 [[scalar_map.to_rgba(seg_id)[0:3]]]).repeat(
                 seg_image.shape[0], seg_image.shape[1], 1).to(seg_image.device)
-            print("color.shape:", color.shape)
             rgb_image = torch.where(seg_image == seg_id, color, rgb_image)
         return rgb_image.to(torch.uint8)
 
