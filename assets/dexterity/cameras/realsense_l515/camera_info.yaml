@@ -1,0 +1,3 @@
+fovx: 70
+resolution: [1024, 768]
+image_type: 'rgbd'

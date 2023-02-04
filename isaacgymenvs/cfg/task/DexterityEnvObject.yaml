@@ -17,6 +17,11 @@ cameras:
         pos: [0.75, 0, 0.5]
         quat: [-0.131, 0, 0.991, 0]
 
+    topview:
+        model: 'realsense_d405'
+        pos: [ 0.0, 0.0, 1.5 ]
+        quat: [ 0, 0.707, 0, 0.707 ]
+
     palmview:
         model: 'realsense_d405'
         pos: [ 0.0125, 0.038, 0.081 ]

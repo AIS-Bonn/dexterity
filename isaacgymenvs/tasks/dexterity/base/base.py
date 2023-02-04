@@ -290,16 +290,16 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         # Create camera actors
         if "cameras" in self.cfg_env.keys():
-            self.create_camera_actors(env_ptr, i, actor_count, self.device,
-                                      self.num_envs)
-            actor_count += self.camera_count
-            # Store camera actor env_ids to set the root pose of attached
-            # cameras later
-            if i == 0:
-                for camera_name, dexterity_camera in self._camera_dict.items():
-                    setattr(self, f"{camera_name}_actor_id_env",
-                            self.gym.find_actor_index(
-                                env_ptr, camera_name, gymapi.DOMAIN_ENV))
+            self.create_camera_actors(env_ptr, i, actor_count)
+            for camera_name, dexterity_camera in self._camera_dict.items():
+                if dexterity_camera.add_camera_actor:
+                    actor_count += 1
+                    # Store camera actor env_ids to set the root pose of
+                    # attached cameras later
+                    if i == 0:
+                        setattr(self, f"{camera_name}_actor_id_env",
+                                self.gym.find_actor_index(
+                                    env_ptr, camera_name, gymapi.DOMAIN_ENV))
         return actor_count
 
     def _create_robot_actor(self, env_ptr: int, i: int, actor_count: int,
