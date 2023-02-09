@@ -76,25 +76,27 @@ class DexterityVideoRecordingProperties:
         norm = colors.Normalize(vmin=vmin, vmax=vmax)
         return cmx.ScalarMappable(norm=norm, cmap=self.SEG_ID_CMAP)
 
-    def segmentation_to_rgb(self, seg_image: torch.Tensor) -> torch.Tensor:
-        seg_image = seg_image.unsqueeze(-1).repeat(1, 1, 3)
+    def segmentation_to_rgb(self, seg: torch.Tensor) -> torch.Tensor:
+        seg = seg.unsqueeze(-1).repeat((1,) * len(seg.shape) + (3,))
         scalar_map = self.scalar_color_mapping(
-            torch.min(seg_image).float(), torch.max(seg_image).float())
-        rgb_image = torch.zeros_like(seg_image)
+            torch.min(seg).float(), torch.max(seg).float())
+        rgb = torch.zeros_like(seg)
 
-        for seg_id in range(torch.max(seg_image) + 1):
-            color = 255 * torch.Tensor(
-                [[scalar_map.to_rgba(seg_id)[0:3]]]).repeat(
-                seg_image.shape[0], seg_image.shape[1], 1).to(seg_image.device)
-            rgb_image = torch.where(seg_image == seg_id, color, rgb_image)
-        return rgb_image.to(torch.uint8)
+        for seg_id in range(int(torch.max(seg)) + 1):
+            rgb_id = torch.zeros_like(seg)
+            color_map = (torch.Tensor(scalar_map.to_rgba(seg_id)[0:3]) * 255).to(
+                torch.uint8)
+            rgb_id[..., 0:3] = color_map
+            rgb = torch.where(seg == seg_id, rgb_id, rgb)
+        return rgb.to(torch.uint8)
 
 
 class DexterityCameraSensorProperties:
     """Implements properties of the camera sensors, such as image-types, poses,
     and camera intrinsics."""
 
-    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'seg', 'rgb_seg', 'pc', 'cpc']
+    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
+                           'pc_seg']
     CAMERA_ASSET_ROOT = os.path.join(
         os.path.dirname(__file__), '../../../../assets/dexterity/cameras')
 
@@ -299,7 +301,7 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
                 camera_handle, env_ptr, self.camera_transform)
 
     def acquire_camera_tensors(self, env_ptr: int, camera_handle: int) -> None:
-        if any(t in self._image_type for t in ["rgb", "cpc"]):
+        if "rgb" in self._image_type:
             camera_tensor_color = self.gym.get_camera_image_gpu_tensor(
                 self.sim, env_ptr, camera_handle, gymapi.IMAGE_COLOR)
             torch_camera_tensor_color = gymtorch.wrap_tensor(
@@ -381,10 +383,13 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
         return torch.stack(rgb_seg_image, dim=0)
 
     def _get_pc(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
-        return self._get_point_cloud(env_ptrs, env_ids, colored=False)
+        return self._get_point_cloud(env_ptrs, env_ids)
 
-    def _get_cpc(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
-        return self._get_point_cloud(env_ptrs, env_ids, colored=True)
+    def _get_pc_rgb(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        return self._get_point_cloud(env_ptrs, env_ids, features='rgb')
+
+    def _get_pc_seg(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        return self._get_point_cloud(env_ptrs, env_ids, features='seg')
 
     def _get_color_image(self, env_ptr: int, env_id: int) -> torch.Tensor:
         if self.use_camera_tensors:
@@ -413,19 +418,24 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
                 gymapi.IMAGE_SEGMENTATION).astype(np.uint8)).to(self.device)
 
     def _get_point_cloud(self, env_ptrs: List, env_ids: List[int],
-                         colored: bool, add_coordinate_system: bool = True
+                         features: str = None,
+                         add_coordinate_system: bool = False
                          ) -> torch.Tensor:
+        assert features in [None, 'rgb', 'seg']
+
         xyz = self.depth_to_xyz(env_ptrs, env_ids)
 
-        if colored:
-            rgb_image = self._get_rgb(env_ptrs, env_ids)
-            rgb = rgb_image.view(len(env_ids), -1, 3).float().to(self.device)
-
-            if add_coordinate_system:
-                xyz, rgb = self.add_coordinate_system(xyz, rgb, env_ids)
-
-            cpc = torch.cat([xyz, rgb], dim=-1)
-            return cpc
+        if features:
+            feature_image = getattr(self, f'_get_{features}')(env_ptrs, env_ids)
+            if features == 'rgb':
+                feature_shape = (len(env_ids), -1, 3)
+            elif features == 'seg':
+                feature_shape = (len(env_ids), -1, 1)
+            features = feature_image.view(feature_shape).float().to(self.device)
+            if add_coordinate_system and features == 'rgb':
+                xyz, features = self.add_coordinate_system(
+                    xyz, features, env_ids)
+            return torch.cat([xyz, features], dim=-1)
         return xyz
 
     def depth_to_xyz(self, env_ptrs, env_ids):
@@ -807,6 +817,9 @@ class DexterityBaseCameras:
 
                 elif self._camera_dict[camera_name].image_type == 'seg':
                     seg_image = image_dict[camera_name][env_id]
+                    #import matplotlib.pyplot as plt
+                    #plt.imshow(seg_image.cpu().numpy())
+                    #plt.show()
                     np_image = self._camera_dict[
                         camera_name].segmentation_to_rgb(
                         seg_image).cpu().numpy()
@@ -818,9 +831,14 @@ class DexterityBaseCameras:
                                  ).nonzero().squeeze(-1)
                     xyz = xyz[valid_idx]
 
-                    if self._camera_dict[camera_name].image_type == 'cpc':
+                    if self._camera_dict[camera_name].image_type == 'pc_rgb':
                         rgb = (image_dict[camera_name][env_id, :, 3:6] / 255)[
                             valid_idx]
+                    elif self._camera_dict[camera_name].image_type == 'pc_seg':
+                        seg_id = image_dict[camera_name][env_id, :, 3][
+                            valid_idx]
+                        rgb = self._camera_dict[
+                            camera_name].segmentation_to_rgb(seg_id) / 255
                     else:
                         rgb = torch.zeros_like(xyz)
 

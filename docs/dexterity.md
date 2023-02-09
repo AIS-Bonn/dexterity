@@ -51,10 +51,10 @@ If `save_videos: True` is set in the `debug:` section of the [DexterityBase.yaml
 The canonical [vec_task.py](../isaacgymenvs/tasks/base/vec_task.py) class returns observation as a `dict`, where the *obs* key holds state-space observation. We add visual observations under a new *image* key and then separate the observations by the inidvidual cameras. So, the image of the camera in the example above can be found under `obs_dict["image"]["frontview"]`.
 
 
-The available camera / image types are currently `'d'` (depth image), `'rgb'` (color image), `'rgbd'` (concatenated color and depth image), `'pc'` (point cloud generated from depth image), and `'cpc'` (colored point cloud generated from color and depth image).
+The available camera / image types are currently `'d'` (depth image), `'rgb'` (color image), `'rgbd'` (concatenated color and depth image), `'pc'` (point cloud generated from depth image), `'pc_rgb'` (colored point cloud generated from color and depth image), and `'pc_seg'` (point cloud with segmentation features for all points).
 
 ### Point clouds
-Cameras of type `'pc'`, or `'cpc'` will automatically output point cloud observations, like the ones shown below. We compensate for the offset of the view-matrices in Isaac Gym, such that all point cloud data is in the environment-specific coordinate systems.
+Cameras of type `'pc'`, `'pc_rgb'`, or `'pc_seg'` will automatically output point cloud observations, like the ones shown below. We compensate for the offset of the view-matrices in Isaac Gym, such that all point cloud data is in the environment-specific coordinate systems.
 
 | Camera transformation                        | Env 1                                                                                                   | Env 2                                                                                                   | Env 3                                                                                                   | Env 4                                                                                                   |
 |----------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
