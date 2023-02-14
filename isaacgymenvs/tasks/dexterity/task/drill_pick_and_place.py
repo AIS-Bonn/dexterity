@@ -36,6 +36,7 @@ import hydra
 import omegaconf
 import os
 
+import torch
 from isaacgym import gymapi, gymtorch, torch_utils
 from isaacgym.torch_utils import *
 import isaacgymenvs.tasks.dexterity.dexterity_control as ctrl
@@ -93,7 +94,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         demo_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), '..', '..', '..',
                          '..', 'assets', 'dexterity', 'tools',
-                         'drills', 'canonical',
+                         'drills', 'train', 'black_and_decker_unknown',
                          self.robot.manipulator.model_name + '_demo_pose.npz'))
         if os.path.isfile(demo_path):
             self.demo_pose_npz = np.load(demo_path)
@@ -106,6 +107,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                         self.device, dtype=torch.float32).repeat(
                         self.num_envs, 1, 1)
                     setattr(self, k, self.demo_pose[k].clone())
+
                 # Store ik_body pose and residual dof pos
                 # (shape: [num_envs, 3 or 4 or num_residual_actuated_dofs]
                 else:
@@ -113,6 +115,17 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                         self.device, dtype=torch.float32).repeat(
                         self.num_envs, 1)
                     setattr(self, k, self.demo_pose[k].clone())
+
+                # Store relative positions and rotations
+                if hasattr(self, k.replace('_demo', '')):
+                    if '_pos' in k:
+                        setattr(self, 'to_' + k,
+                                self.demo_pose[k].clone() - getattr(
+                                    self, k.replace('_demo', '')))
+                    elif '_quat' in k:
+                        setattr(self, 'to_' + k, quat_mul(
+                                self.demo_pose[k].clone(), quat_conjugate(getattr(
+                                    self, k.replace('_demo', '')))))
 
     def _refresh_demo_pose(self):
         if hasattr(self, "demo_pose"):
@@ -143,13 +156,24 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
                         getattr(self, k)[:] = quat_mul(
                             self.drill_quat, v)
 
+                # Update relative positions and rotations
+                if hasattr(self, k.replace('_demo', '')):
+                    if '_pos' in k:
+                        getattr(self, 'to_' + k)[:] = getattr(self, k) - getattr(
+                        self, k.replace('_demo', ''))
+
+                    elif '_quat' in k:
+                        getattr(self, 'to_' + k)[:] = quat_mul(
+                            getattr(self, k), quat_conjugate(getattr(
+                            self, k.replace('_demo', ''))))
+
     def compute_observations(self):
         """Compute observations."""
 
         obs_tensors = []
         for observation in self.cfg_task.env.observations:
             # Flatten body dimension for keypoint observations
-            if observation.startswith(tuple(self.keypoint_dict.keys())):
+            if any(k in observation for k in self.keypoint_dict.keys()):
                 obs_tensors.append(getattr(self, observation).flatten(1, 2))
             else:
                 obs_tensors.append(getattr(self, observation))
@@ -191,25 +215,33 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         """Compute reward at current timestep."""
         self.rew_buf[:] = 0.
 
+        # Get drill height: Δh
+        # delta_lift_off_height is clamped between the initial difference
+        # (self.cfg_task.rl.lift_off_height) and the target (0).
+        drill_height = self.drill_pos[:, 2]
+        drill_height_initial = self.drill_pos_initial[:, 2]
+        delta_lift_off_height = torch.clamp(
+            self.cfg_task.rl.lift_off_height -
+            (drill_height - drill_height_initial),
+            min=0, max=self.cfg_task.rl.lift_off_height)
+
         # Get distance to target position: Δx
         drill_target_pos_dist = torch.norm(
-            self.drill_pos - self.drill_target_pos, p=2, dim=1)
-        drill_target_pos_dist_initial = torch.norm(
-            self.drill_pos_initial - self.drill_target_pos, p=2, dim=1)
+            self.to_drill_target_pos, p=2, dim=1)
+        #drill_target_pos_dist_initial = torch.norm(
+        #    self.drill_pos_initial - self.drill_target_pos, p=2, dim=1)
 
         # Get smallest angle to target orientation: Δθ
-        drill_target_quat_dist = quat_mul(
-            self.drill_quat, quat_conjugate(self.drill_target_quat))
         drill_target_angle_dist = 2.0 * torch.asin(
-            torch.clamp(torch.norm(drill_target_quat_dist[:, 0:3],
+            torch.clamp(torch.norm(self.to_drill_target_quat[:, 0:3],
                                    p=2, dim=-1), max=1.0))
-        drill_target_quat_dist_initial = quat_mul(
-            self.drill_quat_initial,
-            quat_conjugate(self.drill_target_quat))
-        drill_target_angle_dist_initial = 2.0 * torch.asin(
-            torch.clamp(torch.norm(
-                drill_target_quat_dist_initial[:, 0:3],
-                p=2, dim=-1), max=1.0))
+        #drill_target_quat_dist_initial = quat_mul(
+        #    self.drill_quat_initial,
+        #    quat_conjugate(self.drill_target_quat))
+        #drill_target_angle_dist_initial = 2.0 * torch.asin(
+        #    torch.clamp(torch.norm(
+        #        drill_target_quat_dist_initial[:, 0:3],
+        #        p=2, dim=-1), max=1.0))
 
         # Check whether the target pose has been reached
         target_pos_reached = \
@@ -219,54 +251,115 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         target_pose_reached = torch.logical_and(
             target_pos_reached, target_angle_reached)
 
+        # Get distance to demo ik_body position: Δx
+        ik_body_demo_pos_dist = torch.norm(
+            self.ik_body_pos - self.ik_body_demo_pos, p=2, dim=1)
+        # Get smallest angle to demo ik_body orientation: Δθ
+        ik_body_demo_quat_dist = quat_mul(
+            self.ik_body_quat, quat_conjugate(self.ik_body_demo_quat))
+        ik_body_demo_angle_dist = 2.0 * torch.asin(
+            torch.clamp(torch.norm(ik_body_demo_quat_dist[:, 0:3],
+                                   p=2, dim=-1), max=1.0))
+        # Check whether demo ik_body pose has been reached
+        close_to_ik_body_pose = exponential_rew(
+            1.0, ik_body_demo_pos_dist, c=10) * exponential_rew(
+            1.0, ik_body_demo_angle_dist, c=5)
+        ik_body_pose_reached = torch.logical_and(
+            ik_body_demo_pos_dist < 0.045,
+            ik_body_demo_angle_dist < 0.4)
+
+        # Check whether the thumb is under the drill
+        thumb_to_drill = self.fingertips_pos[:, 4] - self.drill_pos
+        thumb_to_drill_tool_coordinates = quat_rotate_inverse(
+            self.drill_quat, thumb_to_drill)
+        thumb_under_drill = thumb_to_drill_tool_coordinates[:, 1] > 0.
+
+        # Check whether the target dof pos has been reached
+        dof_pos_dist = torch.abs(
+            self.residual_actuated_dof_demo_pos -
+            self.dof_pos[:, self.residual_actuated_dof_indices])
+        dof_pos_reached = torch.all(dof_pos_dist < 0.4, dim=1)
+
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
             # Penalize distance of keypoint groups to pre-recorded pose
             if reward_term.startswith(tuple(self.keypoint_dict.keys())):
-                keypoint_group_name = '_'.join(reward_term.split('_')[:-3])
-                assert reward_term.endswith('_dist_penalty'), \
-                    f"Reward term {reward_term} depends on " \
-                    f"keypoint_group {keypoint_group_name}, but is not " \
-                    f"a distance penalty."
+                keypoint_group_name = '_'.join(reward_term.split('_')[:-2])
+                keypoint_dist = torch.norm(
+                    getattr(self, 'to_' + keypoint_group_name + '_demo_pos'),
+                    dim=2)
 
-                assert reward_term.split('_')[-3] == "imitation", \
-                    f"Reward term {reward_term} should be an imitation loss."
+                mean_keypoint_dist = keypoint_dist.mean(1)
 
-                assert f'{keypoint_group_name}_pos' in self.cfg['env']['observations'], \
-                    f"Cannot use imitation loss on keypoint group " \
-                    f"{keypoint_group_name} poses if " \
-                    f"'{keypoint_group_name}_pos' is not part of the " \
-                    f"observations."
+                # This is a distance penalty to the demonstrated keypoint pose
+                if reward_term.endswith('dist_penalty'):
+                    # keypoint reward is only used once the ik_body_pose is reached
+                    #reward = 0.025 * ik_body_pose_reached * torch.sum(keypoint_dist < 0.04, dim=-1)
+                    reward = ik_body_pose_reached * exponential_rew(
+                        scale, mean_keypoint_dist, c=8)
 
-                keypoint_pos = getattr(self, keypoint_group_name + '_pos')
-                keypoint_demo_pos = getattr(
-                    self, keypoint_group_name + '_demo_pos')
+                # This term rewards lift-off if the keypoint pose is satisfied
+                elif reward_term.endswith('based_liftoff'):
+                    keypoint_pose_reached = torch.all(
+                        keypoint_dist < 0.045, dim=1)
+                    reward = keypoint_pose_reached * exponential_rew(
+                        scale, delta_lift_off_height, c=5)
 
-                keypoint_dist_demo = torch.sum(torch.norm(
-                    keypoint_pos - keypoint_demo_pos, dim=2), dim=1)
-                reward = hyperbole_rew(
-                        scale, keypoint_dist_demo, c=0.05, pow=1)
+                else:
+                    assert False
+
+            elif reward_term == 'liftoff_reward':
+                delta_ik_body_pos_height = torch.clamp(
+                    self.cfg_task.rl.lift_off_height - (self.ik_body_pos[:, 2] -0.1), min=0.)
+                print("dof_pos_reached:", dof_pos_reached)
+                print("ik_body_pose_reached:", ik_body_pose_reached)
+                reward = torch.logical_and(ik_body_pose_reached, dof_pos_reached) * exponential_rew(
+                    scale, delta_ik_body_pos_height, c=5)
+
+            elif reward_term == 'around_handle_reward':
+                reward = scale * thumb_to_drill_tool_coordinates[:, 1]
+                #reward = scale * ik_body_pose_reached * thumb_under_drill
+
+            elif reward_term == 'ik_body_pos_dist_penalty':
+                reward = -scale * ik_body_demo_pos_dist
+
+            elif reward_term == 'ik_body_quat_dist_penalty':
+                reward = -scale * ik_body_demo_angle_dist
+
+            elif reward_term == 'dof_dist_penalty':
+                residual_actuated_dof_open_pos = torch.Tensor([[-1.571, 0, 0, 0, 0]]).repeat(self.num_envs, 1).to(self.device)
+                residual_actuated_dof_target_pos = torch.where(
+                    ik_body_pose_reached.unsqueeze(1).repeat(1, 5),
+                    self.residual_actuated_dof_demo_pos,
+                    residual_actuated_dof_open_pos)
+
+                residual_actuated_dof_dist = torch.abs(
+                    residual_actuated_dof_target_pos -
+                    self.dof_pos[:, self.residual_actuated_dof_indices])
+                mean_residual_actuated_dof_dist = \
+                    residual_actuated_dof_dist.mean(dim=-1)
+
+                reward = scale * -mean_residual_actuated_dof_dist + scale * ik_body_pose_reached
 
             # Penalize large actions
             elif reward_term == 'action_penalty':
-                action_norm = torch.norm(self.actions, p=2, dim=-1)
-                reward = - action_norm * scale
+                squared_action_norm = torch.linalg.norm(
+                    self.actions, dim=-1)
+                reward = - squared_action_norm * scale
 
             # Reward progress towards target position
             elif reward_term == 'target_pos_dist_penalty':
-                reward = \
-                    hyperbole_rew(
-                        scale, drill_target_pos_dist, c=0.05, pow=1) - \
-                    hyperbole_rew(
-                        scale, drill_target_pos_dist_initial, c=0.05, pow=1)
+                reward = torch.logical_and(
+                    ik_body_pose_reached, dof_pos_reached) * \
+                         hyperbole_rew(
+                        scale, drill_target_pos_dist, c=0.05, pow=1)
 
             # Reward progress towards target orientation
             elif reward_term == 'target_quat_dist_penalty':
-                reward = \
-                    hyperbole_rew(
-                        scale, drill_target_angle_dist, c=0.5, pow=1) - \
-                    hyperbole_rew(
-                        scale, drill_target_angle_dist_initial, c=0.5, pow=1)
+                reward = torch.logical_and(
+                    ik_body_pose_reached, dof_pos_reached) * \
+                         hyperbole_rew(
+                             scale, drill_target_angle_dist, c=0.05, pow=1)
 
             # Reward reaching the target pose
             elif reward_term == 'success_bonus':
@@ -277,14 +370,17 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
 
             self.rew_buf[:] += reward
             reward_terms["reward_terms/" + reward_term] = reward.mean()
+
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
+
+        print("reward_terms:", reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
 
         if self.drills_dropped:
-            self._reset_drill(env_ids, apply_reset=True)
+            self._reset_drill(env_ids, apply_reset=False)
         else:
             self._drop_drill(
                 env_ids,
@@ -329,8 +425,9 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         # Randomize drop position of drill
         drill_pos_drop = self._get_random_drop_pos(env_ids)
         drill_quat_drop = torch.tensor(
-            [[0, 0, 0, 1]], dtype=torch.float,
+            [[-0.707, 0, 0, 0.707]], dtype=torch.float,
             device=self.device).repeat(self.num_envs, 1)
+        #drill_quat_drop = self._get_random_drop_quat(env_ids)
 
         # Set root state tensor of the simulation
         self.root_pos[env_ids, self.drill_actor_id_env] = drill_pos_drop
@@ -374,17 +471,24 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         self.root_quat[env_ids, self.drill_site_actor_id_env] = \
             drill_quat_target
 
+        # Reset pose of drill and drill-site.
         if apply_reset:
+            drill_indices = self.drill_actor_ids_sim[env_ids].to(torch.int32)
             drill_site_indices = self.drill_site_actor_ids_sim[env_ids].to(
                 torch.int32)
+            indices = torch.cat([drill_indices, drill_site_indices])
             self.gym.set_actor_root_state_tensor_indexed(
                 self.sim,
                 gymtorch.unwrap_tensor(self.root_state),
-                gymtorch.unwrap_tensor(drill_site_indices),
-                len(drill_site_indices))
+                gymtorch.unwrap_tensor(indices),
+                len(indices))
 
     def _reset_buffers(self, env_ids):
         """Reset buffers."""
 
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
+
+    def visualize_ik_body_demo_pose(self, env_id: int, axis_length: float = 0.3
+                                    ) -> None:
+        self.visualize_body_pose("ik_body_demo", env_id, axis_length)

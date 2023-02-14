@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot name="rigid_drill">
+  <link name="base">
+    <visual>
+      <geometry>
+        <mesh filename="assets/base.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/base.obj" />
+      </geometry>
+    </collision>
+    <visual>
+      <geometry>
+        <mesh filename="assets/trigger.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/trigger.obj" />
+      </geometry>
+    </collision>
+    <visual>
+      <geometry>
+        <mesh filename="assets/chuck.obj" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/chuck.obj" />
+      </geometry>
+    </collision>
+    <visual>
+      <geometry>
+        <mesh filename="assets/bit.obj" />
+      </geometry>
+    </visual>
+  </link>
+</robot>

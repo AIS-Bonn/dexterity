@@ -6,5 +6,5 @@ defaults:
 
 env:
     env_name: 'DexterityEnvDrill'
-    drills: ['canonical/canonical.urdf']
+    drills: ['train/black_and_decker_unknown/rigid.urdf']
     drill_target_color: [0, 1, 0]

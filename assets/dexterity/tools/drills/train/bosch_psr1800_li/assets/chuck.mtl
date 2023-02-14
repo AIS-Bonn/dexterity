@@ -1,0 +1,15 @@
+# Blender MTL File: 'None'
+# Material Count: 1
+
+newmtl Bosch_PSR1800_LI-2.001
+Ns 45.562510
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 1
+map_Bump ./Bosch_PSR1800_LI-2_normal.jpg
+map_Kd ./Bosch_PSR1800_LI-2.jpg
+map_Ks ./Bosch_PSR1800_LI-2_specular_map.jpg
