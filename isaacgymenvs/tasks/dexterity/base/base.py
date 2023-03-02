@@ -409,11 +409,13 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                                    0:self.ik_body_dof_count]
 
         # Initialize pose targets for inverse kinematics
-        self.ctrl_target_ik_body_pos = torch.zeros((self.num_envs, 3),
-                                                   device=self.device)
-        self.ctrl_target_ik_body_quat = torch.tensor([[0, 0, 0, 1]],
-                                                     device=self.device).repeat(
-            self.num_envs, 1)
+        # Initialize pose targets for inverse kinematics
+        self.base_ctrl_target_ik_body_pos = torch.tensor(
+            [[0., 0., 0.5]], device=self.device).repeat(self.num_envs, 1)
+        self.base_ctrl_target_ik_body_quat = torch.tensor(
+            [[0., 0., 0., 1.]], device=self.device).repeat(self.num_envs, 1)
+        self.ctrl_target_ik_body_pos = self.base_ctrl_target_ik_body_pos.clone()
+        self.ctrl_target_ik_body_quat = self.base_ctrl_target_ik_body_quat.clone()
 
         # Initialize DoF targets for residual DoFs
         self.ctrl_target_residual_actuated_dof_pos = torch.zeros(
@@ -897,11 +899,14 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             (len(env_ids), 1))  # shape = (len(env_ids), num_dofs)
         self.dof_vel[env_ids, :self.robot_dof_count] = 0.0
 
+
+        # Reset control targets
+        self.ctrl_target_ik_body_pos[env_ids] = \
+            self.base_ctrl_target_ik_body_pos[env_ids].clone()
+        self.ctrl_target_ik_body_quat[env_ids] = \
+            self.base_ctrl_target_ik_body_quat[env_ids].clone()
         self.ctrl_target_dof_pos[env_ids] = \
             self.dof_pos[env_ids, :self.robot_dof_count]
-
-        # Reset target joint pos of residual joints. Necessary when relative
-        # control is used for those joints.
         self.ctrl_target_residual_actuated_dof_pos[env_ids, :] = 0.
 
         if apply_reset:
