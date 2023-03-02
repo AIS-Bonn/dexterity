@@ -149,18 +149,27 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
     
     def _update_observation_num(self, cfg) -> int:
         # Get the number of environment-specific observations.
+        skip_keys = ()
         num_observations = 0
         for observation in cfg['env']['observations']:
-            if observation == 'object_synthetic_pointcloud_pos':
-                obs_dim = 64 * 3
+            if observation.startswith('object_synthetic_pointcloud'):
+                skip_keys += (observation,)
+                split_observation = observation.split('_')
+                assert split_observation[-1] == 'pos'
+                if split_observation[-2].isdigit():
+                    self.synthetic_pointcloud_dimension = int(split_observation[-2])
+                else:
+                    self.synthetic_pointcloud_dimension = 64
+                obs_dim = self.synthetic_pointcloud_dimension * 3
             elif observation == 'object_bounding_box_pos':
+                skip_keys += (observation,)
                 obs_dim = 8 * 3
             else:
                 continue
             num_observations += obs_dim
         
         # Add the number of base observations.
-        num_observations += super()._update_observation_num(cfg, skip_keys=('object_synthetic_pointcloud_pos', 'object_bounding_box_pos'))
+        num_observations += super()._update_observation_num(cfg, skip_keys=skip_keys)
         return num_observations
 
     def create_envs(self):
@@ -310,7 +319,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_linvel = self.root_linvel[:, self.object_actor_id_env, 0:3]
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
-        if "object_synthetic_pointcloud_pos" in self.cfg["env"]["observations"]:
+        if any(obs.startswith("object_synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
             self.object_synthetic_pointcloud_pos = self._acquire_object_synthetic_pointcloud()
 
         if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
@@ -323,7 +332,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         """
         object_mesh_samples_pos = []
         for obj in self.objects:
-            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=64))
+            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=self.synthetic_pointcloud_dimension))
         object_mesh_samples_pos = np.stack(object_mesh_samples_pos)
         num_repeats = math.ceil(self.num_envs / len(self.objects))
         self.object_mesh_samples_pos = torch.from_numpy(object_mesh_samples_pos).to(
@@ -396,7 +405,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
 
-        if "object_synthetic_pointcloud_pos" in self.cfg["env"]["observations"]:
+        if any(obs.startswith("object_synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
             self._refresh_object_synthetic_pointcloud()
 
         if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
