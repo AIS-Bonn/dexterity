@@ -37,9 +37,13 @@ asset_info_object_sets.yaml.
 
 import glob
 import hydra
+import math
 import numpy as np
 import os
+from scipy.spatial.transform import Rotation as R
+import trimesh
 from typing import *
+from urdfpy import URDF
 
 from isaacgym import gymapi, gymutil
 from isaacgym.torch_utils import *
@@ -52,27 +56,28 @@ from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
 class DexterityObject:
     """Helper class that wraps object assets to make information about object
     geometry, etc. more easily available."""
-    def __init__(self, gym, sim, asset_root, asset_file) -> None:
+    def __init__(self, gym, sim, asset_root: str, asset_file: str) -> None:
         self._gym = gym
+        self._sim = sim
+        self._asset_root = asset_root
+        self._asset_file = asset_file
+        self.name = asset_file.split('/')[-1].split('.')[0]
 
-        # Load default asset options
+        self.acquire_asset_options()
+        self.asset = gym.load_asset(sim, asset_root, asset_file,
+                                     self.asset_options)
+
+    def acquire_asset_options(self, vhacd_resolution: int = 100000) -> None:
         self._asset_options = gymapi.AssetOptions()
         self._asset_options.override_com = True
         self._asset_options.override_inertia = True
         self._asset_options.vhacd_enabled = True  # Enable convex decomposition
         self._asset_options.vhacd_params = gymapi.VhacdParams()
-        self._asset_options.vhacd_params.resolution = 1000000
+        self._asset_options.vhacd_params.resolution = vhacd_resolution
 
-        # Create IsaacGym asset
-        self._asset = gym.load_asset(sim, asset_root, asset_file,
-                                     self._asset_options)
-
-        # Set object name based on asset file name
-        self.name = asset_file.split('/')[-1].split('.')[0]
-
-    @property
-    def asset(self):
-        return self._asset
+    def acquire_mesh(self) -> None:
+        urdf = URDF.load(os.path.join(self._asset_root, self._asset_file))
+        self.mesh = urdf.base_link.collision_mesh
 
     @property
     def asset_options(self) -> gymapi.AssetOptions:
@@ -84,17 +89,30 @@ class DexterityObject:
 
     @property
     def rigid_body_count(self) -> int:
-        return self._gym.get_asset_rigid_body_count(self._asset)
+        return self._gym.get_asset_rigid_body_count(self.asset)
 
     @property
     def rigid_shape_count(self) -> int:
-        return self._gym.get_asset_rigid_shape_count(self._asset)
+        return self._gym.get_asset_rigid_shape_count(self.asset)
 
     @property
     def start_pose(self) -> gymapi.Transform:
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(0, 0, 0.5)
         return start_pose
+
+    def sample_points_from_mesh(self, num_samples: int) -> np.array:
+        if not hasattr(self, "mesh"):
+            self.acquire_mesh()
+        points = np.array(trimesh.sample.sample_surface(
+            self.mesh, count=num_samples)[0]).astype(float)
+        return points
+    
+    def find_bounding_box_from_mesh(self) -> Tuple[np.array, np.array]:
+        if not hasattr(self, "mesh"):
+            self.acquire_mesh()
+        to_origin, extents = trimesh.bounds.oriented_bounds(self.mesh)
+        return to_origin, extents
 
 
 class DexterityEnvObject(DexterityBase, DexterityABCEnv):
@@ -128,6 +146,22 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_sets_asset_root = os.path.normpath(os.path.join(
             os.path.dirname(__file__),
             self.cfg_env['env']['object_sets_asset_root']))
+    
+    def _update_observation_num(self, cfg) -> int:
+        # Get the number of environment-specific observations.
+        num_observations = 0
+        for observation in cfg['env']['observations']:
+            if observation == 'object_synthetic_pointcloud_pos':
+                obs_dim = 64 * 3
+            elif observation == 'object_bounding_box_pos':
+                obs_dim = 8 * 3
+            else:
+                continue
+            num_observations += obs_dim
+        
+        # Add the number of base observations.
+        num_observations += super()._update_observation_num(cfg, skip_keys=('object_synthetic_pointcloud_pos', 'object_bounding_box_pos'))
+        return num_observations
 
     def create_envs(self):
         """Set env options. Import assets. Create actors."""
@@ -276,6 +310,84 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_linvel = self.root_linvel[:, self.object_actor_id_env, 0:3]
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
+        if "object_synthetic_pointcloud_pos" in self.cfg["env"]["observations"]:
+            self.object_synthetic_pointcloud_pos = self._acquire_object_synthetic_pointcloud()
+
+        if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
+            self.object_bounding_box_pos = self._acquire_object_bounding_box()
+
+    def _acquire_object_synthetic_pointcloud(self) -> torch.Tensor:
+        """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a 
+        placeholder for the absolute position of the points in space (object_synthetic_pointcloud_pos) to be updated
+        by _refresh_object_synthetic_pointcloud().
+        """
+        object_mesh_samples_pos = []
+        for obj in self.objects:
+            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=64))
+        object_mesh_samples_pos = np.stack(object_mesh_samples_pos)
+        num_repeats = math.ceil(self.num_envs / len(self.objects))
+        self.object_mesh_samples_pos = torch.from_numpy(object_mesh_samples_pos).to(
+            self.device, dtype=torch.float32).repeat(num_repeats, 1, 1)[:self.num_envs]
+        object_synthetic_pointcloud_pos = torch.zeros_like(self.object_mesh_samples_pos)
+        return object_synthetic_pointcloud_pos
+    
+    def _refresh_object_synthetic_pointcloud(self) -> None:
+        """Update the relative position of the sampled points (object_mesh_samples_pos) by the current 
+        object pose."""
+        num_samples = self.object_synthetic_pointcloud_pos.shape[1]
+        self.object_synthetic_pointcloud_pos[:] = self.object_pos.unsqueeze(1).repeat(
+            1, num_samples, 1) + quat_apply(self.object_quat.unsqueeze(1).repeat(1, num_samples, 1),
+            self.object_mesh_samples_pos)
+
+    def _acquire_object_bounding_box(self) -> torch.Tensor:
+        """Acquire extent and pose offset of the bounding box and return a placeholder for the absolute 
+        position of the bounding box corners in space (object_bounding_box_pos) to be updated by
+        _refresh_object_bounding_box().
+        """
+        self.object_bounding_box_extents = []
+        self.object_bounding_box_pos_offset = []
+        self.object_bounding_box_quat_offset = []
+        for obj in self.objects:
+            to_origin, extents = obj.find_bounding_box_from_mesh()
+            from_origin = np.linalg.inv(to_origin)
+            rotation_matrix = R.from_matrix(from_origin[0:3, 0:3])
+            translation = np.array(
+                [from_origin[0, 3], from_origin[1, 3], from_origin[2, 3]])
+            self.object_bounding_box_pos_offset.append(translation)
+            self.object_bounding_box_quat_offset.append(rotation_matrix.as_quat())
+            self.object_bounding_box_extents.append(extents)
+
+        num_repeats = math.ceil(self.num_envs / len(self.objects))
+        self.object_bounding_box_extents = torch.from_numpy(
+            np.stack(self.object_bounding_box_extents)).to(self.device).float().repeat(num_repeats, 1)[:self.num_envs]
+        self.object_bounding_box_pos_offset = torch.from_numpy(
+            np.stack(self.object_bounding_box_pos_offset)).to(self.device).float().repeat(num_repeats, 1)[:self.num_envs]
+        self.object_bounding_box_quat_offset = torch.from_numpy(
+            np.stack(self.object_bounding_box_quat_offset)).to(self.device).float().repeat(num_repeats, 1)[:self.num_envs]
+
+        self.bounding_box_corner_coords = torch.tensor(
+            [[[-0.5, -0.5, -0.5],
+              [-0.5, -0.5, 0.5],
+              [-0.5, 0.5, -0.5],
+              [-0.5, 0.5, 0.5],
+              [0.5, -0.5, -0.5],
+              [0.5, -0.5, 0.5],
+              [0.5, 0.5, -0.5],
+              [0.5, 0.5, 0.5]]],
+            device=self.device).repeat(self.num_envs, 1, 1)
+
+        object_bounding_box_pos = torch.zeros([self.num_envs, 8, 3])
+        return object_bounding_box_pos
+
+    def _refresh_object_bounding_box(self) -> None:
+        bounding_box_pos = self.object_pos + quat_apply(
+            self.object_quat, self.object_bounding_box_pos_offset)
+        bounding_box_quat = quat_mul(self.object_quat, self.object_bounding_box_quat_offset)
+        self.object_bounding_box_pos[:] = bounding_box_pos.unsqueeze(1).repeat(
+            1, 8, 1) + quat_apply(bounding_box_quat.unsqueeze(1).repeat(1, 8, 1),
+                self.bounding_box_corner_coords * self.object_bounding_box_extents.unsqueeze(
+                    1).repeat(1, 8, 1))
+
     def refresh_env_tensors(self):
         """Refresh tensors."""
         # NOTE: Tensor refresh functions should be called once per step, before
@@ -283,7 +395,12 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # NOTE: Since the object_pos, object_quat etc. are obtained from the
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
-        pass
+
+        if "object_synthetic_pointcloud_pos" in self.cfg["env"]["observations"]:
+            self._refresh_object_synthetic_pointcloud()
+
+        if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
+            self._refresh_object_bounding_box()
 
     def _get_random_drop_pos(self, env_ids) -> torch.Tensor:
         object_pos_drop = torch.tensor(

@@ -38,6 +38,7 @@ import hydra
 import math
 import os
 import sys
+from typing import *
 
 from isaacgym import gymapi, gymtorch, torch_utils
 from isaacgym.torch_utils import *
@@ -66,7 +67,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         self._get_base_yaml_params()
         cfg = self._get_robot_model(cfg)
-        cfg = self._update_observation_num(cfg)
+        num_observations = self._update_observation_num(cfg)
+        cfg["env"]["numObservations"] = num_observations
 
         if self.cfg_base.mode.export_scene:
             sim_device = 'cpu'
@@ -119,43 +121,44 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         cfg["env"]["numActions"] = 6 + self.residual_actuator_count
         return cfg
 
-    def _update_observation_num(self, cfg):
+    def _update_observation_num(self, cfg, skip_keys: Tuple = ())-> int:
+        """Calculates the basic number of observations fro positions, rotations, velocities and keypoint-groups.
+        Any other environment-specific observations are handled separately first and then included in the skip_keys.
+        """
         self.keypoint_dict = self.robot.model.get_keypoints()
 
         num_observations = 0
         for observation in cfg['env']['observations']:
-            # Infer general type of observation (e.g. position or quaternion)
-            if observation.endswith('_pos') or \
-                    observation.endswith('_pos_demo'):
-                obs_dim = 3
-            elif observation.endswith('_quat') or \
-                    observation.endswith('_quat_demo'):
-                obs_dim = 4
-            elif observation.endswith('_linvel'):
-                obs_dim = 3
-            elif observation.endswith('_angvel'):
-                obs_dim = 3
-            # Previous action can be included in the observation. obs_dim is
-            # then the dimension of the action-space of the robot.
-            elif observation == 'previous_action':
-                obs_dim = cfg["env"]["numActions"]
-            else:
-                # Assume other observations must be camera sensors and can
-                # therefore be skipped
-                continue
+            if observation not in skip_keys:
+                # Infer general type of observation (e.g. position, quaternion, or velocities).
+                if observation.endswith('_pos'):
+                    obs_dim = 3
+                elif observation.endswith('_quat'):
+                    obs_dim = 4
+                elif observation.endswith('_linvel'):
+                    obs_dim = 3
+                elif observation.endswith('_angvel'):
+                    obs_dim = 3
+                # Previous action can be included in the observation. obs_dim is
+                # then the dimension of the action-space of the robot.
+                elif observation == 'previous_action':
+                    obs_dim = cfg['env']['numActions']
+                else:
+                    # Other observations, e.g. camera sensors or environment specific observations are 
+                    # handled separately.
+                    continue
 
-            # Adjust dimensionality for keypoint group observations that can
-            # include multiple bodies
-            for keypoint_group_name in self.keypoint_dict.keys():
-                if observation.startswith(keypoint_group_name):
-                    # Multiply by number of keypoints in that group
-                    obs_dim *= len(
-                        self.keypoint_dict[keypoint_group_name].keys())
+                # Adjust dimensionality for keypoint group observations that can
+                # include multiple bodies
+                for keypoint_group_name in self.keypoint_dict.keys():
+                    if observation.startswith(keypoint_group_name):
+                        # Multiply by number of keypoints in that group
+                        obs_dim *= len(
+                            self.keypoint_dict[keypoint_group_name].keys())
 
-            # Add dimensionality of this observation to the total number
-            num_observations += obs_dim
-        cfg["env"]["numObservations"] = num_observations
-        return cfg
+                # Add dimensionality of this observation to the total number
+                num_observations += obs_dim
+        return num_observations
 
     def create_sim(self):
         """Set sim and PhysX params. Create sim object, ground plane, and envs."""
@@ -579,21 +582,21 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         joint positions or object poses."""
         obs_tensors = []
         for observation in self.cfg_task.env.observations:
-            # Camera observations are computed separately
+            # Camera observations are computed separately.
             if "cameras" in self.cfg_env.keys():
                 if observation in self.cfg_env.cameras.keys():
                     continue
-
-            # Flatten body dimension for keypoint observations
-            if observation.startswith(tuple(self.keypoint_dict.keys())):
-                obs_tensors.append(getattr(self, observation).flatten(1, 2))
-            elif observation == "previous_action":
+            
+            if observation == "previous_action":
                 obs_tensors.append(self.actions)
             else:
-                obs_tensors.append(getattr(self, observation))
+                obs = getattr(self, observation)
+                # Flatten observations that have more than one dimension (e.g. the position of keypoints or bounding box corners).
+                if len(obs.shape) == 3:
+                    obs = obs.flatten(1, 2)
+                obs_tensors.append(obs)
 
-        self.obs_buf = torch.cat(obs_tensors,
-                                 dim=-1)  # shape = (num_envs, num_observations)
+        self.obs_buf = torch.cat(obs_tensors, dim=-1)  # shape = (num_envs, num_observations)
 
     def _compute_visual_observations(self):
         if self._camera_dict:
