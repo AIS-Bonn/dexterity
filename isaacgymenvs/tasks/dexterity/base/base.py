@@ -590,13 +590,16 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             if observation == "previous_action":
                 obs_tensors.append(self.actions)
             else:
-                obs = getattr(self, observation)
+                obs = self.get_observation_tensor(observation)
                 # Flatten observations that have more than one dimension (e.g. the position of keypoints or bounding box corners).
                 if len(obs.shape) == 3:
                     obs = obs.flatten(1, 2)
                 obs_tensors.append(obs)
 
         self.obs_buf = torch.cat(obs_tensors, dim=-1)  # shape = (num_envs, num_observations)
+
+    def get_observation_tensor(self, observation: str) -> torch.Tensor:
+        return getattr(self, observation)
 
     def _compute_visual_observations(self):
         if self._camera_dict:

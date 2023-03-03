@@ -171,6 +171,12 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # Add the number of base observations.
         num_observations += super()._update_observation_num(cfg, skip_keys=skip_keys)
         return num_observations
+    
+    def get_observation_tensor(self, observation: str) -> torch.Tensor:
+        if observation.startswith('object_synthetic_pointcloud'):
+            return self.object_synthetic_pointcloud_pos
+        else:
+            return super().get_observation_tensor(observation)
 
     def create_envs(self):
         """Set env options. Import assets. Create actors."""
@@ -385,7 +391,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
               [0.5, 0.5, 0.5]]],
             device=self.device).repeat(self.num_envs, 1, 1)
 
-        object_bounding_box_pos = torch.zeros([self.num_envs, 8, 3])
+        object_bounding_box_pos = torch.zeros([self.num_envs, 8, 3]).to(self.device)
         return object_bounding_box_pos
 
     def _refresh_object_bounding_box(self) -> None:
