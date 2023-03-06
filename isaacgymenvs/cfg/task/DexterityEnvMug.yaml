@@ -1,0 +1,10 @@
+# See schema in factory_schema_config_env.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    - /dexterity_schema_config_env
+
+env:
+    env_name: 'DexterityEnvDrill'
+    drills: ['train/black_and_decker_unknown/rigid.urdf']
+    drill_target_color: [0, 1, 0]

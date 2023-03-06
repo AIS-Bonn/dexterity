@@ -1,0 +1,50 @@
+# See schema in factory_schema_config_task.py for descriptions of common parameters.
+
+defaults:
+    - _self_
+    # - /factory_schema_config_task
+
+name: DexterityTaskMugPutOnShelf
+physics_engine: ${..physics_engine}
+full_experiment_name: ${..experiment}
+
+
+# needed for headless VR
+enableCameraSensors: False
+
+sim:
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    up_axis: "z"
+    dt: 0.033333333 # required, but overridden in DexterityBase.yaml
+    gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
+
+    disable_gravity: False
+
+env:
+    numEnvs: ${resolve_default:16384,${...num_envs}}
+    numObservations: 0  # overwritten depending on observations
+    observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'fingertips_pos', 'to_ik_body_demo_pos', 'to_ik_body_demo_quat', 'to_residual_actuated_dof_demo_pos', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'fingertips_demo_pos', 'fingertips_demo_quat']
+    numActions: 0  # overwritten depending on robot configuration
+
+randomize:
+    mug_pos_drop: [ 0.0, 0.0, 0.1 ]  # position from which drill is dropped
+    mug_pos_drop_noise: [ 0.01, 0.01, 0.01 ]  # noise on drill drop position
+    num_mug_drop_steps: 150  # number of steps to drop drills
+
+    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
+    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
+    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+
+rl:
+    reward:
+        action_penalty: 0.001  # scale on action penalty
+        ik_body_pos_dist_penalty: 0.1
+        ik_body_quat_dist_penalty: 0.025
+        ik_body_pose_reached_bonus: 0.25
+        dof_dist_penalty: 0.05
+        dof_pos_reached_bonus: 0.5
+        liftoff_reward: 3.0  # scale on object lift-off progress reward
+    lift_off_height: 0.1
+    max_episode_length: 300

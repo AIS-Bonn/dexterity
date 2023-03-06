@@ -1,0 +1,15 @@
+# Blender 3.1.0 MTL File: 'None'
+# www.blender.org
+
+newmtl tools_hammer
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.500000 0.500000 0.500000
+Ks 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 3
+map_Kd  ./tools_2_low_tools_hammer_BaseColor.png
+map_Ns  ./tools_2_low_tools_hammer_Roughness.png
+map_refl  ./tools_2_low_tools_hammer_Metallic.png

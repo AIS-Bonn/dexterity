@@ -1,0 +1,8 @@
+,latent_shape_params,first_principal_component,second_principal_component,name
+0,[0. 0.],0.0,0.0,ycb_hammer
+1,[-66.74   8.51],-66.73746,8.5117035,used_hammer
+2,[12.42 -8.39],12.41694,-8.392227,ball_peen_hammer
+3,[  9.9  -23.49],9.898093,-23.494503,hammer_01
+4,[  9.93 -12.88],9.925248,-12.87721,hammer_02
+5,[ 11.4  -16.71],11.401958,-16.707527,hammer_03
+6,[23.1  52.96],23.095144,52.959763,hammer_04
