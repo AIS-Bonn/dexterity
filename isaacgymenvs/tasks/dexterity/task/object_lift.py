@@ -124,6 +124,24 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
                         1 - alpha) * self.success_rate_ewma
                 self.log({"success_rate_ewma": self.success_rate_ewma})
 
+                # Log exponentially weighted moving average (EWMA) of the
+                # object-wise success rate
+                for i, obj in enumerate(self.objects):
+                    if not hasattr(self, obj.name + "_success_rate_ewma"):
+                        setattr(self, obj.name + "_success_rate_ewma", 0.)
+                    num_resets = torch.sum(self.reset_buf[i::len(self.objects)])
+                    if num_resets > 0:
+                        num_successes = torch.sum(object_lifted[i::len(self.objects)])
+                        curr_success_rate = num_successes / num_resets
+                        alpha = (num_resets * len(self.objects) / self.num_envs) * \
+                                self.cfg_base.logging.success_rate_ewma.alpha
+                        setattr(
+                            self, obj.name + "_success_rate_ewma",
+                            alpha * curr_success_rate + (1 - alpha) * getattr(
+                                self, obj.name + "_success_rate_ewma"))
+                        self.log({obj.name + "_success_rate_ewma": getattr(
+                            self, obj.name + "_success_rate_ewma")})
+
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
         self._compute_object_lifting_reward(
