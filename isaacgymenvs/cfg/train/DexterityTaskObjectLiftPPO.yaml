@@ -58,10 +58,10 @@ params:
     save_best_after: 50
     save_frequency: 100
     print_stats: True
-    grad_norm: 1.0
-    entropy_coef: 0.0
+    grad_norm: 1.5
+    entropy_coef: 0.002
     truncate_grads: True
-    e_clip: 0.1
+    e_clip: 0.15
     horizon_length: 8
     minibatch_size: 32768
     mini_epochs: 8
