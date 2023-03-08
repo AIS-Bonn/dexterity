@@ -95,6 +95,8 @@ def launch_rlg_hydra(cfg: DictConfig):
             resume="allow",
             monitor_gym=True,
         )
+    else:
+        run = None
 
     def create_env_thunk(**kwargs):
         envs = isaacgymenvs.make(
@@ -143,7 +145,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # convert CLI arguments into dictionory
     # create runner and set the settings
-    runner = build_runner(RLGPUAlgoObserver())
+    runner = build_runner(RLGPUAlgoObserver(wandb_run=run))
     runner.load(rlg_config_dict)
     runner.reset()
 

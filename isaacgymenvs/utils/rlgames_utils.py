@@ -30,9 +30,11 @@ from rl_games.common import env_configurations, vecenv
 from rl_games.common.algo_observer import AlgoObserver
 from rl_games.algos_torch import torch_ext
 from isaacgymenvs.utils.utils import set_seed
+import os
 import torch
 import numpy as np
 from typing import Callable
+import wandb
 
 from isaacgymenvs.tasks import isaacgym_task_map
 
@@ -95,8 +97,9 @@ def get_rlgames_env_creator(
 class RLGPUAlgoObserver(AlgoObserver):
     """Allows us to log stats from the env along with the algorithm running stats. """
 
-    def __init__(self):
-        pass
+    def __init__(self, wandb_run=None):
+        self._wandb_run = wandb_run
+        self.best_ckpt_mtime = 0
 
     def after_init(self, algo):
         self.algo = algo
@@ -147,6 +150,7 @@ class RLGPUAlgoObserver(AlgoObserver):
             self.writer.add_scalar('scores/iter', mean_scores, epoch_num)
             self.writer.add_scalar('scores/time', mean_scores, total_time)
 
+        # Log custom data to tensorboard.
         if hasattr(self.algo.vec_env.env, "log_data"):
             for k, v in self.algo.vec_env.env.log_data.items():
                 self.log(k + '/frame', v, frame)
@@ -155,6 +159,34 @@ class RLGPUAlgoObserver(AlgoObserver):
 
             # clear dict of values to log
             self.algo.vec_env.env.log_data = {}
+
+        # Log model checkpoints to Weight & Biases run.
+        if hasattr(self.algo.vec_env.env, "cfg_base"):
+            if self.algo.vec_env.env.cfg_base.logging["log_ckpts_to_wandb"]:
+                self.save_wandb_artifacts(epoch_num)
+
+    def save_wandb_artifacts(self, epoch_num: int) -> None:
+        if self._wandb_run is not None:
+            # Log periodically saved checkpoints.
+            if epoch_num % self.algo.save_freq == 1:
+                for ckpt in os.listdir(self.algo.nn_dir):
+                    if ckpt.startswith('last_' + self.algo.config['name'] +
+                                       '_ep_' + str(epoch_num - 1)):
+                        ckpt_artifact = wandb.Artifact(name=ckpt, type='model')
+                        ckpt_artifact.add_file(
+                            os.path.join(self.algo.nn_dir, ckpt))
+                        self._wandb_run.log_artifact(ckpt_artifact)
+
+            # Log the best checkpoint.
+            best_ckpt_file = os.path.join(
+                self.algo.nn_dir, self.algo.config['name'] + ".pth")
+            if os.path.isfile(best_ckpt_file) and \
+                    os.stat(best_ckpt_file).st_mtime != self.best_ckpt_mtime:
+                self.best_ckpt_mtime = os.stat(best_ckpt_file).st_mtime
+                ckpt_artifact = wandb.Artifact(
+                    name=self.algo.config['name'] + ".pth", type='model')
+                ckpt_artifact.add_file(best_ckpt_file)
+                self._wandb_run.log_artifact(ckpt_artifact)
 
     def log(self, k, v, step):
         if isinstance(v, torch.Tensor):
