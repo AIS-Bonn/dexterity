@@ -30,6 +30,7 @@ from rl_games.common import env_configurations, vecenv
 from rl_games.common.algo_observer import AlgoObserver
 from rl_games.algos_torch import torch_ext
 from isaacgymenvs.utils.utils import set_seed
+from omegaconf import OmegaConf
 import os
 import torch
 import numpy as np
@@ -108,6 +109,12 @@ class RLGPUAlgoObserver(AlgoObserver):
         self.direct_info = {}
         self.writer = self.algo.writer
 
+        # Log cfg_base, cfg_env, and cfg_task files to Weights & Biases run.
+        if hasattr(self.algo.vec_env.env, "cfg_base"):
+            if self.algo.vec_env.env.cfg_base.logging["wandb_add_config_files"]:
+                self.wandb_add_config_files()
+
+
     def process_infos(self, infos, done_indices):
         assert isinstance(infos, dict), "RLGPUAlgoObserver expects dict info"
         if isinstance(infos, dict):
@@ -160,12 +167,12 @@ class RLGPUAlgoObserver(AlgoObserver):
             # clear dict of values to log
             self.algo.vec_env.env.log_data = {}
 
-        # Log model checkpoints to Weight & Biases run.
+        # Log model checkpoints to Weights & Biases run.
         if hasattr(self.algo.vec_env.env, "cfg_base"):
-            if self.algo.vec_env.env.cfg_base.logging["log_ckpts_to_wandb"]:
-                self.save_wandb_artifacts(epoch_num)
+            if self.algo.vec_env.env.cfg_base.logging["wandb_add_checkpoints"]:
+                self.wandb_add_checkpoints(epoch_num)
 
-    def save_wandb_artifacts(self, epoch_num: int) -> None:
+    def wandb_add_checkpoints(self, epoch_num: int) -> None:
         if self._wandb_run is not None:
             # Log periodically saved checkpoints.
             if epoch_num % self.algo.save_freq == 1:
@@ -187,6 +194,19 @@ class RLGPUAlgoObserver(AlgoObserver):
                     name=self.algo.config['name'] + ".pth", type='model')
                 ckpt_artifact.add_file(best_ckpt_file)
                 self._wandb_run.log_artifact(ckpt_artifact)
+
+    def wandb_add_config_files(self) -> None:
+        if self._wandb_run is not None:
+            for additional_config in ["cfg_base", "cfg_env", "cfg_task"]:
+                if hasattr(self.algo.vec_env.env, additional_config):
+                    OmegaConf.save(
+                        getattr(self.algo.vec_env.env, additional_config),
+                        additional_config + ".yaml")
+                    artifact = wandb.Artifact(
+                        name=additional_config, type='config')
+                    artifact.add_file(local_path=additional_config + ".yaml")
+                    os.remove(additional_config + ".yaml")
+                    self._wandb_run.log_artifact(artifact)
 
     def log(self, k, v, step):
         if isinstance(v, torch.Tensor):

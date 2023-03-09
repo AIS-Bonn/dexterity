@@ -93,7 +93,9 @@ debug:
 # the EWMA of the success rate can be specified in a sub-dictionary of that
 # logging key.
 logging:
-    log_ckpts_to_wandb: True
+    wandb_add_checkpoints: True
+    wandb_add_config_files: True
+
     reward_terms: ""
     success_rate_ewma:
         alpha: 0.05
