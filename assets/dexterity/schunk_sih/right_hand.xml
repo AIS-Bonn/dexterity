@@ -4,8 +4,8 @@
     <default>
         <default class="right_hand">
             <mesh scale="0.001 0.001 0.001"/>
-            <joint axis="1 0 0" damping="0.1" armature="0.01"/>
-            <position kp="5" forcerange="-5 5"/>
+            <joint axis="1 0 0" damping="1" armature="0.01"/>
+            <position kp="200" forcerange="-50 50"/>
 
             <!-- default joint and actuator attributes -->
             <default class="thumb_rotating">
@@ -69,80 +69,80 @@
         <mesh class="right_hand" file="th_inter_cvx.stl"/>
         <mesh class="right_hand" file="th_distal.stl"/>
 
-        <mesh class="right_hand" file="visual/palm_axes.stl"/>
-        <mesh class="right_hand" file="visual/palm_back_base.stl"/>
-        <mesh class="right_hand" file="visual/palm_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/palm_connector.stl"/>
-        <mesh class="right_hand" file="visual/palm_flange_screws.stl"/>
-        <mesh class="right_hand" file="visual/palm_flange.stl"/>
-        <mesh class="right_hand" file="visual/palm_front_base.stl"/>
-        <mesh class="right_hand" file="visual/palm_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/palm_pins.stl"/>
-        <mesh class="right_hand" file="visual/palm_rolls.stl"/>
-        <mesh class="right_hand" file="visual/palm_springs.stl"/>
-        <mesh class="right_hand" file="visual/palm_thumb_base.stl"/>
+        <mesh class="right_hand" file="palm_axes.stl"/>
+        <mesh class="right_hand" file="palm_back_base.stl"/>
+        <mesh class="right_hand" file="palm_back_plate.stl"/>
+        <mesh class="right_hand" file="palm_connector.stl"/>
+        <mesh class="right_hand" file="palm_flange_screws.stl"/>
+        <mesh class="right_hand" file="palm_flange.stl"/>
+        <mesh class="right_hand" file="palm_front_base.stl"/>
+        <mesh class="right_hand" file="palm_front_plate.stl"/>
+        <mesh class="right_hand" file="palm_pins.stl"/>
+        <mesh class="right_hand" file="palm_rolls.stl"/>
+        <mesh class="right_hand" file="palm_springs.stl"/>
+        <mesh class="right_hand" file="palm_thumb_base.stl"/>
 
-        <mesh class="right_hand" file="visual/if_distal_top.stl"/>
-        <mesh class="right_hand" file="visual/if_distal_bottom.stl"/>
-        <mesh class="right_hand" file="visual/if_distal_nail.stl"/>
-        <mesh class="right_hand" file="visual/if_distal_axis.stl"/>
-        <mesh class="right_hand" file="visual/if_distal_spring.stl"/>
-        <mesh class="right_hand" file="visual/if_proximal_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/if_proximal_base.stl"/>
-        <mesh class="right_hand" file="visual/if_proximal_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/if_proximal_roll.stl"/>
-        <mesh class="right_hand" file="visual/if_proximal_screws.stl"/>
+        <mesh class="right_hand" file="if_distal_top.stl"/>
+        <mesh class="right_hand" file="if_distal_bottom.stl"/>
+        <mesh class="right_hand" file="if_distal_nail.stl"/>
+        <mesh class="right_hand" file="if_distal_axis.stl"/>
+        <mesh class="right_hand" file="if_distal_spring.stl"/>
+        <mesh class="right_hand" file="if_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="if_proximal_base.stl"/>
+        <mesh class="right_hand" file="if_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="if_proximal_roll.stl"/>
+        <mesh class="right_hand" file="if_proximal_screws.stl"/>
 
-        <mesh class="right_hand" file="visual/mf_distal_top.stl"/>
-        <mesh class="right_hand" file="visual/mf_distal_bottom.stl"/>
-        <mesh class="right_hand" file="visual/mf_distal_nail.stl"/>
-        <mesh class="right_hand" file="visual/mf_distal_axis.stl"/>
-        <mesh class="right_hand" file="visual/mf_distal_spring.stl"/>
-        <mesh class="right_hand" file="visual/mf_proximal_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/mf_proximal_base.stl"/>
-        <mesh class="right_hand" file="visual/mf_proximal_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/mf_proximal_roll.stl"/>
-        <mesh class="right_hand" file="visual/mf_proximal_screws.stl"/>
+        <mesh class="right_hand" file="mf_distal_top.stl"/>
+        <mesh class="right_hand" file="mf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="mf_distal_nail.stl"/>
+        <mesh class="right_hand" file="mf_distal_axis.stl"/>
+        <mesh class="right_hand" file="mf_distal_spring.stl"/>
+        <mesh class="right_hand" file="mf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="mf_proximal_base.stl"/>
+        <mesh class="right_hand" file="mf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="mf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="mf_proximal_screws.stl"/>
 
-        <mesh class="right_hand" file="visual/rf_distal_top.stl"/>
-        <mesh class="right_hand" file="visual/rf_distal_bottom.stl"/>
-        <mesh class="right_hand" file="visual/rf_distal_nail.stl"/>
-        <mesh class="right_hand" file="visual/rf_distal_axis.stl"/>
-        <mesh class="right_hand" file="visual/rf_distal_spring.stl"/>
-        <mesh class="right_hand" file="visual/rf_proximal_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/rf_proximal_base.stl"/>
-        <mesh class="right_hand" file="visual/rf_proximal_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/rf_proximal_roll.stl"/>
-        <mesh class="right_hand" file="visual/rf_proximal_screws.stl"/>
+        <mesh class="right_hand" file="rf_distal_top.stl"/>
+        <mesh class="right_hand" file="rf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="rf_distal_nail.stl"/>
+        <mesh class="right_hand" file="rf_distal_axis.stl"/>
+        <mesh class="right_hand" file="rf_distal_spring.stl"/>
+        <mesh class="right_hand" file="rf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="rf_proximal_base.stl"/>
+        <mesh class="right_hand" file="rf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="rf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="rf_proximal_screws.stl"/>
 
-        <mesh class="right_hand" file="visual/lf_distal_top.stl"/>
-        <mesh class="right_hand" file="visual/lf_distal_bottom.stl"/>
-        <mesh class="right_hand" file="visual/lf_distal_nail.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_axis.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_base.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_roll.stl"/>
-        <mesh class="right_hand" file="visual/lf_proximal_screws.stl"/>
+        <mesh class="right_hand" file="lf_distal_top.stl"/>
+        <mesh class="right_hand" file="lf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="lf_distal_nail.stl"/>
+        <mesh class="right_hand" file="lf_proximal_axis.stl"/>
+        <mesh class="right_hand" file="lf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="lf_proximal_base.stl"/>
+        <mesh class="right_hand" file="lf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="lf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="lf_proximal_screws.stl"/>
 
-        <mesh class="right_hand" file="visual/th_distal_top.stl"/>
-        <mesh class="right_hand" file="visual/th_distal_bottom.stl"/>
-        <mesh class="right_hand" file="visual/th_distal_nail.stl"/>
-        <mesh class="right_hand" file="visual/th_distal_axis.stl"/>
+        <mesh class="right_hand" file="th_distal_top.stl"/>
+        <mesh class="right_hand" file="th_distal_bottom.stl"/>
+        <mesh class="right_hand" file="th_distal_nail.stl"/>
+        <mesh class="right_hand" file="th_distal_axis.stl"/>
 
-        <mesh class="right_hand" file="visual/th_inter_back_plate.stl"/>
-        <mesh class="right_hand" file="visual/th_inter_base.stl"/>
-        <mesh class="right_hand" file="visual/th_inter_front_plate.stl"/>
-        <mesh class="right_hand" file="visual/th_inter_roll.stl"/>
-        <mesh class="right_hand" file="visual/th_inter_screws.stl"/>
-        <mesh class="right_hand" file="visual/th_inter_spring.stl"/>
+        <mesh class="right_hand" file="th_inter_back_plate.stl"/>
+        <mesh class="right_hand" file="th_inter_base.stl"/>
+        <mesh class="right_hand" file="th_inter_front_plate.stl"/>
+        <mesh class="right_hand" file="th_inter_roll.stl"/>
+        <mesh class="right_hand" file="th_inter_screws.stl"/>
+        <mesh class="right_hand" file="th_inter_spring.stl"/>
 
-        <mesh class="right_hand" file="visual/th_proximal_axis.stl"/>
-        <mesh class="right_hand" file="visual/th_proximal_base.stl"/>
-        <mesh class="right_hand" file="visual/th_proximal_guides.stl"/>
-        <mesh class="right_hand" file="visual/th_proximal_roll.stl"/>
-        <mesh class="right_hand" file="visual/th_proximal_screws.stl"/>
-        <mesh class="right_hand" file="visual/th_proximal_spring.stl"/>
+        <mesh class="right_hand" file="th_proximal_axis.stl"/>
+        <mesh class="right_hand" file="th_proximal_base.stl"/>
+        <mesh class="right_hand" file="th_proximal_guides.stl"/>
+        <mesh class="right_hand" file="th_proximal_roll.stl"/>
+        <mesh class="right_hand" file="th_proximal_screws.stl"/>
+        <mesh class="right_hand" file="th_proximal_spring.stl"/>
 
     </asset>
 
@@ -293,7 +293,7 @@
                         <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_roll" />
                         <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_screws" />
                         <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_spring" />
-                        <geom class="plastic_collision" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_cvx" />
+                        <geom class="plastic_collision" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter" />
                         <body name="th_distal" pos="-0.0391 0 0">
                             <site name="keypoint-hand_bodies-th_distal" pos="-0.023 0 0.015"/>
                             <site name="keypoint-fingertips-th" pos="-0.023 0 0.015"/>

@@ -74,6 +74,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.arm_eef_body_id_env = None  # set in subclass
         self.tracker_body_id_env = None  # set in subclass
 
+        # Count the RL steps taken for curricula.
+        self.frame_count = 0
+
         super().__init__(cfg, rl_device, sim_device, graphics_device_id,
                          headless, virtual_screen_capture, force_render)  # create_sim() is called here
 
@@ -125,11 +128,11 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         num_observations = 0
         for observation in cfg['env']['observations']:
             # Infer general type of observation (e.g. position or quaternion)
-            if observation.endswith('_pos') or \
-                    observation.endswith('_pos_demo'):
+            if 'residual_actuated_dof' in observation:
+                obs_dim = 5  # self.robot.model.manipulator.actuator_count
+            elif observation.endswith('_pos'):
                 obs_dim = 3
-            elif observation.endswith('_quat') or \
-                    observation.endswith('_quat_demo'):
+            elif observation.endswith('_quat'):
                 obs_dim = 4
             elif observation.endswith('_linvel'):
                 obs_dim = 3
@@ -147,7 +150,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             # Adjust dimensionality for keypoint group observations that can
             # include multiple bodies
             for keypoint_group_name in self.keypoint_dict.keys():
-                if observation.startswith(keypoint_group_name):
+                if keypoint_group_name in observation:
                     # Multiply by number of keypoints in that group
                     obs_dim *= len(
                         self.keypoint_dict[keypoint_group_name].keys())
@@ -169,16 +172,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         #if self.cfg_base.mode.export_scene:
         #    self.sim_params.use_gpu_pipeline = False
         #else:
-        #    self.sim_params.use_gpu_pipeline = True
 
-        #self.sim_params.physx.use_gpu = True
+        self.sim_params.use_gpu_pipeline = (self.device.startswith("cuda") or self.device.startswith("gpu"))
+        self.sim_params.physx.use_gpu = (self.device.startswith("cuda") or self.device.startswith("gpu"))
+
         self.sim_params.physx.solver_type = 1  # default = 1 (Temporal Gauss-Seidel)
+        self.sim_params.physx.num_subscenes = 4
+        self.sim_params.physx.num_threads = 4  # for CPU PhysX only
         self.sim_params.physx.num_position_iterations = self.cfg_base.sim.num_pos_iters
         self.sim_params.physx.num_velocity_iterations = self.cfg_base.sim.num_vel_iters
-        self.sim_params.physx.rest_offset = 0.0  # default = 0.001
+
+        self.sim_params.physx.rest_offset = 0.001  # default = 0.001
         self.sim_params.physx.contact_offset = 0.002  # default = 0.02
-        self.sim_params.physx.bounce_threshold_velocity = 0.2  # default = 0.01
-        self.sim_params.physx.max_depenetration_velocity = 1000  # default = 100.0
+        self.sim_params.physx.bounce_threshold_velocity = 0.01  # default = 0.01
+        self.sim_params.physx.max_depenetration_velocity = 100.0  # default = 100.0
         #self.sim_params.physx.friction_offset_threshold = 0.01  # default = 0.04
         #self.sim_params.physx.friction_correlation_distance = 0.00625  # default = 0.025
 
@@ -316,7 +323,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                             table_asset, table_pose):
         # Segmentation id set to 0. Table is viewed as background.
         table_handle = self.gym.create_actor(
-            env_ptr, table_asset, table_pose, 'table', i, 0, 0)
+            env_ptr, table_asset, table_pose, 'table', i, 0, 1)
         self.table_actor_ids_sim.append(actor_count)
 
         # Set table shape properties
@@ -330,6 +337,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         table_shape_props[0].thickness = 0.0  # default = 0.0
         self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
                                                   table_shape_props)
+        self.gym.set_rigid_body_color(
+            env_ptr, table_handle, 0, gymapi.MESH_VISUAL,
+            gymapi.Vec3(0.6, 0.6, 0.6))
+
         self.table_handles.append(table_handle)
 
     def acquire_base_tensors(self):
@@ -406,13 +417,18 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                                    0:self.ik_body_dof_count]
 
         # Initialize pose targets for inverse kinematics
-        self.ctrl_target_ik_body_pos = torch.zeros((self.num_envs, 3),
-                                                   device=self.device)
-        self.ctrl_target_ik_body_quat = torch.tensor([[0, 0, 0, 1]],
-                                                     device=self.device).repeat(
-            self.num_envs, 1)
+        self.base_ctrl_target_ik_body_pos = torch.tensor(
+            [[0., 0., 0.5]], device=self.device).repeat(self.num_envs, 1)
+        self.base_ctrl_target_ik_body_quat = torch.tensor(
+            [[0., 0., 0., 1.]], device=self.device).repeat(self.num_envs, 1)
+        self.ctrl_target_ik_body_pos = self.base_ctrl_target_ik_body_pos.clone()
+        self.ctrl_target_ik_body_quat = self.base_ctrl_target_ik_body_quat.clone()
 
         # Initialize DoF targets for residual DoFs
+        self.residual_actuated_dof_pos = \
+            self.dof_pos[:, self.residual_actuated_dof_indices]
+        self.residual_actuated_dof_vel = \
+            self.dof_vel[:, self.residual_actuated_dof_indices]
         self.ctrl_target_residual_actuated_dof_pos = torch.zeros(
             (self.num_envs, self.residual_actuator_count), device=self.device)
 
@@ -452,6 +468,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.gym.refresh_mass_matrix_tensors(self.sim)
 
         self.refresh_keypoint_tensors()
+        self.refresh_dof_views()
 
     def refresh_keypoint_tensors(self) -> None:
         if not hasattr(self, 'keypoint_specs'):
@@ -468,11 +485,22 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                     torch_jit_utils.tf_combine(
                         self.body_quat[:, body_ids_env],
                         self.body_pos[:, body_ids_env],
-                        quat,
-                        pos)
+                        quat.to(self.device),
+                        pos.to(self.device))
 
                 setattr(self, group_name + '_pos', keypoint_group_pos)
                 setattr(self, group_name + '_quat', keypoint_group_quat)
+
+    def refresh_dof_views(self) -> None:
+        if not hasattr(self, 'dof_pos'):
+            return
+
+        if any(observation.startswith('residual_actuated_dof')
+                   for observation in self.cfg['env']['observations']):
+            self.residual_actuated_dof_pos[:] = \
+                self.dof_pos[:, self.residual_actuated_dof_indices]
+            self.residual_actuated_dof_vel[:] = \
+                self.dof_vel[:, self.residual_actuated_dof_indices]
 
     def pre_physics_step(self, actions):
         """Reset environments. Apply actions from policy. Simulation step called
@@ -540,6 +568,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         """Step buffers. Refresh tensors. Compute observations and reward."""
 
         self.progress_buf[:] += 1
+        self.frame_count += self.num_envs
 
         # In this policy, episode length is constant
         is_last_step = (self.progress_buf[0] == self.max_episode_length - 1)
@@ -552,7 +581,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.compute_reward()
 
 
-        if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
+        #if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
+        if len(self.cfg_base.debug.visualize) > 0 and self.num_envs < 64:
             self.gym.clear_lines(self.viewer)
             self.draw_visualizations(self.cfg_base.debug.visualize)
 
@@ -561,8 +591,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def compute_observations(self):
         """Compute observations."""
-        self._compute_proprioceptive_observations()
         self._compute_visual_observations()
+        self._compute_proprioceptive_observations()
+
 
     def compute_reward(self):
         """Detect successes and failures. Update reward and reset buffers."""
@@ -578,9 +609,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             if "cameras" in self.cfg_env.keys():
                 if observation in self.cfg_env.cameras.keys():
                     continue
-
             # Flatten body dimension for keypoint observations
             if observation.startswith(tuple(self.keypoint_dict.keys())):
+                obs_tensors.append(getattr(self, observation).flatten(1, 2))
+            elif observation.startswith("to_") and observation[3:].startswith(tuple(self.keypoint_dict.keys())):
                 obs_tensors.append(getattr(self, observation).flatten(1, 2))
             elif observation == "previous_action":
                 obs_tensors.append(self.actions)
@@ -894,12 +926,19 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             (len(env_ids), 1))  # shape = (len(env_ids), num_dofs)
         self.dof_vel[env_ids, :self.robot_dof_count] = 0.0
 
+        # Reset control targets
+        self.ctrl_target_ik_body_pos[env_ids] = \
+            self.base_ctrl_target_ik_body_pos[env_ids].clone()
+        self.ctrl_target_ik_body_quat[env_ids] = \
+            self.base_ctrl_target_ik_body_quat[env_ids].clone()
         self.ctrl_target_dof_pos[env_ids] = \
             self.dof_pos[env_ids, :self.robot_dof_count]
-
-        # Reset target joint pos of residual joints. Necessary when relative
-        # control is used for those joints.
         self.ctrl_target_residual_actuated_dof_pos[env_ids, :] = 0.
+
+        ctrl_target_dof_pos = torch.zeros((self.num_envs, self.num_dofs),
+                                          device=self.device)
+        ctrl_target_dof_pos[:, :self.robot_dof_count] = self.ctrl_target_dof_pos
+
 
         if apply_reset:
             multi_env_ids_int32 = self.robot_actor_ids_sim[env_ids].flatten()
@@ -908,6 +947,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 gymtorch.unwrap_tensor(self.dof_state),
                 gymtorch.unwrap_tensor(multi_env_ids_int32),
                 len(multi_env_ids_int32))
+
+        self.gym.set_dof_position_target_tensor(
+            self.sim, gymtorch.unwrap_tensor(ctrl_target_dof_pos))
 
     def _reset_buffers(self, env_ids):
         """Reset buffers."""
@@ -944,36 +986,48 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # Interpret actions as target pos displacements and set pos target
         pos_actions = ik_body_pose_actions[:, 0:3]
         if do_scale:
-            pos_actions = pos_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.pos_action_scale, device=self.device))
+            pos_actions = pos_actions @ torch.diag(
+                torch.tensor(self.cfg_base.ctrl.pos_action_scale,
+                             device=self.device))
 
-        if self.cfg_base.ctrl.add_pose_actions_to == "pose":
-            self.ctrl_target_ik_body_pos = self.ik_body_pos + pos_actions
-        elif self.cfg_base.ctrl.add_pose_actions_to == "target":
-            self.ctrl_target_ik_body_pos += pos_actions
+        if self.cfg_base.ctrl.relative_pose_actions:
+            if self.cfg_base.ctrl.add_pose_actions_to == "pose":
+                self.ctrl_target_ik_body_pos = self.ik_body_pos + pos_actions
+            elif self.cfg_base.ctrl.add_pose_actions_to == "target":
+                self.ctrl_target_ik_body_pos += pos_actions
+            else:
+                assert False
         else:
-            assert False
+            self.ctrl_target_ik_body_pos = pos_actions + self.base_ctrl_target_ik_body_pos
+
 
         # Interpret actions as target rot (axis-angle) displacements
         rot_actions = ik_body_pose_actions[:, 3:6]
         if do_scale:
-            rot_actions = rot_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.rot_action_scale, device=self.device))
-
+            rot_actions = rot_actions @ torch.diag(
+                torch.tensor(self.cfg_base.ctrl.rot_action_scale,
+                             device=self.device))
         # Convert to quat and set rot target
         angle = torch.norm(rot_actions, p=2, dim=-1)
-        axis = rot_actions / angle.unsqueeze(-1)
+        axis = rot_actions / (angle.unsqueeze(-1) + 1e-7)
         rot_actions_quat = torch_utils.quat_from_angle_axis(angle, axis)
-        if self.cfg_base.ctrl.clamp_rot:
-            rot_actions_quat = torch.where(angle.unsqueeze(-1).repeat(1, 4) > self.cfg_base.ctrl.clamp_rot_thresh,
-                                           rot_actions_quat,
-                                           torch.tensor([0.0, 0.0, 0.0, 1.0], device=self.device).repeat(self.num_envs,
-                                                                                                         1))
 
-        if self.cfg_base.ctrl.add_pose_actions_to == "pose":
-            self.ctrl_target_ik_body_quat = torch_utils.quat_mul(rot_actions_quat, self.ik_body_quat)
-        elif self.cfg_base.ctrl.add_pose_actions_to == "target":
-            self.ctrl_target_ik_body_quat = torch_utils.quat_mul(rot_actions_quat, self.ctrl_target_ik_body_quat)
+        if self.cfg_base.ctrl.relative_pose_actions:
+            if self.cfg_base.ctrl.clamp_rot:
+                rot_actions_quat = torch.where(angle.unsqueeze(-1).repeat(1, 4) > self.cfg_base.ctrl.clamp_rot_thresh,
+                                               rot_actions_quat,
+                                               torch.tensor([0.0, 0.0, 0.0, 1.0], device=self.device).repeat(self.num_envs,
+                                                                                                             1))
+
+            if self.cfg_base.ctrl.add_pose_actions_to == "pose":
+                self.ctrl_target_ik_body_quat = torch_utils.quat_mul(rot_actions_quat, self.ik_body_quat)
+            elif self.cfg_base.ctrl.add_pose_actions_to == "target":
+                self.ctrl_target_ik_body_quat = torch_utils.quat_mul(rot_actions_quat, self.ctrl_target_ik_body_quat)
+            else:
+                assert False
+
         else:
-            assert False
+            self.ctrl_target_ik_body_quat = torch_utils.quat_mul(rot_actions_quat, self.base_ctrl_target_ik_body_quat)
 
         # Action refers to relative change in target joint angles: j_{t+1}^{target} = j_{t}^{target} + a+t * \delta t * c_{rel_change_scale}.
         # Note that j_t refers to the joint control space in the [-1, 1] interval and is not in

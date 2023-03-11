@@ -6,17 +6,34 @@ class DexterityBaseVisualizations:
     def draw_visualizations(self, visualizations: List[str]) -> None:
         for env_id in range(self.num_envs):
             for visualization in visualizations:
-                # For visualization of multiple keypoint poses
-                if visualization.startswith(tuple(self.keypoint_dict.keys())):
-                    split_visualization = visualization.split('_')
-                    assert split_visualization[-1] == 'pose'
-                    keypoint_group_name = '_'.join(split_visualization[:-1])
-                    self.visualize_keypoint_body_pose(
-                        keypoint_group_name, env_id)
+                split_visualization = visualization.split('_')
+                assert split_visualization[-1] in ['pos', 'pose']
+                if split_visualization[-1] == 'pos':
+                    self.visualize_pos(visualization, env_id)
 
-                # For none-keypoint visualizations call the regular functions
-                else:
-                    getattr(self, "visualize_" + visualization)(env_id)
+                elif split_visualization[-1] == 'pose':
+                    # For visualization of multiple keypoint poses
+                    if visualization.startswith(tuple(self.keypoint_dict.keys())):
+                        keypoint_group_name = '_'.join(split_visualization[:-1])
+                        self.visualize_keypoint_body_pose(
+                            keypoint_group_name, env_id)
+
+                    # For none-keypoint visualizations call the regular functions
+                    else:
+                        getattr(self, "visualize_" + visualization)(env_id)
+
+    def visualize_pos(self, name: str, env_id: int, sphere_size: float = 0.003):
+        pos = getattr(self, name)[env_id]
+
+        if len(pos.shape) == 1:
+            pos = pos.unsqueeze(0)
+
+        for point_idx in range(pos.shape[0]):
+            pose = gymapi.Transform(gymapi.Vec3(*pos[point_idx]))
+            sphere_geom = gymutil.WireframeSphereGeometry(
+                sphere_size, 12, 12, gymapi.Transform(), color=(1, 1, 0))
+            gymutil.draw_lines(sphere_geom, self.gym, self.viewer,
+                               self.env_ptrs[env_id], pose)
 
     def visualize_body_pose(self, body_name: str, env_id: int,
                             axis_length: float = 0.3, idx: int = None,

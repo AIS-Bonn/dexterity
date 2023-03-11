@@ -9,8 +9,8 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 assets_dir = os.path.join(cwd, "../../../../assets/dexterity")
 
 MODEL_XML_PATHS = ["franka_emika_panda/panda.xml",
-                   "kuka_allegro/right_hand.xml",
-                   "schunk_sih/right_hand.xml",
+                   #"kuka_allegro/right_hand.xml",
+                   "schunk_sih/right_hand_modified.xml",
                    "shadow_hand/right_hand.xml",
                    "ur5e/ur5e.xml",
                    "vive_tracker/tracker.xml"]
@@ -19,7 +19,7 @@ for i, xml_path in enumerate(MODEL_XML_PATHS):
     MODEL_XML_PATHS[i] = os.path.normpath(os.path.join(assets_dir, xml_path))
 
 
-@pytest.mark.skip(reason="Test when new model is added.")
+#@pytest.mark.skip(reason="Test when new model is added.")
 def test_xml_files(show_model: bool = True):
     for xml_path in MODEL_XML_PATHS:
         model = mujoco.MjModel.from_xml_path(xml_path)
@@ -27,7 +27,7 @@ def test_xml_files(show_model: bool = True):
         if show_model:
             import mujoco_viewer
             data = mujoco.MjData(model)
-            viewer = mujoco_viewer.MujocoViewer(model, data)
+            viewer = mujoco_viewer.MujocoViewer(model, data,)
 
             while True:
                 if viewer.is_alive:
@@ -83,3 +83,7 @@ def test_model_attaching(show_model: bool = True):
                 break
 
         viewer.close()
+
+
+if __name__ == '__main__':
+    test_xml_files(show_model=True)

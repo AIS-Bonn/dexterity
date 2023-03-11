@@ -1,10 +1,41 @@
-# See schema in factory_schema_config_env.py for descriptions of common parameters.
+# See schema in dexterity_schema_config_env.py for descriptions of common parameters.
 
 defaults:
     - _self_
     - /dexterity_schema_config_env
 
 env:
-    env_name: 'DexterityEnvDrill'
-    drills: ['train/black_and_decker_unknown/rigid.urdf']
-    drill_target_color: [0, 1, 0]
+    env_name: 'DexterityEnvMug'
+    mugs: ['grey_mug', 'pink_silver_mug', 'mug_00', 'mug_01', 'mug_03', 'mug_04', 'mug_05', 'mug_06', 'mug_07', 'porcelain_mug']
+    test_mugs: ['violet_mug', 'nescafe_mug', 'mug_10']
+    canonical: 'white_blue_mug'
+
+    disable_grasp_pose_generalization: False
+
+
+cameras:
+    frontview:
+        model: 'realsense_d405'
+        pos: [0.75, 0.75, 0.5]
+        quat: [0., 0, -0.924, 0.383]
+
+    left_sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, 0.3, 0.15 ]
+        quat: [ 0.111, 0.111, -0.698, 0.698 ]
+
+    right_sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, -0.3, 0.15 ]
+        quat: [ -0.111, 0.111, 0.698, 0.698 ]
+
+    topview:
+        model: 'realsense_d405'
+        pos: [ 0.0, 0.0, 1.5 ]
+        quat: [ 0, 0.707, 0, 0.707 ]
+
+    palmview:
+        model: 'realsense_d405'
+        pos: [ 0.0125, 0.038, 0.081 ]
+        quat: [ -0.271, -0.653, 0.271, 0.653 ]  # 45 deg inclined downwards with the connector facing the wrist
+        attach_to_body: 'palm'

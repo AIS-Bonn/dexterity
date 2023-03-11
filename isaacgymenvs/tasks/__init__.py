@@ -34,7 +34,8 @@ from .ball_balance import BallBalance
 from .cartpole import Cartpole
 from .dexterity.task.bin_pick import DexterityTaskBinPick
 from .dexterity.task.drill_pick_and_place import DexterityTaskDrillPickAndPlace
-from.dexterity.task.hammer_drive_nail import DexterityTaskHammerDriveNail
+from .dexterity.task.hammer_drive_nail import DexterityTaskHammerDriveNail
+from .dexterity.task.mug_put_on_shelf import DexterityTaskMugPutOnShelf
 from .dexterity.task.object_lift import DexterityTaskObjectLift
 from .factory.factory_task_gears import FactoryTaskGears
 from .factory.factory_task_insertion import FactoryTaskInsertion
@@ -63,6 +64,7 @@ isaacgym_task_map = {
     "DexterityTaskBinPick": DexterityTaskBinPick,
     "DexterityTaskDrillPickAndPlace": DexterityTaskDrillPickAndPlace,
     "DexterityTaskHammerDriveNail": DexterityTaskHammerDriveNail,
+    "DexterityTaskMugPutOnShelf": DexterityTaskMugPutOnShelf,
     "DexterityTaskObjectLift": DexterityTaskObjectLift,
     "FactoryTaskGears": FactoryTaskGears,
     "FactoryTaskInsertion": FactoryTaskInsertion,

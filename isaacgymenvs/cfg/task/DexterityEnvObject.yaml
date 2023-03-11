@@ -13,7 +13,7 @@ env:
 
 cameras:
     frontview:
-        model: 'realsense_d405'
+        model: 'realsense_l515'
         pos: [0.75, 0, 0.5]
         quat: [-0.131, 0, 0.991, 0]
 

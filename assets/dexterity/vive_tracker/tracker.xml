@@ -12,7 +12,7 @@
 
     <worldbody>
         <body name="tracker" quat="0.5 -0.5 -0.5 -0.5">
-            <geom mesh="vive_tracker" material="htc_vive_blue" class="visual" quat="0.5 0.5 -0.5 -0.5"/>
+            <!--geom mesh="vive_tracker" material="htc_vive_blue" class="visual" quat="0.5 0.5 -0.5 -0.5"/-->
         </body>
     </worldbody>
 </mujoco>

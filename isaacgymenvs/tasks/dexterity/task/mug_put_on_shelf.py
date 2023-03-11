@@ -47,7 +47,7 @@ from isaacgymenvs.tasks.dexterity.task.schema_config_task import \
 from isaacgymenvs.tasks.dexterity.task.task_utils import *
 
 
-class DexterityTaskMugHang(DexterityEnvMug, DexterityABCTask):
+class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless,
                  virtual_screen_capture, force_render):
@@ -78,7 +78,7 @@ class DexterityTaskMugHang(DexterityEnvMug, DexterityABCTask):
         self.cfg_task = omegaconf.OmegaConf.create(self.cfg)
         self.max_episode_length = self.cfg_task.rl.max_episode_length  # required instance var for VecTask
 
-        ppo_path = 'train/DexterityTaskMugHangPPO.yaml'  # relative to Gym's Hydra search path (cfg dir)
+        ppo_path = 'train/DexterityTaskMugPutOnShelfPPO.yaml'  # relative to Gym's Hydra search path (cfg dir)
         self.cfg_ppo = hydra.compose(config_name=ppo_path)
         self.cfg_ppo = self.cfg_ppo['train']  # strip superfluous nesting
 
@@ -91,22 +91,81 @@ class DexterityTaskMugHang(DexterityEnvMug, DexterityABCTask):
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
+        # If the mug has been placed on the shelf
+        self.reset_buf[:] = torch.where(
+            self.on_shelf,
+            torch.ones_like(self.reset_buf),
+            self.reset_buf)
+
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
-        self.rew_buf[:] = 0.
-
-        tool_grasping_reward, reward_terms = self._compute_tool_grasping_reward()
-
-        if "reward_terms" in self.cfg_base.logging.keys():
-            self.log(reward_terms)
+        tool_grasping_reward, tool_grasping_reward_terms, ik_body_pose_reached, all_keypoints_reached, tool_picked_up = self._compute_tool_grasping_reward()
 
         self.rew_buf[:] = tool_grasping_reward
+
+        # Get distance to shelf position: Δx
+        shelf_pos_dist = torch.norm(
+            self.to_shelf_pos, p=2, dim=1)
+        shelf_pos_dist_initial = torch.norm(self.mug_pos_initial - self.shelf_pos, p=2, dim=1)
+        # Get smallest angle to shelf orientation: Δθ
+        shelf_angle_dist = 2.0 * torch.asin(
+            torch.clamp(torch.norm(self.to_shelf_quat[:, 0:3],
+                                   p=2, dim=-1), max=1.0))
+
+        # Check whether the mug has been placed on the shelf
+        target_pos_reached = \
+            shelf_pos_dist < 0.04
+        target_angle_reached = \
+            shelf_angle_dist < 0.4
+        self.on_shelf[:] = torch.logical_and(
+            target_pos_reached, target_angle_reached)
+
+        reward_terms = {}
+        for reward_term, scale in self.cfg_task.rl.reward.items():
+            # Penalize large actions
+            if reward_term == 'action_penalty':
+                squared_action_norm = torch.linalg.norm(
+                    self.actions, dim=-1)
+                reward = - squared_action_norm * scale
+
+            elif reward_term == 'shelf_pose_matching':
+                alpha = 5.
+                beta = 0.5
+                reward = scale * all_keypoints_reached * tool_picked_up * torch.exp(
+                    -alpha * shelf_pos_dist - beta * shelf_angle_dist)
+
+            # Reward progress towards target position
+            elif reward_term == 'shelf_pos_dist_penalty':
+                reward = torch.logical_and(all_keypoints_reached, tool_picked_up) * (hyperbole_rew(scale, shelf_pos_dist, c=0.25, pow=1) - hyperbole_rew(scale, shelf_pos_dist_initial, c=0.25, pow=1))
+
+            # Reward progress towards target orientation
+            elif reward_term == 'shelf_quat_dist_penalty':
+                reward = torch.logical_and(
+                    all_keypoints_reached, tool_picked_up) * \
+                         hyperbole_rew(
+                             scale, shelf_angle_dist, c=0.1, pow=1)
+
+            # Reward reaching the target pose
+            elif reward_term == 'success_bonus':
+                reward = scale * self.on_shelf
+
+            else:
+                continue
+
+            self.rew_buf[:] += reward
+            reward_terms["reward_terms/" + reward_term] = reward.mean()
+
+        if "reward_terms" in self.cfg_base.logging.keys():
+            reward_terms = {**reward_terms, **tool_grasping_reward_terms}
+            self.log(reward_terms)
+            #print("reward_terms:", reward_terms)
+            #print("self.rew_buf:", self.rew_buf)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
 
         if self.mugs_dropped:
-            self.reset_tool(env_ids, apply_reset=False)
+            self.reset_tool(env_ids, apply_reset=True)
         else:
             self.drop_tool(
                 env_ids,
@@ -114,4 +173,8 @@ class DexterityTaskMugHang(DexterityEnvMug, DexterityABCTask):
             self.mugs_dropped = True
 
         self._reset_robot(env_ids, apply_reset=True)
+
+        if self.cfg_task.randomize.move_to_pre_grasp_pose:
+            self.move_to_curriculum_pose(env_ids, sim_steps=500)
+
         self._reset_buffers(env_ids)

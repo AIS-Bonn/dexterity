@@ -52,12 +52,12 @@ def on_press(key):
         space_pressed = True
 
 
-def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
+def record_keypoint_pose(task: str = "DexterityTaskMugPutOnShelf"):
     initialize(config_path="../../../cfg/")
     cfg = compose(config_name="config",
                   overrides=["num_envs=1", "headless=False", "sim_device=cpu",
-                             f"task={task}",
-                             "task.rl.max_episode_length=100000"])
+                             f"task={task}", "seed=3",
+                             "task.rl.max_episode_length=1000"])
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_name = f"{cfg.wandb_name}_{time_str}"
@@ -69,6 +69,8 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
         tool_name = "drill"
     elif cfg.task.name == "DexterityTaskHammerDriveNail":
         tool_name = "hammer"
+    elif cfg.task.name == "DexterityTaskMugPutOnShelf":
+        tool_name = "mug"
     elif cfg.task.name == "DexterityTaskObjectLift":
         tool_name = "object"
     elif cfg.task.name == "DexterityTaskBinPick":
@@ -154,7 +156,7 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
             np_save_dict = {
                 "ik_body_demo_pos": relative_ik_body_pos_in_tool_coordinates.cpu().numpy(),
                 "ik_body_demo_quat": relative_ik_body_quat.cpu().numpy(),
-                "residual_actuated_demo_dofs": env.dof_pos[:, env.residual_actuated_dof_indices]
+                "residual_actuated_dof_demo_pos": env.dof_pos[:, env.residual_actuated_dof_indices]
             }
 
             for keypoint_group in env.keypoint_dict.keys():
@@ -170,8 +172,8 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
 
             asset_root = os.path.normpath(
                 os.path.join(os.path.dirname(__file__), '..', '..', '..', '..',
-                             'assets', 'dexterity', 'tools', tool_name + 's'))
-            asset_file = env.cfg_env['env'][tool_name + 's'][0]
+                             'assets', 'dexterity', 'tools', tool_name))
+            asset_file = env.cfg_env['env']['canonical']
             tool_dir = os.path.dirname(os.path.join(asset_root, asset_file))
             np.savez(os.path.join(tool_dir, env.robot.manipulator.model_name +
                                   '_demo_pose.npz'),

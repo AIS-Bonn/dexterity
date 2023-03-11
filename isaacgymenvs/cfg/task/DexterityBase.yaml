@@ -11,7 +11,7 @@ mode:
 sim:
     dt: 0.03333333333
     num_substeps: 8  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
-    num_pos_iters: 16
+    num_pos_iters: 8
     num_vel_iters: 0
     gravity_mag: 9.81
     add_damping: False
@@ -20,11 +20,11 @@ sim:
     
 env:
     env_spacing: 1.0
-    robot: [ 'franka_emika_panda/panda_limited.xml', 'schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml']
+    robot: [ 'ur5e/ur5e.xml', 'schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml']
     robot_depth: 0.6
     robot_friction: 1.0
-    has_table: False
-    table_height: 0.2
+    has_table: True
+    table_height: 0.01
     table_friction: 0.3
 
 ctrl:
@@ -40,8 +40,8 @@ ctrl:
     gym_default:
         ik_method: dls
         ik_prop_gain: 100
-        ik_deriv_gain: 25
-        residual_prop_gain: 10
+        ik_deriv_gain: 40
+        residual_prop_gain: 8
         residual_deriv_gain: 4
     joint_space_id:
         ik_method: dls
@@ -53,13 +53,20 @@ ctrl:
         residual_damping: 5.0
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
+    # For relative actions
     pos_action_scale: [ 0.1, 0.1, 0.1 ]
     rot_action_scale: [ 0.2, 0.2, 0.2 ]
+    # For absolute actions
+    #pos_action_scale: [ 0.5, 0.5, 0.5 ]
+    #rot_action_scale: [ 1.571, 1.571, 1.571 ]
+
     torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True
     clamp_rot_thresh: 1.0e-6
 
+
+    relative_pose_actions: True  # Whether the actions for the end-effector pose refer to the absolute target or are added to the current target.
     relative_residual_actions: True  # Whether the actions for the hand joint targets (e.g. finger movements) refer to the absolute target or are added to the current target.
     relative_residual_target_change_scale: 5.0
 
@@ -84,7 +91,7 @@ debug:
     save_videos: True  # Saves all camera observations to mp4 if cameras are used in the environment
 
     verbose: True
-    visualize: []
+    visualize: ['hand_bodies_demo_pose'] # ['ik_body_pose', 'hand_bodies_demo_pose', 'ik_body_demo_pose', 'pre_grasp_pose'] #['ik_body_pose', 'pre_grasp_pose', 'ik_body_demo_pose' ] # ['hand_bodies_pose', 'hand_bodies_demo_pose']
 
 # Specifies data to be logged in addition the data logged by default through
 # rl-games. dexterity environments check for the keys in logging (e.g.

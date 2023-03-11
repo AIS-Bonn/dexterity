@@ -6,5 +6,35 @@ defaults:
 
 env:
     env_name: 'DexterityEnvDrill'
-    drills: ['train/black_and_decker_unknown/rigid.urdf']
+    #drills: ['bosch_gsb180_li', 'bosch_psr1800_li', 'concept_drill', 'dewalt_dcd780', 'dewalt_unknown', 'makita_bhp451', 'makita_unknown', 'makita_xfd15', 'porter_cable_unknown', 'solidworks_arp']
+    #test_drills: ['blank_hagen_unknown', 'nasali_unknown', 'ryobi_one_plus']
+    #canonical: 'black_and_decker_unknown'
+
+    drills: [ 'bosch_gsb180_li', 'bosch_psr1800_li', 'concept_drill', 'dewalt_dcd780' ]
+    canonical: 'concept_drill'
+
     drill_target_color: [0, 1, 0]
+
+    disable_grasp_pose_generalization: False
+
+
+cameras:
+    frontview:
+        model: 'realsense_l515'
+        pos: [0.75, 0.75, 0.5]
+        quat: [0., 0, -0.924, 0.383]
+
+    sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, 1.2, 0.6 ]
+        quat: [ 0.111, 0.111, -0.698, 0.698 ]
+
+    left_sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, 0.3, 0.15 ]
+        quat: [ 0.111, 0.111, -0.698, 0.698 ]
+
+    right_sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, -0.3, 0.15 ]
+        quat: [ -0.111, 0.111, 0.698, 0.698 ]

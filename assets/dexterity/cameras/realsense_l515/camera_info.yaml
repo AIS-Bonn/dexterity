@@ -1,3 +1,5 @@
 fovx: 70
-resolution: [1024, 768]
-image_type: 'rgbd'
+resolution: [1920, 1080]
+#resolution: [1024, 768]
+#resolution: [128, 128]
+image_type: 'rgb_seg'

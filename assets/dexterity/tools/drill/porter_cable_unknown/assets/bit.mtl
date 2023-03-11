@@ -1,13 +1,12 @@
-# Blender MTL File: 'porter_cable.blend'
+# Blender MTL File: 'None'
 # Material Count: 1
 
-newmtl _Metal_Aluminum_Anodized_1.001
+newmtl Color_005.001
 Ns 94.117644
 Ka 1.000000 1.000000 1.000000
-Kd 0.792157 0.819608 0.858824
+Kd 0.503677 0.503677 0.503677
 Ks 0.330000 0.330000 0.330000
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
 illum 2
-map_Kd ../../drill_00/assets/_Metal_Aluminum_Anodized_1.jpg

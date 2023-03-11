@@ -10,12 +10,12 @@ full_experiment_name: ${..experiment}
 
 
 # needed for headless VR
-enableCameraSensors: True
+enableCameraSensors: False
 
 sim:
     use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
     up_axis: "z"
-    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    dt: 0.033333333 # required, but overridden in DexterityBase.yaml
     gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
 
     disable_gravity: False
@@ -23,16 +23,18 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'hammer_pos', 'hammer_quat', 'hand_bodies_pos', 'hand_bodies_pos_demo']
+    observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'ik_body_demo_pos', 'ik_body_demo_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
-    hammer_pos_drop: [ 0.0, 0.0, 0.5 ]  # position from which hammer is dropped
-    hammer_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on hammer drop position
-    num_hammer_drop_steps: 150  # number of steps to drop hammers
-    workspace_extent_xy: [ [ -0.25, -0.25 ], [ 0.25, 0.25 ] ] # hammers that land outside the workspace will be dropped again
+    move_to_pre_grasp_pose: True
 
-    nail_pos_xy_initial: [ 0.4, 0.0 ]  # initial xy position of the hammer
+    hammer_pos_drop: [ 0.0, 0.1, 0.1 ]  # position from which hammer is dropped
+    hammer_pos_drop_noise: [ 0.01, 0.01, 0.01 ]  # noise on hammer drop position
+    hammer_quat_drop: [-0.707, 0, 0, 0.707]
+    num_hammer_drop_steps: 150  # number of steps to drop hammers
+
+    nail_pos_xy_initial: [ 0.15, 0.0 ]  # initial xy position of the hammer
     nail_pos_xy_initial_noise: [ 0.05, 0.05 ]  # noise on initial hammer position
 
     ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
@@ -43,10 +45,15 @@ randomize:
 
 rl:
     reward:
-        action_penalty: 0.0  # scale on action penalty
-        #fingertips_imitation_dist_penalty: 0.0  # scale on fingertips distance penalty to the pre-recorded pose.
-        hand_bodies_imitation_dist_penalty: 1.0  # scale on hand_bodies distance penalty to the pre-recorded pose.
-        nail_depth_reward: 10.0  # reward that scales with depth of the nail
-        success_bonus: 1000.0  # reward received upon reaching target depth
-    target_nail_depth: -0.09  # target depth that the nail should be driven to
-    max_episode_length: 450
+        action_penalty: 0.001  # scale on action penalty
+        hand_bodies_dist_penalty: 0.00001
+        hand_bodies_reached_bonus: 0.5
+        ik_body_pose_success_bonus: 0.25
+        liftoff_reward: 0.05  # scale on object lift-off progress reward
+        nail_dist_penalty: 0.25
+        nail_depth_reward: 1000.0
+        success_bonus: 1000.0
+
+    lift_off_height: 0.1
+    target_nail_depth: -0.075
+    max_episode_length: 300

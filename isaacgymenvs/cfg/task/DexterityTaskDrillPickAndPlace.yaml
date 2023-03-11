@@ -23,13 +23,16 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'fingertips_pos', 'to_ik_body_demo_pos', 'to_ik_body_demo_quat', 'to_residual_actuated_dof_demo_pos', 'to_fingertips_demo_pos', 'to_drill_target_pos', 'to_drill_target_quat']
+    observations: ['ik_body_pos', 'ik_body_quat', 'to_drill_target_pos', 'to_drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'sideview'] #, 'left_sideview', 'right_sideview']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
-    drill_pos_drop: [ 0.1, 0.0, 0.5 ]  # position from which drill is dropped
-    drill_pos_drop_noise: [ 0.25, 0.25, 0.2 ]  # noise on drill drop position
+    move_to_pre_grasp_pose: True
+
+    drill_pos_drop: [ 0.1, 0.0, 0.3 ]  # position from which drill is dropped
+    drill_pos_drop_noise: [ 0.1, 0.1, 0.0 ]  # noise on drill drop position
     num_drill_drop_steps: 150  # number of steps to drop drills
+    drill_quat_drop: [-0.707, 0., 0., 0.707]
 
     drill_pos_target: [ 0.0, 0.0, 0.5 ]  # position from which drill is dropped
     drill_pos_target_noise: [ 0.05, 0.05, 0.05 ]  # noise on drill drop position
@@ -43,18 +46,14 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        #around_handle_reward: 0.05
-        #fingertips_dist_penalty: 0.8  # scale on fingertips distance penalty to the pre-recorded pose.
-        #fingertips_based_liftoff: 5.0  # scale on fingertips distance penalty to the pre-recorded pose.
-        #hand_bodies_imitation_dist_penalty: 0.1  # scale on hand_bodies distance penalty to the pre-recorded pose.
-        ik_body_pos_dist_penalty: 0.1
-        ik_body_quat_dist_penalty: 0.025
-        dof_dist_penalty: 0.25
-        liftoff_reward: 3.0  # scale on object lift-off progress reward
-        target_pos_dist_penalty: 2.0  # scale on distance penalty between drill pos and drill target pos
-        target_quat_dist_penalty: 1.0  # scale on min angle distance penalty between drill quat and drill target quat
+        hand_bodies_dist_penalty: 0.00001
+        hand_bodies_reached_bonus: 0.5
+        ik_body_pose_success_bonus: 0.25
+        liftoff_reward: 0.05  # scale on object lift-off progress reward
+        target_pose_matching: 10.0
         success_bonus: 5000.0  # reward received upon reaching target pose
-    lift_off_height: 0.1  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+
+    lift_off_height: 0.075  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_pos_threshold: 0.05  # maximum distance in meters to target pos to count as reached
-    target_angle_threshold: 0.1  # maximum angle in rad to target quat to count as reached
+    target_angle_threshold: 0.15  # maximum angle in rad to target quat to count as reached
     max_episode_length: 300

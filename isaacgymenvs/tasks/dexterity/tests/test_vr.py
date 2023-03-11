@@ -28,6 +28,7 @@
 
 import datetime
 import isaacgym
+import pytest
 
 import os
 from omegaconf import OmegaConf
@@ -40,6 +41,7 @@ from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 import isaacgymenvs
 
 
+@pytest.mark.skip(reason="Test when new model is added.")
 def test_vr_viewer():
     initialize(config_path="../../../cfg/")
     cfg = compose(config_name="config", overrides=["num_envs=1", "task=DexterityTaskObjectLift", "headless=False", "sim_device=cpu"])

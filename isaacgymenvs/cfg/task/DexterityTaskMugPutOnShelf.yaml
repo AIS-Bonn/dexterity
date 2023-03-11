@@ -10,7 +10,7 @@ full_experiment_name: ${..experiment}
 
 
 # needed for headless VR
-enableCameraSensors: False
+enableCameraSensors: True
 
 sim:
     use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
@@ -23,13 +23,16 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'fingertips_pos', 'to_ik_body_demo_pos', 'to_ik_body_demo_quat', 'to_residual_actuated_dof_demo_pos', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'fingertips_demo_pos', 'fingertips_demo_quat']
+    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'to_ik_body_demo_pos', 'to_ik_body_demo_quat', 'hand_bodies_pos', 'to_hand_bodies_demo_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'ik_body_demo_pos', 'ik_body_demo_quat'] #, 'left_sideview', 'right_sideview' ]
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
+    move_to_pre_grasp_pose: True
     mug_pos_drop: [ 0.0, 0.0, 0.1 ]  # position from which drill is dropped
-    mug_pos_drop_noise: [ 0.01, 0.01, 0.01 ]  # noise on drill drop position
-    num_mug_drop_steps: 150  # number of steps to drop drills
+    mug_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on drill drop position
+    mug_z_axis_noise: 0.1
+    mug_quat_drop: [0, 0, 0, 1.0]
+    num_mug_drop_steps: 150  # number of steps to drop mugs
 
     ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
     ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
@@ -40,11 +43,14 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        ik_body_pos_dist_penalty: 0.1
-        ik_body_quat_dist_penalty: 0.025
-        ik_body_pose_reached_bonus: 0.25
-        dof_dist_penalty: 0.05
-        dof_pos_reached_bonus: 0.5
-        liftoff_reward: 3.0  # scale on object lift-off progress reward
-    lift_off_height: 0.1
+        hand_bodies_dist_penalty: 0.00001
+        hand_bodies_reached_bonus: 0.5
+        ik_body_pose_success_bonus: 0.25
+        liftoff_reward: 0.05  # scale on object lift-off progress reward
+        #shelf_pos_dist_penalty: 10.0
+        #shelf_quat_dist_penalty: 1.0
+        shelf_pose_matching: 10.0
+        success_bonus: 5000.0
+
+    lift_off_height: 0.075
     max_episode_length: 300

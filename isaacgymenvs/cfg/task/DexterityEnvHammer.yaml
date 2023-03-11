@@ -1,4 +1,4 @@
-# See schema in factory_schema_config_env.py for descriptions of common parameters.
+# See schema in dexterity_schema_config_env.py for descriptions of common parameters.
 
 defaults:
     - _self_
@@ -6,5 +6,21 @@ defaults:
 
 env:
     env_name: 'DexterityEnvHammer'
-    hammers: ['canonical/canonical.urdf']
+    hammers: ['used_hammer', 'ball_peen_hammer', 'hammer_01', 'hammer_02', 'hammer_03', 'hammer_04', 'impact_hammer', 'sludge_hammer', 'turquoise_hammer', 'stanley_hammer']
+    test_hammers: ['black_red_hammer', 'gap_hammer', 'grit_hammer']
+    canonical: 'ycb_hammer'
+
     nail_color: [1, 0, 0]
+    disable_grasp_pose_generalization: False
+
+cameras:
+    frontview:
+        model: 'realsense_l515'
+        pos: [0.75, 0.75, 0.5]
+        quat: [0., 0, -0.924, 0.383]
+
+    sideview:
+        model: 'realsense_l515'
+        pos: [ 0.0, 1.1, 0.5 ]
+        quat: [ 0.111, 0.111, -0.698, 0.698 ]
+
