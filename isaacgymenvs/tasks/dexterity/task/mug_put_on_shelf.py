@@ -129,8 +129,8 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
                 reward = - squared_action_norm * scale
 
             elif reward_term == 'shelf_pose_matching':
-                alpha = 5.
-                beta = 0.5
+                alpha = 10.
+                beta = 1.
                 reward = scale * all_keypoints_reached * tool_picked_up * torch.exp(
                     -alpha * shelf_pos_dist - beta * shelf_angle_dist)
 

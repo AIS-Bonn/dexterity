@@ -296,7 +296,8 @@ class DexterityInstance:
             gym,
             sim,
             asset_root: str,
-            asset_file: str
+            asset_file: str,
+            vhacd_resolution: int = 100000
     ) -> None:
         self.gym = gym
         self.sim = sim
@@ -315,10 +316,9 @@ class DexterityInstance:
         #self._asset_options.max_linear_velocity = 10.0
         #self._asset_options.max_angular_velocity = 10.0
 
-
         self._asset_options.vhacd_enabled = True  # Enable convex decomposition
         self._asset_options.vhacd_params = gymapi.VhacdParams()
-        #self._asset_options.vhacd_params.resolution = 512000
+        self._asset_options.vhacd_params.resolution = vhacd_resolution
 
         # Create IsaacGym asset
         self._asset = gym.load_asset(sim, asset_root, asset_file,
@@ -539,6 +539,11 @@ class DexterityCategory:
                 instance.latent_shape_params = latent_shape_params
 
     def acquire_instances(self, asset_root: str, source_file: str, target_files: List[str]) -> None:
+        if self.tool_category == 'drill':
+            vhacd_resolution = 512000
+        else:
+            vhacd_resolution = 100000
+
         # Create DexterityInstances from the asset files
         self.target_instances = []
         pbar = tqdm([source_file, ] + target_files)
@@ -547,10 +552,10 @@ class DexterityCategory:
 
             if i == 0:
                 self.source_instance = DexterityInstance(self.gym, self.sim, asset_root,
-                                                         instance_file)
+                                                         instance_file, vhacd_resolution=vhacd_resolution)
             else:
                 self.target_instances.append(
-                    DexterityInstance(self.gym, self.sim, asset_root, instance_file))
+                    DexterityInstance(self.gym, self.sim, asset_root, instance_file, vhacd_resolution=vhacd_resolution))
 
     def acquire_deformation_fields(self, alpha: float, beta: float, max_iterations: int = 100) -> torch.Tensor:
         self.source_pc = self.source_instance.sample_pointcloud(rgb=(0, 0, 255))

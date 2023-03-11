@@ -23,7 +23,7 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'to_drill_target_pos', 'to_drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'sideview'] #, 'left_sideview', 'right_sideview']
+    observations: ['ik_body_pos', 'ik_body_quat', 'to_drill_target_pos', 'to_drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat'] #, 'left_sideview', 'right_sideview']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
@@ -46,9 +46,9 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        hand_bodies_dist_penalty: 0.00001
-        hand_bodies_reached_bonus: 0.5
-        ik_body_pose_success_bonus: 0.25
+        hand_bodies_dist_penalty: 0.000001
+        hand_bodies_reached_bonus: 0.1
+        ik_body_pose_success_bonus: 0.05
         liftoff_reward: 0.05  # scale on object lift-off progress reward
         target_pose_matching: 10.0
         success_bonus: 5000.0  # reward received upon reaching target pose

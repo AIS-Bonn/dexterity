@@ -17,6 +17,13 @@
         <box size="0.2 0.375 0.015"/>
       </geometry>
     </collision>
+
+    <collision>
+      <origin xyz="0 0 -0.1"/>
+      <geometry>
+        <box size="0.2 0.375 0.15"/>
+      </geometry>
+    </collision>
   </link>
 </robot>
 
