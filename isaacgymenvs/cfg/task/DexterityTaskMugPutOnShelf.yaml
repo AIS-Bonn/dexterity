@@ -26,6 +26,8 @@ env:
     observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'ik_body_demo_pos', 'ik_body_demo_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'mug_pos', 'mug_quat', 'shelf_pos'] #, 'left_sideview', 'right_sideview' ]
     numActions: 0  # overwritten depending on robot configuration
 
+ablation: '' # 'disable_grasp_pose_generalization', 'disable_pre_grasp_pose', 'disable_demo_guidance'
+
 randomize:
     move_to_pre_grasp_pose: True
     mug_pos_drop: [ -0.15, 0.0, 0.1 ]  # position from which drill is dropped
@@ -43,14 +45,14 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        hand_bodies_dist_penalty: 0.000001
-        hand_bodies_reached_bonus: 0.1
-        ik_body_pose_success_bonus: 0.05
+        hand_bodies_dist_penalty: 0.000005
+        hand_bodies_reached_bonus: 0.25
+        ik_body_pose_success_bonus: 0.125
         liftoff_reward: 0.05  # scale on object lift-off progress reward
         #shelf_pos_dist_penalty: 10.0
         #shelf_quat_dist_penalty: 1.0
         shelf_pose_matching: 10.0
-        success_bonus: 5000.0
+        success_bonus: 100.0
 
     lift_off_height: 0.075
     max_episode_length: 300

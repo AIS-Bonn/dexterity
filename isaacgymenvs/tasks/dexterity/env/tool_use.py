@@ -139,6 +139,9 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
         self.tool_picked_up_once = torch.zeros(self.num_envs,
                                                dtype=torch.bool,
                                                device=self.device)
+        self.succeeded_once = torch.zeros(self.num_envs,
+                                               dtype=torch.bool,
+                                               device=self.device)
 
         # Acquire tool pose and velocities
         tool_actor_id_env = getattr(self, f"{self.tool_category}_actor_id_env")
@@ -278,7 +281,7 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
         for tool_instance in [self.category_space.source_instance, ] + self.category_space.target_instances:
             demo_poses.append(tool_instance.demo_dict)
             for k in collected_demo_poses.keys():
-                if self.cfg_env['env']['disable_grasp_pose_generalization']:
+                if self.cfg_task.ablation == 'disable_grasp_pose_generalization':
                     collected_demo_poses[k].append(self.category_space.source_instance.demo_dict[k])
                 else:
                     collected_demo_poses[k].append(tool_instance.demo_dict[k])
@@ -526,6 +529,7 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
 
 
         self.tool_picked_up_once[env_ids] = False
+        self.succeeded_once[env_ids] = False
 
         # Set actor root state tensor
         if apply_reset:

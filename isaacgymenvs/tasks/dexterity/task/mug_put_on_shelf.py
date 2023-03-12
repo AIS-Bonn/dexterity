@@ -91,6 +91,21 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
+        # Log exponentially weighted moving average (EWMA) of the success rate
+        if "success_rate_ewma" in self.cfg_base.logging.keys():
+            if not hasattr(self, "success_rate_ewma"):
+                self.success_rate_ewma = 0.
+            num_resets = torch.sum(self.reset_buf)
+            # Update success rate if resets have actually occurred
+            if num_resets > 0:
+                num_successes = torch.sum(self.succeeded_once)
+                curr_success_rate = num_successes / num_resets
+                alpha = (num_resets / self.num_envs) * \
+                        self.cfg_base.logging.success_rate_ewma.alpha
+                self.success_rate_ewma = alpha * curr_success_rate + (
+                        1 - alpha) * self.success_rate_ewma
+                self.log({"success_rate_ewma": self.success_rate_ewma})
+
         # If the mug has been placed on the shelf
         #self.reset_buf[:] = torch.where(
         #    self.on_shelf,
@@ -102,6 +117,9 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
         tool_grasping_reward, tool_grasping_reward_terms, ik_body_pose_reached, all_keypoints_reached, tool_picked_up = self._compute_tool_grasping_reward()
 
         self.rew_buf[:] = tool_grasping_reward
+
+        if self.cfg_task.ablation == 'disable_demo_guidance':
+            self.rew_buf[:] *= 0.
 
         # Get distance to shelf position: Δx
         shelf_pos_dist = torch.norm(
@@ -119,6 +137,9 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
             shelf_angle_dist < 0.4
         self.on_shelf[:] = torch.logical_and(
             target_pos_reached, target_angle_reached)
+
+        self.succeeded_once = torch.logical_or(self.succeeded_once,
+                                               self.on_shelf)
 
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
@@ -174,7 +195,7 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
 
         self._reset_robot(env_ids, apply_reset=True)
 
-        if self.cfg_task.randomize.move_to_pre_grasp_pose:
+        if self.cfg_task.ablation not in ['disable_pre_grasp_pose', 'disable_demo_guidance']:
             self.move_to_curriculum_pose(env_ids, sim_steps=500)
 
         self._reset_buffers(env_ids)
