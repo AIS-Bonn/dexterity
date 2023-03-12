@@ -92,10 +92,10 @@ class DexterityTaskMugPutOnShelf(DexterityEnvMug, DexterityABCTask):
             self.reset_buf)
 
         # If the mug has been placed on the shelf
-        self.reset_buf[:] = torch.where(
-            self.on_shelf,
-            torch.ones_like(self.reset_buf),
-            self.reset_buf)
+        #self.reset_buf[:] = torch.where(
+        #    self.on_shelf,
+        #    torch.ones_like(self.reset_buf),
+        #    self.reset_buf)
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""

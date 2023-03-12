@@ -77,14 +77,13 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
-        nail_depth = self.dof_pos[:, -1]
-        nail_driven = nail_depth < self.cfg_task.rl.target_nail_depth
+        #nail_depth = self.dof_pos[:, -1]
+        #nail_driven = nail_depth < self.cfg_task.rl.target_nail_depth
 
-        # If the mug has been placed on the shelf
-        self.reset_buf[:] = torch.where(
-            nail_driven,
-            torch.ones_like(self.reset_buf),
-            self.reset_buf)
+        #self.reset_buf[:] = torch.where(
+        #    nail_driven,
+        #    torch.ones_like(self.reset_buf),
+        #    self.reset_buf)
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
@@ -109,16 +108,16 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
                 reward = - squared_action_norm * scale
 
             elif reward_term == 'nail_dist_penalty':
-                reward = all_keypoints_reached * hyperbole_rew(
+                reward = self.tool_picked_up_once * hyperbole_rew(
                     scale, nail_pos_dist, c=0.05, pow=1)
 
             # Reward progress towards target position
             elif reward_term == 'nail_depth_reward':
-                reward = scale * -nail_depth
+                reward = scale * self.tool_picked_up_once * -nail_depth
 
             # Reward reaching the target pose
             elif reward_term == 'success_bonus':
-                reward = scale * nail_driven
+                reward = scale * self.tool_picked_up_once * nail_driven
 
             else:
                 continue
@@ -131,6 +130,7 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
             self.log(reward_terms)
 
         print("reward_terms:", reward_terms)
+        print("self.tool_picked_up_once:", self.tool_picked_up_once)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
@@ -190,9 +190,3 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
             gymtorch.unwrap_tensor(self.dof_state),
             gymtorch.unwrap_tensor(robot_and_nail_indices),
             len(robot_and_nail_indices))
-
-    def _reset_buffers(self, env_ids):
-        """Reset buffers."""
-
-        self.reset_buf[env_ids] = 0
-        self.progress_buf[env_ids] = 0

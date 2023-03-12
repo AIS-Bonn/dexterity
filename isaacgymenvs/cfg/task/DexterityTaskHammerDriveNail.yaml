@@ -10,7 +10,7 @@ full_experiment_name: ${..experiment}
 
 
 # needed for headless VR
-enableCameraSensors: False
+enableCameraSensors: True
 
 sim:
     use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
@@ -23,14 +23,13 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'ik_body_demo_pos', 'ik_body_demo_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat']
+    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'ik_body_demo_pos', 'ik_body_demo_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'hammer_pos', 'hammer_quat', 'nail_pos']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
     move_to_pre_grasp_pose: True
-
-    hammer_pos_drop: [ 0.0, 0.1, 0.1 ]  # position from which hammer is dropped
-    hammer_pos_drop_noise: [ 0.01, 0.01, 0.01 ]  # noise on hammer drop position
+    hammer_pos_drop: [ -0.05, 0.1, 0.1 ]  # position from which hammer is dropped
+    hammer_pos_drop_noise: [ 0.01, 0.01, 0.0 ]  # noise on hammer drop position
     hammer_quat_drop: [-0.707, 0, 0, 0.707]
     num_hammer_drop_steps: 150  # number of steps to drop hammers
 
@@ -46,9 +45,9 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        hand_bodies_dist_penalty: 0.00001
-        hand_bodies_reached_bonus: 0.5
-        ik_body_pose_success_bonus: 0.25
+        hand_bodies_dist_penalty: 0.000001
+        hand_bodies_reached_bonus: 0.1
+        ik_body_pose_success_bonus: 0.05
         liftoff_reward: 0.05  # scale on object lift-off progress reward
         nail_dist_penalty: 0.25
         nail_depth_reward: 1000.0

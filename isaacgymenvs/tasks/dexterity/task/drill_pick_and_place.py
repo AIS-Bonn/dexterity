@@ -89,6 +89,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
+        '''
         # If the drill reaches the target pose
         # Get distance to target position: Δx
         drill_target_pos_dist = torch.norm(
@@ -109,6 +110,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         self.reset_buf[:] = torch.where(target_pose_reached,
                                         torch.ones_like(self.reset_buf),
                                         self.reset_buf)
+        '''
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""

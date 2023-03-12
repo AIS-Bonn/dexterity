@@ -23,7 +23,7 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'to_ik_body_demo_pos', 'to_ik_body_demo_quat', 'hand_bodies_pos', 'to_hand_bodies_demo_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'ik_body_demo_pos', 'ik_body_demo_quat'] #, 'left_sideview', 'right_sideview' ]
+    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'ik_body_demo_pos', 'ik_body_demo_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat', 'mug_pos', 'mug_quat', 'shelf_pos'] #, 'left_sideview', 'right_sideview' ]
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
@@ -43,9 +43,9 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        hand_bodies_dist_penalty: 0.00001
-        hand_bodies_reached_bonus: 0.5
-        ik_body_pose_success_bonus: 0.25
+        hand_bodies_dist_penalty: 0.000001
+        hand_bodies_reached_bonus: 0.1
+        ik_body_pose_success_bonus: 0.05
         liftoff_reward: 0.05  # scale on object lift-off progress reward
         #shelf_pos_dist_penalty: 10.0
         #shelf_quat_dist_penalty: 1.0
