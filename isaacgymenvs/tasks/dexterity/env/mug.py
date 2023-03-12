@@ -132,7 +132,7 @@ class DexterityEnvMug(DexterityEnvToolUse):
         table_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         mug_pose = gymapi.Transform()
-        shelf_pose = gymapi.Transform(p=gymapi.Vec3(0.25, 0, 0.25))
+        shelf_pose = gymapi.Transform(p=gymapi.Vec3(0.125, 0, 0.25))
 
         self.env_ptrs = []
         self.mug_handles = []

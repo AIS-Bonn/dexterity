@@ -142,9 +142,9 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
 
             # Reward matching the target pose.
             elif reward_term == 'target_pose_matching':
-                alpha = 5.
-                beta = 0.5
-                reward = scale * all_keypoints_reached * torch.exp(
+                alpha = 10.
+                beta = 1.0
+                reward = scale * self.tool_picked_up_once * torch.exp(
                     -alpha * drill_target_pos_dist - beta * drill_target_angle_dist)
 
             # Reward progress towards target position
@@ -174,8 +174,8 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
         if "reward_terms" in self.cfg_base.logging.keys():
             reward_terms = {**reward_terms, **tool_grasping_reward_terms}
             self.log(reward_terms)
-            print("reward_terms:", reward_terms)
-            print("self.rew_buf:", self.rew_buf)
+            #print("reward_terms:", reward_terms)
+            #print("self.rew_buf:", self.rew_buf)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""

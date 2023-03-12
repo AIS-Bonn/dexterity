@@ -136,6 +136,10 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
     def _acquire_env_tensors(self):
         """Acquire and wrap tensors. Create views."""
 
+        self.tool_picked_up_once = torch.zeros(self.num_envs,
+                                               dtype=torch.bool,
+                                               device=self.device)
+
         # Acquire tool pose and velocities
         tool_actor_id_env = getattr(self, f"{self.tool_category}_actor_id_env")
         setattr(self, f"{self.tool_category}_pos",
@@ -409,6 +413,9 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
         delta_lift_off_height = torch.clamp(
             self.cfg_task.rl.lift_off_height - tool_height, min=0)
         tool_picked_up = tool_height > self.cfg_task.rl.lift_off_height
+
+        self.tool_picked_up_once = torch.logical_or(self.tool_picked_up_once, tool_picked_up)
+
         self.log({'tool_picked_up': tool_picked_up.float().mean().item()})
 
         keypoints_reached_threshold = 0.05
@@ -502,8 +509,9 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
 
             tool_grasping_reward += reward
             reward_terms["reward_terms/" + reward_term] = reward.mean()
-            #print("reward_terms:", reward_terms)
-            #print("tool_grasping_reward:", tool_grasping_reward)
+        #print("reward_terms:", reward_terms)
+        #print("tool_grasping_reward:", tool_grasping_reward)
+        #print("self.tool_picked_up_once:", self.tool_picked_up_once)
         return tool_grasping_reward, reward_terms, ik_body_pose_reached, all_keypoints_reached, tool_picked_up
 
     def reset_tool(self, env_ids, apply_reset: bool = True):
@@ -515,6 +523,9 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
             getattr(self, f"{self.tool_category}_quat_initial")[env_ids]
         self.root_linvel[env_ids, tool_actor_id_env] = 0.0
         self.root_angvel[env_ids, tool_actor_id_env] = 0.0
+
+
+        self.tool_picked_up_once[env_ids] = False
 
         # Set actor root state tensor
         if apply_reset:

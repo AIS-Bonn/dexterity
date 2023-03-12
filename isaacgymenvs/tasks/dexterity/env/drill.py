@@ -212,10 +212,7 @@ class DexterityEnvDrill(DexterityEnvToolUse):
 
     def _acquire_env_tensors(self):
         """Acquire and wrap tensors. Create views."""
-        self.drill_pos = self.root_pos[:, self.drill_actor_id_env, 0:3]
-        self.drill_quat = self.root_quat[:, self.drill_actor_id_env, 0:4]
-        self.drill_linvel = self.root_linvel[:, self.drill_actor_id_env, 0:3]
-        self.drill_angvel = self.root_angvel[:, self.drill_actor_id_env, 0:3]
+        super()._acquire_env_tensors()
 
         self.drill_target_pos = self.root_pos[:, self.drill_site_actor_id_env, 0:3]
         self.drill_target_quat = self.root_quat[:, self.drill_site_actor_id_env, 0:4]

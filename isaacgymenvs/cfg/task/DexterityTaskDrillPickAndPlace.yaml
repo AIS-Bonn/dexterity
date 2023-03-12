@@ -23,7 +23,8 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'to_drill_target_pos', 'to_drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat'] #, 'left_sideview', 'right_sideview']
+    observations: ['previous_action', 'ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'drill_target_pos', 'drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat'] #, 'left_sideview', 'right_sideview']
+    #observations: ['ik_body_pos', 'ik_body_quat', 'to_drill_target_pos', 'to_drill_target_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat'] #, 'left_sideview', 'right_sideview']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:

@@ -28,8 +28,8 @@ env:
 
 randomize:
     move_to_pre_grasp_pose: True
-    mug_pos_drop: [ 0.0, 0.0, 0.1 ]  # position from which drill is dropped
-    mug_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on drill drop position
+    mug_pos_drop: [ -0.15, 0.0, 0.1 ]  # position from which drill is dropped
+    mug_pos_drop_noise: [ 0.025, 0.05, 0.0 ]  # noise on drill drop position
     mug_z_axis_noise: 0.1
     mug_quat_drop: [0, 0, 0, 1.0]
     num_mug_drop_steps: 150  # number of steps to drop mugs
