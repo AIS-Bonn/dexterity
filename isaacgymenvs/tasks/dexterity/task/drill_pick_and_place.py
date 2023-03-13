@@ -166,7 +166,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
             elif reward_term == 'target_pose_matching':
                 alpha = 10.
                 beta = 1.0
-                reward = scale * self.tool_picked_up_once * torch.exp(
+                reward = scale * self.tool_picked_up_once * all_keypoints_reached * torch.exp(
                     -alpha * drill_target_pos_dist - beta * drill_target_angle_dist)
 
             # Reward progress towards target position
@@ -185,7 +185,7 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
 
             # Reward reaching the target pose
             elif reward_term == 'success_bonus':
-                reward = scale * target_pose_reached
+                reward = scale * target_pose_reached * all_keypoints_reached
 
             else:
                 continue

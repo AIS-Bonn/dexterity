@@ -53,10 +53,10 @@ rl:
         hand_bodies_reached_bonus: 0.25
         ik_body_pose_success_bonus: 0.125
         liftoff_reward: 0.05  # scale on object lift-off progress reward
-        target_pose_matching: 10.0
+        target_pose_matching: 25.0
         success_bonus: 100.0  # reward received upon reaching target pose
 
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
-    target_pos_threshold: 0.05  # maximum distance in meters to target pos to count as reached
-    target_angle_threshold: 0.15  # maximum angle in rad to target quat to count as reached
+    target_pos_threshold: 0.03  # maximum distance in meters to target pos to count as reached
+    target_angle_threshold: 0.1  # maximum angle in rad to target quat to count as reached
     max_episode_length: 300
