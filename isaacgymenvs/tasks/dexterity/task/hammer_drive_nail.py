@@ -113,6 +113,10 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
         nail_pos_dist = torch.norm(
             self.nail_pos - self.hammer_pos, p=2, dim=1)
 
+        hammer_close_to_nail = nail_pos_dist < 0.05
+
+        self.log({"nail_pos_dist": nail_pos_dist.mean().item()})
+
         # Get depth of the nail
         nail_depth = self.dof_pos[:, -1]
         nail_driven = nail_depth < self.cfg_task.rl.target_nail_depth
@@ -129,16 +133,16 @@ class DexterityTaskHammerDriveNail(DexterityEnvHammer, DexterityABCTask):
                 reward = - squared_action_norm * scale
 
             elif reward_term == 'nail_dist_penalty':
-                reward = self.tool_picked_up_once * hyperbole_rew(
+                reward = torch.logical_and(self.tool_picked_up_once, all_keypoints_reached) * hyperbole_rew(
                     scale, nail_pos_dist, c=0.05, pow=1)
 
             # Reward progress towards target position
             elif reward_term == 'nail_depth_reward':
-                reward = scale * self.tool_picked_up_once * -nail_depth
+                reward = scale * torch.logical_and(self.tool_picked_up_once, all_keypoints_reached) * hammer_close_to_nail * -nail_depth
 
             # Reward reaching the target pose
             elif reward_term == 'success_bonus':
-                reward = scale * self.tool_picked_up_once * nail_driven
+                reward = scale * torch.logical_and(self.tool_picked_up_once, all_keypoints_reached) * hammer_close_to_nail * nail_driven
 
             else:
                 continue

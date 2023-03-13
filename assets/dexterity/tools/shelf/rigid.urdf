@@ -14,7 +14,7 @@
     <collision>
       <origin xyz="0 0 -0.015"/>
       <geometry>
-        <box size="0.2 0.375 0.015"/>
+        <box size="0.2 0.375 0.018"/>
       </geometry>
     </collision>
 

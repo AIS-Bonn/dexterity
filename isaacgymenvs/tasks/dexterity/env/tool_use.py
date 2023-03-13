@@ -649,7 +649,7 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
             actions[:, 0:3] = 1 * pos_error
             actions[:, 3:6] = 1 * axis_angle_error
 
-            dof_targets = (1 - 0.75*progress) * residual_actuated_dof_open_pos + 0.75*progress * self.residual_actuated_dof_demo_pos
+            dof_targets = (1 - 0.5*progress) * residual_actuated_dof_open_pos + 0.5*progress * self.residual_actuated_dof_demo_pos
             actions[:, 6:] = dof_targets - self.dof_pos[:, self.residual_actuated_dof_indices]
             actions = torch.clamp(actions, -1, 1)
 

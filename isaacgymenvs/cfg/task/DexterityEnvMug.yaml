@@ -15,9 +15,10 @@ env:
 
 cameras:
     frontview:
-        model: 'realsense_d405'
-        pos: [0.75, 0.75, 0.5]
-        quat: [0., 0, -0.924, 0.383]
+        model: 'realsense_l515'
+        pos: [0.8, 0.8, 0.7]
+        #quat: [0., 0, -0.924, 0.383]
+        quat: [0.223, 0.093, -0.908, 0.343]
 
     left_sideview:
         model: 'realsense_l515'
