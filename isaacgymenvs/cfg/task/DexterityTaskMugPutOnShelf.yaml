@@ -54,5 +54,5 @@ rl:
         shelf_pose_matching: 10.0
         success_bonus: 100.0
 
-    lift_off_height: 0.075
+    lift_off_height: 0.05
     max_episode_length: 300

@@ -35,8 +35,8 @@ randomize:
     hammer_quat_drop: [-0.707, 0, 0, 0.707]
     num_hammer_drop_steps: 150  # number of steps to drop hammers
 
-    nail_pos_xy_initial: [ 0.15, 0.0 ]  # initial xy position of the hammer
-    nail_pos_xy_initial_noise: [ 0.05, 0.05 ]  # noise on initial hammer position
+    nail_pos_xy_initial: [ 0.45, 0.0 ]  # initial xy position of the hammer
+    nail_pos_xy_initial_noise: [ 0.01, 0.01 ]  # noise on initial hammer position
 
     ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
     ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
@@ -55,6 +55,6 @@ rl:
         nail_depth_reward: 100.0
         success_bonus: 100.0
 
-    lift_off_height: 0.075
+    lift_off_height: 0.05
     target_nail_depth: -0.075
     max_episode_length: 300
