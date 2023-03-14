@@ -198,7 +198,7 @@ class DexterityEnvToolUse(DexterityBase, DexterityABCEnv):
 
     def estimate_observed_shapes(
             self,
-            cameras: Tuple[str] = ('left_sideview', 'right_sideview'),
+            cameras: Tuple[str] = ('left_sideview', ),
             visualize: bool = True
     ) -> None:
 

@@ -174,7 +174,7 @@ class DexterityEnvDrill(DexterityEnvToolUse):
             # Create drill site actor (used to visualize target pose)
             drill_site_handle = self.gym.create_actor(
                 env_ptr, used_drill_site, drill_site_pose, 'drill_site', i, 0,
-                2)
+                3)
             self.drill_site_actor_ids_sim.append(actor_count)
             self.drill_site_handles.append(drill_site_handle)
             for rigid_body_idx in range(

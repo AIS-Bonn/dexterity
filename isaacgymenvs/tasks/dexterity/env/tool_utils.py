@@ -743,7 +743,7 @@ class DexterityCategory:
                         y_range = [-0.2, 0.2]
                         z_range = [-0.35, 0.05]
                     camera = dict(
-                        eye=dict(x=1.5, y=0., z=0.)
+                        eye=dict(x=0., y=1.5, z=0.)
                     )
 
                     tmp_fig = go.Figure(data=[go.Scatter3d(
@@ -811,7 +811,7 @@ class DexterityCategory:
                 y=obs[:, 1].cpu().numpy(),
                 z=obs[:, 2].cpu().numpy(),
                 mode='markers',
-                marker=dict(size=3),
+                marker=dict(size=2, color='rgba(255, 0, 0, 1.0)'),
                 name='observed')
             scatters = [obs_scatter, ]
 
@@ -819,8 +819,7 @@ class DexterityCategory:
             #latent_params.data = good_latent_params
 
             losses = []
-
-            for itr in range(1000):
+            for itr in range(2000):
                 deformation_feature_vector = torch.matmul(
                     latent_params, principal_def)
                 deformation_field = ((deformation_feature_vector * def_std) + def_mean).reshape(-1, 3)
@@ -851,13 +850,13 @@ class DexterityCategory:
                 print("latent_params:", latent_params)
                 print(f"loss: {loss:>7f}  [{itr:>5d}/{100:>5d}]")
 
-                if itr % 250 == 0:
+                if itr % 100 == 0:
                     def_can_scatter = go.Scatter3d(
                         x=def_can[:, 0].detach().cpu().numpy(),
                         y=def_can[:, 1].detach().cpu().numpy(),
                         z=def_can[:, 2].detach().cpu().numpy(),
                         mode='markers',
-                        marker=dict(size=3),
+                        marker=dict(size=2, color=('rgba(0, 0, 255, 1.0)')),
                         name=f"deformed_canonical_itr={itr}")
                     scatters.append(def_can_scatter)
 
@@ -866,19 +865,25 @@ class DexterityCategory:
             fig = go.Figure(data=scatters, )
             fig.update_layout(
                 scene=dict(
-                    xaxis=dict(range=[-0.75, 0.75], ),
-                    yaxis=dict(range=[-0.75, 0.75], ),
-                    zaxis=dict(range=[-0.05, 1.45], ), ),
-
+                    xaxis=dict(range=[-0.4, 0.05], ),
+                    yaxis=dict(range=[-0.225, 0.225], ),
+                    zaxis=dict(range=[-0.35, 0.1], ), ),
             )
 
-            #fig.show()
+            fig.update_scenes(aspectratio=dict(x=1, y=1, z=1))
+            fig.update_scenes(xaxis_visible=False, yaxis_visible=False,
+                              zaxis_visible=False)
+
+            fig.show()
 
             loss_curve = go.Scatter(x=list(range(len(losses))),
                                     y=losses)
 
             loss_fig = go.Figure(data=[loss_curve, ])
-            #loss_fig.show()
+            loss_fig.show()
+
+            import time
+            time.sleep(1000)
 
             # Set latent params and new demo pose for a partially observed instance
             instance_list[env_id].latent_shape_params = latent_params.detach().cpu().clone()
