@@ -405,8 +405,8 @@ class DexterityCategory:
             source_file: str,
             target_files: List[str],
             demo_path: os.path,
-            alpha: float = 2.0,
-            beta: float = 3.0,
+            alpha: float = 3.0,
+            beta: float = 2.0,
             max_iterations: int = 100,
             num_latents: int = 4,
             normalize: bool = True,
@@ -572,6 +572,7 @@ class DexterityCategory:
         registration = DexterityDeformableRegistration(
             target_pc, deepcopy(self.source_pc), alpha, beta, max_iterations, show)
         G, W = registration.get_registration_parameters()
+        target_instance.transformed_keypoints = registration.transform_point_cloud(self.demo_pose['hand_bodies' + '_demo_pos'])
         return W.flatten()
 
     def find_principal_deformations(self, num_latents: int) -> None:
@@ -626,7 +627,8 @@ class DexterityCategory:
 
             else:
                 latent_shape_params = torch.matmul(deformation_vector, self.principal_deformations)
-                transformed_hand_bodies = self.transform_keypoints(latent_shape_params, keypoint_group='hand_bodies')
+                #transformed_hand_bodies = self.transform_keypoints(latent_shape_params, keypoint_group='hand_bodies')
+                transformed_hand_bodies = instance.transformed_keypoints
                 self.manipulator_model = DexterityRobot(
                     '/home/user/mosbach/PycharmProjects/dexterity/assets/dexterity/',
                     ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
