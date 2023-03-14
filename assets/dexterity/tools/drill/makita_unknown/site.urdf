@@ -1,43 +1,10 @@
 <?xml version="1.0"?>
-<robot name="drill">
+<robot name="site">
   <link name="base">
     <visual>
       <geometry>
-        <mesh filename="assets/base.obj" />
+        <mesh filename="assets/downsampled_16k.obj" />
       </geometry>
     </visual>
   </link>
-  <link name="trigger">
-    <visual>
-      <geometry>
-        <mesh filename="assets/trigger.obj" />
-      </geometry>
-    </visual>
-  </link>
-  <joint name="base_to_trigger" type="fixed">
-    <parent link="base"/>
-    <child link="trigger"/>
-  </joint>
-  <link name="chuck">
-    <visual>
-      <geometry>
-        <mesh filename="assets/chuck.obj" />
-      </geometry>
-    </visual>
-  </link>
-  <joint name="base_to_chuck" type="fixed">
-    <parent link="base"/>
-    <child link="chuck"/>
-  </joint>
-  <link name="bit">
-    <visual>
-      <geometry>
-        <mesh filename="assets/bit.obj" />
-      </geometry>
-    </visual>
-  </link>
-  <joint name="chuck_to_bit" type="fixed">
-    <parent link="chuck"/>
-    <child link="bit"/>
-  </joint>
 </robot>

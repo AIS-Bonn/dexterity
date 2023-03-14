@@ -6,7 +6,7 @@ defaults:
 
 env:
     env_name: 'DexterityEnvDrill'
-    drills: ['bosch_gsb180_li', 'bosch_psr1800_li', 'concept_drill', 'dewalt_dcd780', 'dewalt_unknown', 'makita_bhp451', 'makita_unknown', 'makita_xfd15', 'porter_cable_unknown', 'solidworks_arp']
+    drills: ['bosch_gsb180_li', 'bosch_psr1800_li', 'concept_drill', 'dewalt_dcd780', 'dewalt_unknown', 'makita_bhp451', 'makita_unknown', 'makita_xfd15', 'porter_cable_unknown', 'drill_and_driver_l76']
     test_drills: ['blank_hagen_unknown', 'nasali_unknown', 'ryobi_one_plus']
     canonical: 'black_and_decker_unknown'
 

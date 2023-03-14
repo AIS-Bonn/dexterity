@@ -1,10 +1,15 @@
 <?xml version="1.0"?>
-<robot name="site">
+<robot name="rigid_drill">
   <link name="base">
     <visual>
       <geometry>
         <mesh filename="assets/downsampled_16k.obj" />
       </geometry>
     </visual>
+    <collision>
+      <geometry>
+        <mesh filename="assets/downsampled_16k.obj" />
+      </geometry>
+    </collision>
   </link>
 </robot>
