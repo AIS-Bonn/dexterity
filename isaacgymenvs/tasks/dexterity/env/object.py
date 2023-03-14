@@ -211,9 +211,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         def solve_object_regex(regex: str, object_set: str) -> List[str]:
             root = os.path.join(self.object_sets_asset_root, 'urdf', object_set)
             ret_list = []
+            regex_path_len = len(regex.split("/"))
             regex = os.path.normpath(os.path.join(root, regex))
             for path in glob.glob(regex):
-                file_name = path.split("/")[-1]
+                file_name = "/".join(path.split("/")[-regex_path_len:])
                 if "." in file_name:
                     obj, extension = file_name.split(".")
                 else:
