@@ -630,7 +630,7 @@ class DexterityCategory:
                 #transformed_hand_bodies = self.transform_keypoints(latent_shape_params, keypoint_group='hand_bodies')
                 transformed_hand_bodies = instance.transformed_keypoints
                 self.manipulator_model = DexterityRobot(
-                    '/home/user/mosbach/PycharmProjects/dexterity/assets/dexterity/',
+                    '../assets/dexterity/',
                     ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
 
                 joint_space_optimization = DexterityJointSpaceOptimization(
