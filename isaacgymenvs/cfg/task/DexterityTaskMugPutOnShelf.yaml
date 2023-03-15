@@ -51,7 +51,7 @@ rl:
         liftoff_reward: 0.05  # scale on object lift-off progress reward
         #shelf_pos_dist_penalty: 10.0
         #shelf_quat_dist_penalty: 1.0
-        shelf_pose_matching: 10.0
+        shelf_pose_matching: 50.0
         success_bonus: 100.0
 
     lift_off_height: 0.05

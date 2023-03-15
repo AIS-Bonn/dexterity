@@ -211,11 +211,11 @@ class DexterityTaskDrillPickAndPlace(DexterityEnvDrill, DexterityABCTask):
             self.drills_dropped = True
 
         self._reset_robot(env_ids, apply_reset=True)
+        self._reset_target_pose(env_ids, apply_reset=True)
 
         if self.cfg_task.ablation not in ['disable_pre_grasp_pose', 'disable_demo_guidance']:
             self.move_to_curriculum_pose(env_ids, sim_steps=500)
 
-        self._reset_target_pose(env_ids, apply_reset=True)
         self._reset_buffers(env_ids)
 
     def _reset_target_pose(self, env_ids, apply_reset: bool = True) -> None:

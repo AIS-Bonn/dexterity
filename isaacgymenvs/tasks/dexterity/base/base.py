@@ -339,7 +339,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                                                   table_shape_props)
         self.gym.set_rigid_body_color(
             env_ptr, table_handle, 0, gymapi.MESH_VISUAL,
-            gymapi.Vec3(0.6, 0.6, 0.6))
+            gymapi.Vec3(0.72*0.913, 0.72*0.882, 0.72*0.764))
 
         self.table_handles.append(table_handle)
 
@@ -711,15 +711,25 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                                     self.cfg_ctrl['residual_prop_gains']), dim=-1).to('cpu')
             deriv_gains = torch.cat((self.cfg_ctrl['ik_deriv_gains'],
                                      self.cfg_ctrl['residual_deriv_gains']), dim=-1).to('cpu')
+            efforts = torch.Tensor([[150., 150., 150., 28., 28., 28., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1]]).repeat(self.num_envs, 1)
+
             # No tensor API for getting/setting actor DOF props; thus, loop required
-            for env_ptr, robot_handle, prop_gain, deriv_gain in zip(self.env_ptrs, self.robot_handles, prop_gains,
-                                                                     deriv_gains):
+            for env_ptr, robot_handle, prop_gain, deriv_gain, effort in zip(self.env_ptrs, self.robot_handles, prop_gains, deriv_gains, efforts):
                 robot_dof_props = self.gym.get_actor_dof_properties(env_ptr, robot_handle)
                 self.robot_dof_lower_limits.append(robot_dof_props['lower'])
                 self.robot_dof_upper_limits.append(robot_dof_props['upper'])
                 robot_dof_props['driveMode'][:] = gymapi.DOF_MODE_POS
                 robot_dof_props['stiffness'] = prop_gain
                 robot_dof_props['damping'] = deriv_gain
+                robot_dof_props['effort'] = effort
+
+                #print("robot_dof_props:", robot_dof_props)
+
+                #print("robot_dof_props.dtype:", robot_dof_props.dtype)
+
+                #import time
+                #time.sleep(1000)
+
                 self.gym.set_actor_dof_properties(env_ptr, robot_handle, robot_dof_props)
 
         elif self.cfg_ctrl['motor_ctrl_mode'] == 'manual':
@@ -780,6 +790,12 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         #print("self.ctrl_target_dof_pos:", self.ctrl_target_dof_pos)
         # Scale DoF targets from [-1, 1] to the DoF limits of the robot
+
+        #print("self.ctrl_target_dof_pos.shape:", self.ctrl_target_dof_pos.shape)
+        #print("self.robot_dof_lower_limits.shape:", self.robot_dof_lower_limits.shape)
+        #print("self.robot_dof_upper_limits.shape:",
+        #      self.robot_dof_upper_limits.shape)
+
         self.ctrl_target_dof_pos = scale(
             self.ctrl_target_dof_pos, self.robot_dof_lower_limits,
             self.robot_dof_upper_limits)

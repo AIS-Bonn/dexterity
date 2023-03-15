@@ -127,7 +127,7 @@ class DexterityEnvDrill(DexterityEnvToolUse):
         drill_sites_list = [source_drill_site_asset, ] + target_drill_site_assets
 
         actor_count = 0
-        drill_count = len(self.cfg_env['env']['drills']) + 1
+        drill_count = len(drills_list)
         for i in range(self.num_envs):
             # Create new env
             env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)

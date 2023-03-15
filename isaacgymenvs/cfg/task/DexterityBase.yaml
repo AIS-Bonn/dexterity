@@ -10,7 +10,7 @@ mode:
 
 sim:
     dt: 0.03333333333
-    num_substeps: 16  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
+    num_substeps: 8  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
     num_pos_iters: 16
     num_vel_iters: 0
     gravity_mag: 9.81

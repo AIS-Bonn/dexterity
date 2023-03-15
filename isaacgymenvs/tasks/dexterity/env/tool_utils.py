@@ -129,18 +129,23 @@ class DexterityJointSpaceOptimization:
             manipulator_robot: DexterityRobot,
             demo_pose: Dict[str, np.array],
             target_keypoints: np.array,
+            target_ik_body_pos: np.array,  # For WP ablation
             keypoint_group: str = 'hand_bodies',
-            show: bool = True
+            show: bool = True,
+            ablation: str = ''
     ) -> None:
         self.manipulator_robot = manipulator_robot
         self.demo_pose = demo_pose
         self.target_keypoints = target_keypoints
+        self.target_ik_body_pos = target_ik_body_pos
         self.keypoints_group = keypoint_group
 
         self.ik_body_quat_torch = torch.from_numpy(self.demo_pose['ik_body_demo_quat']).to(torch.float32)
         self.ik_body_quat = self._to_mujoco_quat(demo_pose['ik_body_demo_quat'])
 
         self.show = show
+        self.ablation = ablation
+
         self.sim_step = 0
         self._init_mj_model()
 
@@ -276,6 +281,16 @@ class DexterityJointSpaceOptimization:
 
     def optimize_joints_for_keypoints(self, budget: int = 128) -> None:
         self.move_to_canonical_pose()
+
+        if self.ablation == 'constant_grasp':
+            return
+
+        elif self.ablation == 'wrist_pose':
+            self.loss(
+                self.target_ik_body_pos - self.demo_pose['ik_body_demo_pos'],
+                np.zeros(3),
+                np.zeros(self.manipulator_robot.model.num_actions))
+            return
 
         parameterization = ng.p.Instrumentation(
             delta_ik_body_pos=ng.p.Array(shape=(3,)).set_mutation(
@@ -573,6 +588,8 @@ class DexterityCategory:
             target_pc, deepcopy(self.source_pc), alpha, beta, max_iterations, show)
         G, W = registration.get_registration_parameters()
         target_instance.transformed_keypoints = registration.transform_point_cloud(self.demo_pose['hand_bodies' + '_demo_pos'])
+        target_instance.transformed_ik_body_pos = registration.transform_point_cloud(
+            np.expand_dims(self.demo_pose['ik_body' + '_demo_pos'], 0))
         return W.flatten()
 
     def find_principal_deformations(self, num_latents: int) -> None:
@@ -629,12 +646,14 @@ class DexterityCategory:
                 latent_shape_params = torch.matmul(deformation_vector, self.principal_deformations)
                 #transformed_hand_bodies = self.transform_keypoints(latent_shape_params, keypoint_group='hand_bodies')
                 transformed_hand_bodies = instance.transformed_keypoints
+                transformed_ik_body_pos = instance.transformed_ik_body_pos
                 self.manipulator_model = DexterityRobot(
                     '../assets/dexterity/',
                     ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
 
                 joint_space_optimization = DexterityJointSpaceOptimization(
                     self.manipulator_model, self.demo_pose, transformed_hand_bodies,
+                    transformed_ik_body_pos,
                     show=False)
                 joint_space_optimization.optimize_joints_for_keypoints()
                 demo_dict['residual_actuated_dof_demo_pos'] = joint_space_optimization.get_actuated_dof_pos()
@@ -666,20 +685,25 @@ class DexterityCategory:
         deformation_field = ((deformation_feature_vector * self.deformation_std) + self.deformation_mean).reshape(
             -1, 3).numpy()
 
+        points = self.demo_pose[keypoint_group + '_demo_pos']
+
+        if len(points.shape) == 1:
+            points = np.expand_dims(points, 0)
+
         gaussian_kernel = pycpd.gaussian_kernel(
-            X=self.demo_pose[keypoint_group + '_demo_pos'], beta=self.beta,
+            X=points, beta=self.beta,
             Y=self.source_pc.points)
-        transformed_keypoints = self.demo_pose[keypoint_group + '_demo_pos'] + np.dot(
+        transformed_keypoints = points + np.dot(
             gaussian_kernel, deformation_field)
         return transformed_keypoints
 
-    def optimize_joints_for_keypoints(self, target_keypoints: np.array):
+    def optimize_joints_for_keypoints(self, target_keypoints: np.array, target_ik_body_pos: np.array):
         self.manipulator_model = DexterityRobot(
             '/home/user/mosbach/PycharmProjects/dexterity/assets/dexterity/',
             ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
 
         joint_space_optimization = DexterityJointSpaceOptimization(
-            self.manipulator_model, self.demo_pose, target_keypoints, show=False)
+            self.manipulator_model, self.demo_pose, target_keypoints, target_ik_body_pos, show=False)
         joint_space_optimization.optimize_joints_for_keypoints()
         manipulator_rigid_body_poses = joint_space_optimization.get_rigid_body_poses()
         return manipulator_rigid_body_poses
@@ -1099,8 +1123,10 @@ class DexterityCategory:
         target_keypoints = self.transform_keypoints(
             latent_shape_params, keypoint_group='hand_bodies')
 
+        target_ik_body_pos = self.transform_keypoints(latent_shape_params, keypoint_group='ik_body')
+
         manipulator_rigid_body_poses = self.optimize_joints_for_keypoints(
-            target_keypoints)
+            target_keypoints, target_ik_body_pos)
 
         self._manipulator_bodies_trimesh = \
             self.manipulator_model.model.bodies_as_trimesh()
