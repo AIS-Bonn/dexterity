@@ -4,7 +4,7 @@
     <default>
         <default class="right_hand">
             <mesh scale="0.001 0.001 0.001"/>
-            <joint axis="1 0 0" damping="1" armature="0.01" forcerange="-1 1"/>
+            <joint axis="1 0 0" damping="1" armature="0.01"/>
             <position kp="1" forcerange="-1 1"/>
 
             <!-- default joint and actuator attributes -->
