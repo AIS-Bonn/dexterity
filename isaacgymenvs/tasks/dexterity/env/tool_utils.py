@@ -649,7 +649,7 @@ class DexterityCategory:
                 transformed_ik_body_pos = instance.transformed_ik_body_pos
                 self.manipulator_model = DexterityRobot(
                     '../assets/dexterity/',
-                    ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
+                    ['schunk_sih/right_hand_stiff_actuation.xml', 'vive_tracker/tracker.xml'])
 
                 joint_space_optimization = DexterityJointSpaceOptimization(
                     self.manipulator_model, self.demo_pose, transformed_hand_bodies,
@@ -700,7 +700,7 @@ class DexterityCategory:
     def optimize_joints_for_keypoints(self, target_keypoints: np.array, target_ik_body_pos: np.array):
         self.manipulator_model = DexterityRobot(
             '/home/user/mosbach/PycharmProjects/dexterity/assets/dexterity/',
-            ['schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml'])
+            ['schunk_sih/right_hand_stiff_actuation.xml', 'vive_tracker/tracker.xml'])
 
         joint_space_optimization = DexterityJointSpaceOptimization(
             self.manipulator_model, self.demo_pose, target_keypoints, target_ik_body_pos, show=False)
@@ -918,7 +918,7 @@ class DexterityCategory:
                         instance_list[env_id].latent_shape_params, keypoint_group='hand_bodies')
             self.manipulator_model = DexterityRobot(
                 '/home/user/mosbach/PycharmProjects/dexterity/assets/dexterity/',
-                ['schunk_sih/right_hand.xml',
+                ['schunk_sih/right_hand_stiff_actuation.xml',
                  'vive_tracker/tracker.xml'])
 
             joint_space_optimization = DexterityJointSpaceOptimization(
