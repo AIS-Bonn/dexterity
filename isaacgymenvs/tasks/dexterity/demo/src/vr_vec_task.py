@@ -94,7 +94,7 @@ class GymVR:
         # y coordinate is mapped to IsaacGym's z coordinate
         self._tracker_base_pos = np.array([0, 0.5, 0])
 
-        input("Press Enter to set reference frame ...")
+        input("\n Press Enter to set reference frame ...")
         self._set_reference_frame()
 
     def __getattr__(self, item):

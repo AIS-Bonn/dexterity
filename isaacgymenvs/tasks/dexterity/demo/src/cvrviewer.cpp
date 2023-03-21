@@ -1,4 +1,6 @@
 #include "cvrviewer.h"
+#include <unistd.h>
+
 
 // Default constructor (needed for stack-allocation in Cython)
 CVRViewer::CVRViewer() {}
@@ -32,7 +34,7 @@ void CVRViewer::InitDeviceIdx() {
 
     std::map<std::string, int> numDevices;
 
-    int maxAttempts = 40;
+    int maxAttempts = 1000;
     int connectionAttempts = 0;
     bool devicesFound = false;
     do {
@@ -62,7 +64,9 @@ void CVRViewer::InitDeviceIdx() {
 
         devicesFound = numDevices["headset"] == 1 && numDevices["tracker"] >= 1;
         if (!devicesFound) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::cout << "Waiting for Tracker to be connected (Connection attempts: " << connectionAttempts << ")" << "\r" << std::flush;
+            usleep(500000);
+            connectionAttempts++;
         }
     } while (!devicesFound && connectionAttempts < maxAttempts);
 

@@ -65,6 +65,9 @@ Teleoperation and Imitation Learning
 ------
 dexterity provides an interface to teleoperate the Isaac Gym environments in virtual reality. Related code can be found in the [demo](../isaacgymenvs/tasks/dexterity/demo) directory. The teleoperation interface is restricted to specific hardware (Vive VR Headset and Tracker and SenseGlove) and can be used to operate any combination of the robot arm and hand models.
 
+The extensions are built automatically when `pip install -e .` is run if SteamVR is installed. To compile the extensions you can run `python setup.py build_ext --inplace --force`.
+If you run into the error `ImportError: /lib/x86_64-linux-gnu/libwayland-client.so.0: undefined symbol: ffi_type_uint32, version LIBFFI_BASE_7.0` when trying to start the teleoperation interface, run `conda install -c conda-forge libffi` in your conda environment.
+
 Log data with `self.log(dict)`
 ------
 A simple logging interface is provided, whereby all classes derived from the 
