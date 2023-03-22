@@ -138,6 +138,50 @@
               type="box" class="plastic_collision"/>
           <geom size="0.009 0.012 0.002" pos="0.011 0 0.089" type="box" class="plastic_collision"/>
           <geom size="0.01 0.012 0.02" pos="-0.03 0 0.009" type="box" class="plastic_collision"/>
+
+          <!-- Thumb -->
+          <body name="rh_thbase" pos="0.034 -0.00858 0.029" quat="0.92388 0 0.382683 0">
+            <site name="teleop-rh_th_angle1" user="0 0.5 0 0 0"/>
+            <inertial mass="0.01" pos="0 0 0" diaginertia="1.6e-07 1.6e-07 1.6e-07"/>
+            <joint name="rh_THJ5" class="thbase"/>
+            <geom class="plastic_collision" size="0.013"/>
+            <body name="rh_thproximal">
+              <site name="teleop-rh_th_angle0" user="1.571 1 0 0 0"/>
+              <site name="keypoint-hand_bodies-th_proximal" pos="-0.01 0 0.021"/>
+              <inertial mass="0.04" pos="0 0 0.019" diaginertia="1.36e-05 1.36e-05 3.13e-06"/>
+              <joint name="rh_THJ4" class="thproximal"/>
+              <geom class="plastic_visual" mesh="th_proximal"/>
+              <geom class="plastic_collision" size="0.0105 0.009" pos="0 0 0.02" type="capsule"/>
+              <body name="rh_thhub" pos="0 0 0.038">
+                <site name="teleop-rh_th_angle1" user="0 0 0 0 0"/>
+                <inertial mass="0.005" pos="0 0 0" diaginertia="1e-06 1e-06 3e-07"/>
+                <joint name="rh_THJ3" class="thhub"/>
+                <geom size="0.011" class="plastic_collision"/>
+                <body name="rh_thmiddle">
+                  <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
+                  <site name="keypoint-hand_bodies-th_middle" pos="-0.009 0 0.016"/>
+                  <inertial mass="0.02" pos="0 0 0.016" diaginertia="5.1e-06 5.1e-06 1.21e-06"/>
+                  <joint name="rh_THJ2" class="thmiddle"/>
+                  <geom class="plastic_visual" mesh="th_middle"/>
+                  <geom size="0.009 0.009" pos="0 0 0.012" type="capsule"
+                      class="plastic_collision"/>
+                  <geom size="0.01" pos="0 0 0.03" class="plastic_collision"/>
+                  <body name="rh_thdistal" pos="0 0 0.032" quat="1 0 0 -1">
+                    <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
+                    <site name="keypoint-fingertips-th" pos="0 -0.0075 0.0225"/>
+                    <site name="keypoint-hand_bodies-th_distal" pos="0 -0.0075 0.0225"/>
+                    <inertial mass="0.017" pos="0 0 0.0145588" quat="1 0 0 1"
+                        diaginertia="2.37794e-06 2.27794e-06 1e-06"/>
+                    <joint name="rh_THJ1" class="thdistal"/>
+                    <geom class="plastic_visual" mesh="th_distal_pst"/>
+                    <geom class="plastic_collision" type="mesh" mesh="th_distal_pst"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+
+          <!-- Index finger -->
           <body name="rh_ffknuckle" pos="0.033 0 0.095">
             <site name="teleop-rh_if_angle0" user="0 -1 0 0 0"/>
             <inertial mass="0.008" pos="0 0 0" quat="0.5 0.5 -0.5 0.5"
@@ -174,6 +218,8 @@
               </body>
             </body>
           </body>
+
+          <!-- Middle finger -->
           <body name="rh_mfknuckle" pos="0.011 0 0.099">
             <site name="teleop-rh_mf_angle0" user="0 -1 0 0 0"/>
             <inertial mass="0.008" pos="0 0 0" quat="0.5 0.5 -0.5 0.5"
@@ -210,6 +256,8 @@
               </body>
             </body>
           </body>
+
+          <!-- Ring finger -->
           <body name="rh_rfknuckle" pos="-0.011 0 0.095">
             <site name="teleop-rh_rf_angle0" user="0 1 0 0 0"/>
             <inertial mass="0.008" pos="0 0 0" quat="0.5 0.5 -0.5 0.5"
@@ -246,6 +294,8 @@
               </body>
             </body>
           </body>
+
+          <!-- Little finger -->
           <body name="rh_lfmetacarpal" pos="-0.033 0 0.02071">
             <site name="teleop-rh_lf_angle0" user="0 0 0 0 0"/>
             <inertial mass="0.03" pos="0 0 0.04" quat="1 0 0 1"
@@ -286,46 +336,6 @@
                     <joint name="rh_LFJ1" class="middle_distal"/>
                     <geom class="plastic_visual" mesh="f_distal_pst"/>
                     <geom class="plastic_collision" type="mesh" mesh="f_distal_pst"/>
-                  </body>
-                </body>
-              </body>
-            </body>
-          </body>
-          <body name="rh_thbase" pos="0.034 -0.00858 0.029" quat="0.92388 0 0.382683 0">
-            <site name="teleop-rh_th_angle1" user="0 0.5 0 0 0"/>
-            <inertial mass="0.01" pos="0 0 0" diaginertia="1.6e-07 1.6e-07 1.6e-07"/>
-            <joint name="rh_THJ5" class="thbase"/>
-            <geom class="plastic_collision" size="0.013"/>
-            <body name="rh_thproximal">
-              <site name="teleop-rh_th_angle0" user="1.571 1 0 0 0"/>
-              <site name="keypoint-hand_bodies-th_proximal" pos="-0.01 0 0.021"/>
-              <inertial mass="0.04" pos="0 0 0.019" diaginertia="1.36e-05 1.36e-05 3.13e-06"/>
-              <joint name="rh_THJ4" class="thproximal"/>
-              <geom class="plastic_visual" mesh="th_proximal"/>
-              <geom class="plastic_collision" size="0.0105 0.009" pos="0 0 0.02" type="capsule"/>
-              <body name="rh_thhub" pos="0 0 0.038">
-                <site name="teleop-rh_th_angle1" user="0 0 0 0 0"/>
-                <inertial mass="0.005" pos="0 0 0" diaginertia="1e-06 1e-06 3e-07"/>
-                <joint name="rh_THJ3" class="thhub"/>
-                <geom size="0.011" class="plastic_collision"/>
-                <body name="rh_thmiddle">
-                  <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
-                  <site name="keypoint-hand_bodies-th_middle" pos="-0.009 0 0.016"/>
-                  <inertial mass="0.02" pos="0 0 0.016" diaginertia="5.1e-06 5.1e-06 1.21e-06"/>
-                  <joint name="rh_THJ2" class="thmiddle"/>
-                  <geom class="plastic_visual" mesh="th_middle"/>
-                  <geom size="0.009 0.009" pos="0 0 0.012" type="capsule"
-                      class="plastic_collision"/>
-                  <geom size="0.01" pos="0 0 0.03" class="plastic_collision"/>
-                  <body name="rh_thdistal" pos="0 0 0.032" quat="1 0 0 -1">
-                    <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
-                    <site name="keypoint-fingertips-th" pos="0 -0.0075 0.0225"/>
-                    <site name="keypoint-hand_bodies-th_distal" pos="0 -0.0075 0.0225"/>
-                    <inertial mass="0.017" pos="0 0 0.0145588" quat="1 0 0 1"
-                        diaginertia="2.37794e-06 2.27794e-06 1e-06"/>
-                    <joint name="rh_THJ1" class="thdistal"/>
-                    <geom class="plastic_visual" mesh="th_distal_pst"/>
-                    <geom class="plastic_collision" type="mesh" mesh="th_distal_pst"/>
                   </body>
                 </body>
               </body>

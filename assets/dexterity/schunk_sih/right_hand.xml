@@ -1,6 +1,10 @@
 <mujoco model="right_schunk_sih_hand-manipulator">
     <compiler angle="radian" meshdir="assets/right" autolimits="true" />
 
+    <custom>
+        <text name="ros_topic" data="sih" />
+    </custom>
+
     <default>
         <default class="right_hand">
             <mesh scale="0.001 0.001 0.001"/>
@@ -167,6 +171,45 @@
                 <!-- site that can be used to query the palm position-->
                 <site name="keypoint-hand_bodies-palm" pos="0 0.018 0.09"/>
 
+                <!-- thumb -->
+                <body name="th_proximal" pos="-0.034 0.019 0.08">
+                    <site name="teleop-rh_th_angle0" user="-1.571 -1 0 0 0"/>
+                    <site name="keypoint-hand_bodies-th_proximal" pos="-0.0115 0.005 0.011"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_th_proximal" class="thumb_rotating"/>
+                    <geom class="shiny_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_axis" />
+                    <geom class="brushed_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_base" />
+                    <geom class="plastic_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_guides" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_roll" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_screws" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_spring" />
+                    <geom class="plastic_collision" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal" />
+                    <body name="th_inter" pos="-0.024 0.005 0.001">
+                        <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
+                        <site name="keypoint-hand_bodies-th_inter" pos="-0.0175 0 0.016"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                        <joint name="th_proximal_to_th_inter" class="thumb_bending"/>
+                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_back_plate" />
+                        <geom class="brushed_metal_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_base" />
+                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_front_plate" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_roll" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_screws" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_spring" />
+                        <geom class="plastic_collision" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_cvx" />
+                        <body name="th_distal" pos="-0.0391 0 0">
+                            <site name="keypoint-hand_bodies-th_distal" pos="-0.023 0 0.015"/>
+                            <site name="keypoint-fingertips-th" pos="-0.023 0 0.015"/>
+                            <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                            <joint name="th_inter_to_th_distal" class="thumb_bending"/>
+                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_top" />
+                            <geom class="brushed_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_bottom" />
+                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_nail" />
+                            <geom class="shiny_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_axis" />
+                            <geom class="plastic_collision" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal" />
+                        </body>
+                    </body>
+                </body>
+
                 <!-- index finger -->
                 <body name="if_proximal" pos="0.0435 0 0.141">
                     <site name="keypoint-hand_bodies-if_proximal" pos="-0.087 0.016 0.022"/>
@@ -266,45 +309,6 @@
                         <geom class="brushed_metal_visual" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal_bottom" />
                         <geom class="plastic_visual" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal_nail" />
                         <geom class="plastic_collision" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal" />
-                    </body>
-                </body>
-
-                <!-- thumb -->
-                <body name="th_proximal" pos="-0.034 0.019 0.08">
-                    <site name="teleop-rh_th_angle0" user="-1.571 -1 0 0 0"/>
-                    <site name="keypoint-hand_bodies-th_proximal" pos="-0.0115 0.005 0.011"/>
-                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
-                    <joint name="palm_to_th_proximal" class="thumb_rotating"/>
-                    <geom class="shiny_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_axis" />
-                    <geom class="brushed_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_base" />
-                    <geom class="plastic_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_guides" />
-                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_roll" />
-                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_screws" />
-                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_spring" />
-                    <geom class="plastic_collision" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal" />
-                    <body name="th_inter" pos="-0.024 0.005 0.001">
-                        <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
-                        <site name="keypoint-hand_bodies-th_inter" pos="-0.0175 0 0.016"/>
-                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
-                        <joint name="th_proximal_to_th_inter" class="thumb_bending"/>
-                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_back_plate" />
-                        <geom class="brushed_metal_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_base" />
-                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_front_plate" />
-                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_roll" />
-                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_screws" />
-                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_spring" />
-                        <geom class="plastic_collision" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_cvx" />
-                        <body name="th_distal" pos="-0.0391 0 0">
-                            <site name="keypoint-hand_bodies-th_distal" pos="-0.023 0 0.015"/>
-                            <site name="keypoint-fingertips-th" pos="-0.023 0 0.015"/>
-                            <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
-                            <joint name="th_inter_to_th_distal" class="thumb_bending"/>
-                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_top" />
-                            <geom class="brushed_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_bottom" />
-                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_nail" />
-                            <geom class="shiny_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_axis" />
-                            <geom class="plastic_collision" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal" />
-                        </body>
                     </body>
                 </body>
             </body>

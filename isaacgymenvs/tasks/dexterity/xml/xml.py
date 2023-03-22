@@ -43,6 +43,12 @@ class DexterityXML(DexterityABCXML):
         return self._robot_type
 
     @property
+    def ros_topic(self) -> str:
+        if not hasattr(self, "_ros_topic"):
+            self._init_model_info()
+        return self._ros_topic
+
+    @property
     def initial_dof_pos(self) -> List[float]:
         initial_qpos = self._findall_rec(
             node=self.keyframe, tags="key",
@@ -251,8 +257,6 @@ class DexterityXML(DexterityABCXML):
         for tag in MUJOCO_TAGS:
             root = attachment_body if tag == "worldbody" else getattr(self, tag)
             for i, node in enumerate(getattr(other, tag)):
-                #print('tag:', tag)
-                #print('node.attrib:', node.attrib)
 
                 if (self._findall_rec(
                         node=root, tags=node.tag,
@@ -547,6 +551,7 @@ class DexterityXML(DexterityABCXML):
         return ret if ret else None
 
     def _init_model_info(self) -> None:
+        # Set model name and robot type.
         model_info = self.root.attrib["model"].split("-")
         assert len(model_info) == 2, \
             f"Model attribute {model_info} of model {self.xml_path} does not " \
@@ -557,6 +562,12 @@ class DexterityXML(DexterityABCXML):
             f"allowed types {ROBOT_TYPES}."
         self._model_name = model_name
         self._robot_type = robot_type
+
+        # Set ROS topic if it is specified.
+        self._ros_topic = None
+        for child in self.custom:
+            if child.tag == 'text' and child.attrib['name'] == 'ros_topic':
+                self._ros_topic = child.attrib['data']
 
     def _save_xml(self, file_path: str, collect_meshes: bool = True) -> None:
         file_path = os.path.normpath(file_path)

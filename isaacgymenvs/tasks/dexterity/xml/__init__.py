@@ -17,7 +17,7 @@ GYM_ASSET_API =\
      'get_asset_soft_materials', 'get_asset_tendon_count',
      'get_asset_tendon_name', 'get_asset_tendon_properties']
 
-MUJOCO_TAGS = ["actuator", "asset", "compiler", "contact", "default",
+MUJOCO_TAGS = ["actuator", "asset", "compiler", "contact", "custom", "default",
                "equality", "keyframe", "sensor", "worldbody"]
 
 ROBOT_TYPES = ["stand", "arm", "manipulator", "visual_asset"]
