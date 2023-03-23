@@ -444,10 +444,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         return object_quat_drop
 
     def _object_in_workspace(self, object_pos) -> torch.Tensor:
-        x_lower = self.cfg_task.randomize.workspace_extent_xy[0][0]
-        x_upper = self.cfg_task.randomize.workspace_extent_xy[1][0]
-        y_lower = self.cfg_task.randomize.workspace_extent_xy[0][1]
-        y_upper = self.cfg_task.randomize.workspace_extent_xy[1][1]
+        x_lower = self.cfg_task.randomize.workspace_extent_xy[0][0] + self.cfg_task.randomize.object_pos_drop[0]
+        x_upper = self.cfg_task.randomize.workspace_extent_xy[1][0] + self.cfg_task.randomize.object_pos_drop[0]
+        y_lower = self.cfg_task.randomize.workspace_extent_xy[0][1] + self.cfg_task.randomize.object_pos_drop[1]
+        y_upper = self.cfg_task.randomize.workspace_extent_xy[1][1] + self.cfg_task.randomize.object_pos_drop[1]
         object_in_workspace = x_lower <= object_pos[:, 0]
         object_in_workspace = torch.logical_and(
             object_in_workspace, object_pos[:, 0] <= x_upper)

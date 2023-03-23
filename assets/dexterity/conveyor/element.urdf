@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot name="conveyor_element">
+  <link name="base_link">
+  </link>
+  <link name="element_0">
+    <visual>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_0_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_0"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_1">
+    <visual>
+      <origin xyz="0 0.16 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.16 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_1_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_1"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_2">
+    <visual>
+      <origin xyz="0 0.32 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.32 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_2_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_2"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_3">
+    <visual>
+      <origin xyz="0 0.48 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.48 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_3_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_3"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_4">
+    <visual>
+      <origin xyz="0 0.64 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.64 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_4_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_4"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_5">
+    <visual>
+      <origin xyz="0 0.8 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.8 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_5_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_5"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_6">
+    <visual>
+      <origin xyz="0 0.96 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0.96 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_6_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_6"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_7">
+    <visual>
+      <origin xyz="0 1.12 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 1.12 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_7_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_7"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+  <link name="element_8">
+    <visual>
+      <origin xyz="0 1.28 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 1.28 0"/>
+      <geometry>
+        <box size="0.4 0.15 0.02" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="element_8_slider" type="prismatic">
+        <parent link="base_link"/>
+        <child link="element_8"/>
+        <axis xyz="0 1 0"/>
+  </joint>
+</robot>
