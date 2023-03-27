@@ -36,6 +36,7 @@ Configuration defined in DexterityBase.yaml.
 
 import hydra
 import math
+from omegaconf import ListConfig
 import os
 import sys
 from typing import *

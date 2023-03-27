@@ -35,14 +35,18 @@ ctrl:
 
     all:
         jacobian_type: geometric
-        residual_prop_gain: 5
-        residual_deriv_gain: 1
+
     gym_default:
         ik_method: dls
+
         ik_prop_gain: 100
         ik_deriv_gain: 25
-        residual_prop_gain: 10
+        #ik_max_effort: 100.
+
+        residual_prop_gain: 10.
         residual_deriv_gain: 4
+        residual_max_effort: 1.
+
     joint_space_id:
         ik_method: dls
         ik_prop_gain: 40
