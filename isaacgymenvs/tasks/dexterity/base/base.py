@@ -482,6 +482,21 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 setattr(self, group_name + '_pos', keypoint_group_pos)
                 setattr(self, group_name + '_quat', keypoint_group_quat)
 
+    def refresh_contact_force_at_keypoints(self) -> None:
+        """Query the contact force at keypoint bodies. This is used to get the
+        contact force in the fingertips for haptic feedback during VR
+        teleoperation. This method is not called during regular policy
+        training.
+        """
+
+        for group_name, body_ids_env, pos, quat in self.keypoint_specs:
+            keypoint_group_contact_force = self.contact_force[:, body_ids_env]
+            setattr(self, group_name + '_contact_force',
+                    keypoint_group_contact_force)
+            setattr(self, group_name + '_contact_force_local_coords',
+                    quat_rotate_inverse(getattr(self, group_name + '_quat').flatten(0, 1),
+                                        getattr(self, group_name + '_contact_force').flatten(0, 1)).view(self.num_envs, -1, 3))
+
     def pre_physics_step(self, actions):
         """Reset environments. Apply actions from policy. Simulation step called
         after this method."""

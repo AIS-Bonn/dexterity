@@ -125,6 +125,10 @@ std::vector<float> CVRViewer::GetGloveFlexions(bool isRight) {
     return gloves.GetFlexions(isRight);
 }
 
+void CVRViewer::SendHapticFeedback(bool isRight, std::vector<int> Buzz, std::vector<int> ForceFeedback) {
+    return gloves.SendHapticFeedback(isRight, Buzz, ForceFeedback);
+}
+
 
 // Destructor
 CVRViewer::~CVRViewer() {

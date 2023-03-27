@@ -43,6 +43,7 @@ class CVRViewer {
         CVRViewer();
         CVRViewer(int argc, char **argv, uint32_t renderSize[2]);
         ~CVRViewer();
+
         // OpenVR
         float* GetHeadsetPose();
         float* GetTrackerPose();
@@ -51,9 +52,11 @@ class CVRViewer {
         float GetLeftEyeFov();
         float GetRightEyeFov();
         void SubmitVRCameraImages(uint8_t leftEyeImage[], uint8_t rightEyeImage[]);
+
         // SenseGlove
         std::vector<std::vector<float>> GetGloveSensorAngles(bool isRight);
         std::vector<float> GetGloveFlexions(bool isRight);
+        void SendHapticFeedback(bool isRight, std::vector<int> Buzz, std::vector<int> ForceFeedback);
 };
 
 #endif

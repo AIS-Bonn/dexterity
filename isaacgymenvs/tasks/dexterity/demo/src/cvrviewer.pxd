@@ -20,3 +20,4 @@ cdef extern from "cvrviewer.h":
         void SubmitVRCameraImages(uint8_t leftEyeImage[], uint8_t rightEyeImage[]) except +
         vector[vector[float]] GetGloveSensorAngles(bool isRight) except +
         vector[float] GetGloveFlexions(bool isRight) except +
+        void SendHapticFeedback(bool isRight, vector[int] Buzz, vector[int] ForceFeedback) except +

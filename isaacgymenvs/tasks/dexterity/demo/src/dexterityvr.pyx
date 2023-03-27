@@ -76,3 +76,6 @@ cdef class VRViewer:
     def get_glove_flexions(self, is_right):
         flexions = self.cvrviewer.GetGloveFlexions(is_right)
         return flexions
+
+    def send_haptic_feedback(self, is_right, buzz, force_feedback):
+        self.cvrviewer.SendHapticFeedback(is_right, buzz, force_feedback)

@@ -46,10 +46,11 @@ def render_process_target(render_size,
 
 
 class GymVR:
-    def __init__(self, gym, sim, env, headless: bool,
+    def __init__(self, task, gym, sim, env, headless: bool,
                  render_size: Tuple = (1851, 2055),  # recommended: 2468, 2740
                  use_camera_tensors: bool = True,
                  use_multiprocessing: bool = False) -> None:
+        self._task = task
         self._gym = gym
         self._sim = sim
         self._env = env
@@ -161,8 +162,25 @@ class GymVR:
         self._simulated_steps += 1
 
     def simulate_vr(self):
+        # Update camera poses and headset images.
         self._update_vr_camera_poses()
         self._submit_vr_camera_images()
+
+        # Send haptic feedback.
+        self._task.refresh_contact_force_at_keypoints()
+
+        if hasattr(self._task, "fingertips_contact_force"):
+            fingertips_force_magnitude = torch.norm(self._task.fingertips_contact_force,
+                                                    dim=-1)
+            #print(self._task.fingertips_contact_force_local_coords)
+            buzz = 0 * fingertips_force_magnitude[0].cpu().numpy().astype(int)
+
+            thumb_force_feedback = -10 * self._task.fingertips_contact_force_local_coords[0, 0, 2].cpu().numpy().astype(int)
+            force_feedback = -10 * self._task.fingertips_contact_force_local_coords[0, :, 1].cpu().numpy().astype(int)
+            force_feedback[0] = thumb_force_feedback
+            print(force_feedback)
+
+            self._vr_viewer.send_haptic_feedback(True, buzz, force_feedback)
 
     def _create_vr_cameras(self):
         # Set camera properties
@@ -290,7 +308,7 @@ class VRVecTask:
     def __init__(self, task: VecTask) -> None:
         self._task = task
 
-        self._task.gym = GymVR(task.gym, task.sim, task.env_ptrs[0], task.headless)
+        self._task.gym = GymVR(task, task.gym, task.sim, task.env_ptrs[0], task.headless)
 
         # Initialize inverse scaling factors for pose actions
         self.inv_pos_action_scale = (
@@ -314,19 +332,13 @@ class VRVecTask:
     def step(self, actions: torch.Tensor) -> Tuple[
         Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
 
-
         # Synchronize physics simulation with rendering rate in headless mode
         if self._task.headless:
             self._task.gym.sync_frame_time(self._task.sim)
 
-
         # Override pose and residual DoF actions
         actions[:, 0:6] = self._get_ik_body_pose_actions()
-        residual_dof_actions = self._get_residual_dof_actions()
-
-        #print("residual_dof_actions:", residual_dof_actions)
-        #residual_dof_actions[:, 1] = 0. # Overwrite to test thumb while normalized flexions are not working yet
-        actions[:, 6:] = residual_dof_actions
+        actions[:, 6:] = self._get_residual_dof_actions()
         return self._task.step(actions)
 
     def _get_ik_body_pose_actions(self):

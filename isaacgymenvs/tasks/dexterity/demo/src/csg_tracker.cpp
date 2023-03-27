@@ -109,4 +109,16 @@ class CSGTracker {
                 return leftFlexions;
             }
         }
+
+        void SendHapticFeedback(bool isRight, std::vector<int> Buzz, std::vector<int> ForceFeedback) {
+            if (isRight) {
+                rightSenseGlove.SendHaptics(SGCore::Haptics::SG_BuzzCmd(Buzz));
+                rightSenseGlove.SendHaptics(SGCore::Haptics::SG_FFBCmd(ForceFeedback));
+            }
+            else {
+                rightSenseGlove.SendHaptics(SGCore::Haptics::SG_BuzzCmd(Buzz));
+                rightSenseGlove.SendHaptics(SGCore::Haptics::SG_FFBCmd(ForceFeedback));
+            }
+        }
+
 };
