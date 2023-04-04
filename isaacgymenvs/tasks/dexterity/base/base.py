@@ -622,7 +622,26 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             self.obs_dict["image"] = self.get_images()
 
     def parse_controller_spec(self):
-        """Parse controller specification into lower-level controller configuration."""
+        """Parse controller specification into lower-level controller
+        configuration."""
+
+        def set_joint_properties(property_name, property_value, num_joints):
+            # Joint property specified for each joint individually via list.
+            if isinstance(property_value, ListConfig):
+                assert len(property_value) == num_joints, \
+                    f"If {property_name} is specified as a list (for each joint individually) " \
+                    f"the length of the list {len(property_value)} must match the number of " \
+                    f"joints {num_joints}."
+                self.cfg_ctrl[property_name] = torch.Tensor(
+                    property_value).unsqueeze(0).repeat(self.num_envs, 1).to(
+                    self.device).float()
+
+            # Uniform joint property via scalar value.
+            else:
+                self.cfg_ctrl[property_name] = (torch.ones(
+                    (self.num_envs, num_joints), device=self.device) *
+                     property_value)
+
 
         cfg_ctrl_keys = {'num_envs',
                          'jacobian_type',
@@ -641,15 +660,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.cfg_ctrl['ik_body_dof_count'] = self.ik_body_dof_count
         self.cfg_ctrl['robot_actuator_count'] = self.robot_actuator_count
         self.cfg_ctrl['robot_dof_count'] = self.robot_dof_count
-
-        self.cfg_ctrl['residual_prop_gains'] = torch.ones(
-            (self.num_envs, self.cfg_ctrl['robot_dof_count'] - self.cfg_ctrl['ik_body_dof_count']),
-            device=self.device) * self.cfg_base.ctrl.all.residual_prop_gain
-        self.cfg_ctrl['residual_deriv_gains'] = torch.ones(
-            (self.num_envs, self.cfg_ctrl['robot_dof_count'] - self.cfg_ctrl['ik_body_dof_count']),
-            device=self.device) * self.cfg_base.ctrl.all.residual_deriv_gain
-
-
+        self.cfg_ctrl['residual_dof_count'] = self.cfg_ctrl['robot_dof_count'] - self.cfg_ctrl['ik_body_dof_count']
         self.cfg_ctrl['residual_stiffness'] = self.cfg_base.ctrl.joint_space_id.residual_stiffness
         self.cfg_ctrl['residual_damping'] = self.cfg_base.ctrl.joint_space_id.residual_damping
 
@@ -659,22 +670,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             self.cfg_ctrl['gain_space'] = 'joint'
             self.cfg_ctrl['ik_method'] = self.cfg_base.ctrl.gym_default.ik_method
 
-            self.cfg_ctrl['ik_prop_gains'] = (torch.ones(
-                (self.num_envs, self.cfg_ctrl['ik_body_dof_count']),
-                device=self.device) *
-                self.cfg_base.ctrl.gym_default.ik_prop_gain)
-            self.cfg_ctrl['ik_deriv_gains'] = (torch.ones(
-                (self.num_envs, self.cfg_ctrl['ik_body_dof_count']),
-                device=self.device) *
-                self.cfg_base.ctrl.gym_default.ik_deriv_gain)
-            self.cfg_ctrl['residual_prop_gains'] = (torch.ones(
-                (self.num_envs, self.cfg_ctrl['robot_dof_count'] - self.cfg_ctrl['ik_body_dof_count']),
-                device=self.device) *
-                self.cfg_base.ctrl.gym_default.residual_prop_gain)
-            self.cfg_ctrl['residual_deriv_gains'] = (torch.ones(
-                (self.num_envs, self.cfg_ctrl['robot_dof_count'] - self.cfg_ctrl['ik_body_dof_count']),
-                device=self.device) *
-                self.cfg_base.ctrl.gym_default.residual_deriv_gain)
+            set_joint_properties(
+                'ik_prop_gains', self.cfg_base.ctrl.gym_default.ik_prop_gain,
+                self.ik_body_dof_count)
+            set_joint_properties(
+                'ik_deriv_gains', self.cfg_base.ctrl.gym_default.ik_deriv_gain,
+                self.ik_body_dof_count)
+            set_joint_properties(
+                'residual_prop_gains',
+                self.cfg_base.ctrl.gym_default.residual_prop_gain,
+                self.cfg_ctrl['residual_dof_count'])
+            set_joint_properties(
+                'residual_deriv_gains',
+                self.cfg_base.ctrl.gym_default.residual_deriv_gain,
+                self.cfg_ctrl['residual_dof_count'])
 
         elif ctrl_type == 'joint_space_id':
             self.cfg_ctrl['motor_ctrl_mode'] = 'manual'
@@ -715,6 +724,13 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 robot_dof_props['driveMode'][:] = gymapi.DOF_MODE_POS
                 robot_dof_props['stiffness'] = prop_gain
                 robot_dof_props['damping'] = deriv_gain
+
+                # Overwrite max efforts if they are specified.
+                if hasattr(self.cfg_base.ctrl.gym_default, "ik_max_effort"):
+                    robot_dof_props['effort'][:self.cfg_ctrl['ik_body_dof_count']] = self.cfg_base.ctrl.gym_default.ik_max_effort
+                if hasattr(self.cfg_base.ctrl.gym_default, "residual_max_effort"):
+                    robot_dof_props['effort'][self.cfg_ctrl['ik_body_dof_count']:] = self.cfg_base.ctrl.gym_default.residual_max_effort
+
                 self.gym.set_actor_dof_properties(env_ptr, robot_handle, robot_dof_props)
 
         elif self.cfg_ctrl['motor_ctrl_mode'] == 'manual':
