@@ -1,4 +1,5 @@
 from isaacgym import gymapi, gymutil
+import torch
 from typing import *
 
 
@@ -30,17 +31,11 @@ class DexterityBaseVisualizations:
             gymutil.draw_lines(sphere_geom, self.gym, self.viewer,
                                self.env_ptrs[env_id], pose)
 
-    def visualize_pose(self, name: str, env_id: int, axis_length: float = 0.3, sphere_size: float = None):
+    def visualize_pose(self, name: str, env_id: int, axis_length: float = 0.2, sphere_size: float = None):
         split_name = name.split("_")
         body_name = "_".join(split_name[:-1])
         pos = getattr(self, body_name + "_pos")[env_id]
         quat = getattr(self, body_name + "_quat")[env_id]
-        assert all(obs in self.cfg['env']['observations']
-                   for obs in [f'{body_name}_pos',
-                               f'{body_name}_quat']), \
-            f'Cannot visualize {body_name} pose if ' \
-            f'{body_name}_pos and {body_name}_quat' \
-            f'are not part of the observations.'
 
         if len(pos.shape) == 1:
             pos = pos.unsqueeze(0)
@@ -57,3 +52,20 @@ class DexterityBaseVisualizations:
                 gymutil.draw_lines(sphere_geom, self.gym, self.viewer,
                                 self.env_ptrs[env_id], pose)
 
+    def visualize_polygon(self, name: str, env_id: int):
+        points = getattr(self, name)[env_id]
+
+        for start_idx in range(points.shape[0]):
+            end_idx = start_idx + 1 if start_idx < points.shape[0] - 1 else 0
+            start_point = gymapi.Vec3(*points[start_idx])
+            end_point = gymapi.Vec3(*points[end_idx])
+            gymutil.draw_line(start_point, end_point, gymapi.Vec3(1, 1, 0),
+                              self.gym, self.viewer, self.env_ptrs[env_id])
+
+    def visualize_ik_body_workspace(self, env_id: int) -> None:
+        # Set extent in z-direction to 0
+        extent = torch.tensor(self.cfg_base.ctrl.workspace.pos)
+        bbox = gymutil.WireframeBBoxGeometry(extent, pose=gymapi.Transform(),
+                                             color=(0, 1, 1))
+        gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
+                           pose=gymapi.Transform())
