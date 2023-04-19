@@ -2,6 +2,7 @@ import cv2
 import hydra
 from isaacgym import gymapi, gymtorch
 from isaacgym.torch_utils import *
+import math
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
@@ -30,6 +31,73 @@ def depth_image_to_xyz(depth_image, proj_mat, view_mat, device: torch.device):
         batch_size, -1, 4)
     xyz = torch.bmm(x2_hom, view_mat.inverse())[..., 0:3]
     return xyz
+
+
+def xyz_world_to_camera(xyz_world, view_mat):
+    num_envs, num_samples, _ = xyz_world.shape
+
+    # Project from world to camera frame.
+    xyz_hom = torch.cat([xyz_world, torch.ones_like(xyz_world[:, :, 0:1])],
+                        dim=-1).view(num_envs * num_samples, 4, 1)
+    xyz_camera = torch.bmm(view_mat, xyz_hom)[:, 0:3, 0].view(num_envs, num_samples, 3)
+    return xyz_camera
+
+
+def xyz_camera_to_world(xyz_camera, inv_view_mat):
+    num_envs, num_samples, _ = xyz_camera.shape
+
+    # Project from camera to world frame.
+    xyz_hom = torch.cat([xyz_camera, torch.ones_like(xyz_camera[:, :, 0:1])],
+                        dim=-1).view(num_envs * num_samples, 1, 4)
+    xyz_world = torch.bmm(xyz_hom, inv_view_mat)[:, 0, 0:3].view(num_envs, num_samples, 3)
+    return xyz_world
+
+
+def xyz_to_image(xyz, proj_mat, view_mat, width, height):
+    batch_size, num_samples, _ = xyz.shape
+
+    # Project from world to camera frame.
+    xyz_hom = torch.cat([xyz, torch.ones_like(xyz[:, :, 0:1])], dim=-1).view(batch_size * num_samples, 4, 1)
+    xyz_camera = torch.bmm(view_mat, xyz_hom)[:, 0:3, :]
+
+    # Multiply with projection matrix.
+    xyz_camera = torch.bmm(proj_mat, xyz_camera)[..., 0].view(batch_size, num_samples, 3)
+
+    # Divide x and y dimensions by -z (z or perspective divide).
+    xyz_camera[..., 0] /= -xyz_camera[..., 2]
+    xyz_camera[..., 1] /= -xyz_camera[..., 2]
+
+    # Map to image plane.
+    center_u = width / 2
+    center_v = height / 2
+    v = center_v - (xyz_camera[..., 1] * height)
+    u = (xyz_camera[..., 0] * width) + center_u
+    image_plane = torch.stack([v, u], dim=-1).to(torch.long)
+    return image_plane
+
+
+def image_plane_to_bounding_box(image_plane):
+    x = torch.min(image_plane[..., 1], dim=1)[0] - 1
+    y = torch.min(image_plane[..., 0], dim=1)[0] - 1
+    w = torch.max(image_plane[..., 1], dim=1)[0] - x
+    h = torch.max(image_plane[..., 0], dim=1)[0] - y
+    return torch.stack([x, y, w, h], dim=-1)
+
+
+def draw_square(image, point, size: int, color: Tuple[int, int, int]):
+    for i in range(3):
+        image[point[0] - size:point[0] + size, point[1] - size:point[1] + size, i] = color[i]
+    return image
+
+
+def draw_bounding_box(image, bounding_box, width: int, color: Tuple[int, int, int]):
+    x, y, w, h = bounding_box[0], bounding_box[1], bounding_box[2], bounding_box[3]
+    for i in range(3):
+        image[y - width:y + h + width, x - width:x + width, i] = color[i]  # left
+        image[y - width:y + h + width, x + w - width:x + w + width, i] = color[i]  # right
+        image[y - width:y + width, x:x + w, i] = color[i]  # top
+        image[y + h - width:y + h + width, x:x + w, i] = color[i]  # bottom
+    return image
 
 
 class DexterityVideoRecordingProperties:
@@ -157,6 +225,9 @@ class DexterityCameraSensorProperties:
     def pos(self, value: Tuple[float, float, float]) -> None:
         self._pos = gymapi.Vec3(*value)
 
+    def get_pos_tensor(self, num_envs: int, device: torch.device) -> torch.Tensor:
+        return torch.Tensor([[self.pos.x, self.pos.y, self.pos.z]]).repeat(num_envs, 1).to(device)
+
     @property
     def quat(self) -> gymapi.Quat:
         return self._quat
@@ -164,6 +235,44 @@ class DexterityCameraSensorProperties:
     @quat.setter
     def quat(self, value: Tuple[float, float, float, float]) -> None:
         self._quat = gymapi.Quat(*value)
+
+    def get_quat_tensor(self, num_envs: int, device: torch.device) -> torch.Tensor:
+        return torch.Tensor([[self.quat.x, self.quat.y, self.quat.z, self.quat.w]]).repeat(num_envs, 1).to(device)
+
+    def compute_view_matrix(self, repeats: int, device: torch.device) -> torch.Tensor:
+        """Computes the view matrix for a static camera without the need for an
+        Isaac Gym camera sensor."""
+
+        # Build rotation matrix from quaternion.
+        from scipy.spatial.transform import Rotation
+        rotation = Rotation.from_quat([self.quat.x, self.quat.y, self.quat.z, self.quat.w])
+        rotation_matrix = torch.from_numpy(rotation.as_matrix())
+
+        # Fill transformation matrix.
+        transformation_matrix = torch.eye(4)
+        transformation_matrix[0:3, 0:3] = rotation_matrix
+        transformation_matrix[0, 3] = self.pos.x
+        transformation_matrix[1, 3] = self.pos.y
+        transformation_matrix[2, 3] = self.pos.z
+
+        # Get view matrix as inverse of transformation matrix.
+        inv_transformation_matrix = transformation_matrix.inverse()
+        view_matrix = torch.eye(4).to(device)
+        view_matrix[0, :] = -inv_transformation_matrix[1, :]
+        view_matrix[1, :] = inv_transformation_matrix[2, :]
+        view_matrix[2, :] = -inv_transformation_matrix[0, :]
+        return view_matrix.unsqueeze(0).repeat(repeats, 1, 1)
+
+    def compute_projection_matrix(self, repeats: int, device: torch.device) -> torch.Tensor:
+        """Computes the projection matrix of a camera without the need for an
+        Isaac Gym camera sensor."""
+
+        projection_matrix = torch.eye(3).to(device)
+        fovx_rad = self.fovx * (np.pi / 180)
+        aspect = self.width / self.height
+        projection_matrix[0, 0] = 0.5 / (math.tan(0.5 * fovx_rad))
+        projection_matrix[1, 1] = 0.5 / (math.tan(0.5 * fovx_rad) / aspect)
+        return projection_matrix.repeat(repeats, 1, 1)
 
     @property
     def model(self) -> str:
