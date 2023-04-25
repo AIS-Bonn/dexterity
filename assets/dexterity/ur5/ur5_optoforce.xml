@@ -148,7 +148,7 @@
                     <geom mesh="optoforce_base" pos="0.0 0 -0.006" quat="0 0 0.707 0.707" material="linkgray" class="visual"/>
                     <geom mesh="optoforce_connector" pos="0.0 0 -0.006" quat="0 0 0.707 0.707" material="silver" class="visual"/>
                     <geom mesh="optoforce_screws" pos="0.0 0 -0.006" quat="0 0 0.707 0.707" material="black" class="visual"/>
-                    <site name="attachment_site" pos="0 0 0.045" quat="-1 0 0 0"/>
+                    <site name="attachment_site" pos="0 0 0.0435" quat="-1 0 0 0"/>
                   </body>
 
                 </body>
@@ -175,12 +175,12 @@
         ctrl="0 -1.5707 0 0 0 0"/>
 
     <!-- ik_body is centered over the left half of the table -->
-    <key name="real_robot_initial" qpos="0.7614 -1.2729 1.6400 -0.3671 0.7612 1.5709"
-        ctrl="0.6820 -1.2454 1.7978 -0.5524 0.6818 1.5707"/>
+    <key name="real_robot_initial" qpos="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"
+        ctrl="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"/>
 
     <!-- ik_body is centered 0.6m in front of the base -->
-    <key name="initial" qpos="-0.3248 -1.5523 1.6492 -0.0969 1.2460 1.5707"
-        ctrl="-0.3248 -1.5523 1.6492 -0.0969 1.2460 1.5707"/>
+    <key name="default_initial" qpos="-0.2780 -1.5890 1.4855 0.1035 1.2927 1.5707"
+        ctrl="-0.2780 -1.5890 1.4855 0.1035 1.2927 1.5707"/>
   </keyframe>
 
 </mujoco>
