@@ -36,9 +36,12 @@ asset_info_object_sets.yaml.
 """
 
 import glob
+
+import cv2
 import hydra
 import math
-import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backend_bases import MouseButton
 import os
 from scipy.spatial.transform import Rotation as R
 import trimesh
@@ -51,6 +54,57 @@ from isaacgymenvs.tasks.dexterity.base.base import DexterityBase
 from isaacgymenvs.tasks.dexterity.env.schema_class_env import DexterityABCEnv
 from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
     DexteritySchemaConfigEnv
+from isaacgymenvs.tasks.dexterity.base.base_cameras import DexterityCameraSensorProperties
+from isaacgymenvs.tasks.dexterity.base.base_cameras import xyz_to_image, image_plane_to_bounding_box, draw_square, draw_bounding_box, xyz_world_to_camera, xyz_camera_to_world
+
+
+from scipy.ndimage import binary_dilation
+from PIL import Image
+from aot_tracker import _palette
+import gc
+
+
+def colorize_mask(pred_mask):
+    save_mask = Image.fromarray(pred_mask.astype(np.uint8))
+    save_mask = save_mask.convert(mode='P')
+    save_mask.putpalette(_palette)
+    save_mask = save_mask.convert(mode='RGB')
+    return np.array(save_mask)
+
+
+def draw_mask(img, mask, alpha=0.5, id_countour=False):
+    img_mask = np.zeros_like(img)
+    img_mask = img
+    if id_countour:
+        # very slow ~ 1s per image
+        obj_ids = np.unique(mask)
+        obj_ids = obj_ids[obj_ids != 0]
+
+        for id in obj_ids:
+            # Overlay color on  binary mask
+            if id <= 255:
+                color = _palette[id * 3:id * 3 + 3]
+            else:
+                color = [0, 0, 0]
+            foreground = img * (1 - alpha) + np.ones_like(
+                img) * alpha * np.array(color)
+            binary_mask = (mask == id)
+
+            # Compose image
+            img_mask[binary_mask] = foreground[binary_mask]
+
+            countours = binary_dilation(binary_mask,
+                                        iterations=1) ^ binary_mask
+            img_mask[countours, :] = 0
+    else:
+        binary_mask = (mask != 0)
+        countours = binary_dilation(binary_mask,
+                                    iterations=1) ^ binary_mask
+        foreground = img * (1 - alpha) + colorize_mask(mask) * alpha
+        img_mask[binary_mask] = foreground[binary_mask]
+        img_mask[countours, :] = 0
+
+    return img_mask.astype(img.dtype)
 
 
 class DexterityObject:
@@ -148,6 +202,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.cfg_env['env']['object_sets_asset_root']))
     
     def _update_observation_num(self, cfg) -> int:
+        self.synthetic_pointcloud_dimension = 64
+
         # Get the number of environment-specific observations.
         skip_keys = ()
         num_observations = 0
@@ -158,12 +214,21 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 assert split_observation[-1] == 'pos'
                 if split_observation[-2].isdigit():
                     self.synthetic_pointcloud_dimension = int(split_observation[-2])
-                else:
-                    self.synthetic_pointcloud_dimension = 64
                 obs_dim = self.synthetic_pointcloud_dimension * 3
             elif observation == 'object_bounding_box_pos':
                 skip_keys += (observation,)
                 obs_dim = 8 * 3
+            elif observation.startswith('detected_2d_bounding_box_image'):
+                obs_dim = 4  # xywh of bounding box detected by CV pipeline
+            elif observation.startswith('synthetic_2d_bounding_box_image'):
+                skip_keys += (observation,)
+                obs_dim = 4  # xywh of the bounding box projected to the camera image
+            elif observation.startswith('synthetic_2d_bounding_box_world'):
+                skip_keys += (observation,)
+                obs_dim = 4 * 3  # 4 projected corner points
+            elif observation.startswith('detected_segmented_point_cloud'):
+                skip_keys += (observation,)
+                obs_dim = 3
             else:
                 continue
             num_observations += obs_dim
@@ -326,11 +391,41 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_linvel = self.root_linvel[:, self.object_actor_id_env, 0:3]
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
+        self.used_2d_cameras = []
+        self.segmented_point_cloud_cameras = []
+
+        self.detected_segemented_point_clouds = {}
+        
+        # Using synthetic point-cloud in observation.
         if any(obs.startswith("object_synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
             self.object_synthetic_pointcloud_pos = self._acquire_object_synthetic_pointcloud()
+        # Get synthetic point-cloud if I want to calculate bounding boxes.
+        elif any(obs.startswith("synthetic_2d_bounding_box") for obs in self.cfg["env"]["observations"]):
+            self.object_synthetic_pointcloud_pos = self._acquire_object_synthetic_pointcloud()
 
+        # Acquire 3D bounding box.
         if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
             self.object_bounding_box_pos = self._acquire_object_bounding_box()
+
+        # Acquire synthetic or detected 2D bounding box.
+        for obs in self.cfg["env"]["observations"]:
+            if obs.startswith("synthetic_2d_bounding_box_image_"):
+                self._acquire_2d_bounding_box_image(obs, prefix='synthetic_2d_bounding_box_image_')
+            elif obs.startswith("synthetic_2d_bounding_box_world_"):
+                self._acquire_2d_bounding_box_world(obs, prefix='synthetic_2d_bounding_box_world_')
+            elif obs.startswith("detected_2d_bounding_box_image_"):
+                self._acquire_2d_bounding_box_image(obs, prefix='detected_2d_bounding_box_image_')
+            elif obs.startswith("detected_segmented_point_cloud_"):
+                self._acquire_detected_segmented_point_cloud(obs)
+
+    def _acquire_detected_segmented_point_cloud(self, obs: str):
+        camera_name = obs[len("detected_segmented_point_cloud_"):]
+        self.segmented_point_cloud_cameras.append(camera_name)
+
+        setattr(self, obs, torch.zeros((self.num_envs, 3), device=self.device))
+
+        setattr(self, obs + '_testing', [None for _ in range(self.num_envs)])
+        setattr(self, obs + '_testing_subset', [None for _ in range(self.num_envs)])
 
     def _acquire_object_synthetic_pointcloud(self) -> torch.Tensor:
         """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a 
@@ -404,6 +499,518 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.bounding_box_corner_coords * self.object_bounding_box_extents.unsqueeze(
                     1).repeat(1, 8, 1))
 
+    def _acquire_2d_bounding_box_image(self, obs: str, prefix: str) -> None:
+        camera_name = obs[len(prefix):]
+        assert camera_name in self.cfg_env.cameras.keys(), \
+            f"Camera {camera_name}, required in observation {obs} is not " \
+            f"specified in the environment config."
+        self.used_2d_cameras.append(camera_name)
+
+        # Store camera properties.
+        camera_properties = DexterityCameraSensorProperties(
+            **self.cfg_env.cameras[camera_name])
+        setattr(self, camera_name + "_properties", camera_properties)
+
+        # Initialize observation_tensor.
+        setattr(self, obs, torch.zeros(self.num_envs, 4).to(self.device))
+
+    def _acquire_2d_bounding_box_world(self, obs: str, prefix: str) -> None:
+        camera_name = obs[len(prefix):]
+        assert camera_name in self.cfg_env.cameras.keys(), \
+            f"Camera {camera_name}, required in observation {obs} is not " \
+            f"specified in the environment config."
+        self.used_2d_cameras.append(camera_name)
+
+        # Store camera properties.
+        camera_properties = DexterityCameraSensorProperties(
+            **self.cfg_env.cameras[camera_name])
+        setattr(self, camera_name + "_properties", camera_properties)
+
+        # Initialize observation_tensor.
+        setattr(self, obs, torch.zeros(self.num_envs, 4, 3).to(self.device))
+
+    def _refresh_synthetic_2d_bounding_box_image(self, draw_debug_visualization: bool = True) -> None:
+        """To find an object's synthetic 2D bounding box without rendering the
+        scene and employing an instance segmentation pipeline, we project the
+        synthetic 3D pointcloud (points sampled on the object's mesh) into the
+        image plane and then compute their 2D bounding box.
+        """
+        self._refresh_object_synthetic_pointcloud()
+
+        for camera_name in self.used_2d_cameras:
+            camera_properties = getattr(self, camera_name + "_properties")
+
+            # Compute view matrix and projection matrix manually so Isaac Gym
+            # does not need to create a camera sensor.
+            if not hasattr(self, camera_name + "_view_matrix"):
+                setattr(self, camera_name + "_view_matrix",
+                        camera_properties.compute_view_matrix(
+                            self.num_envs * self.synthetic_pointcloud_dimension,
+                            self.device))
+            if not hasattr(self, camera_name + "_projection_matrix"):
+                setattr(self, camera_name + "_projection_matrix",
+                        camera_properties.compute_projection_matrix(
+                            self.num_envs * self.synthetic_pointcloud_dimension,
+                            self.device))
+
+            # Project synthetic pointcloud from world space to the image plane.
+            image_plane = xyz_to_image(
+                self.object_synthetic_pointcloud_pos,
+                getattr(self, camera_name + '_projection_matrix'),
+                getattr(self, camera_name + '_view_matrix'),
+                camera_properties.width, camera_properties.height)
+
+            synthetic_bounding_box = image_plane_to_bounding_box(image_plane)
+            getattr(self, 'synthetic_2d_bounding_box_image_' + camera_name)[:] = \
+                synthetic_bounding_box
+
+            if draw_debug_visualization:
+                assert camera_name in self.cfg["env"]["observations"], \
+                    f"Camera '{camera_name}' is needed to draw the debug " \
+                    f"visualization for observation 'synthetic_2d_bounding_" \
+                    f"box_{camera_name}'."
+                image_dict = self.get_images()
+
+                fig, axs = plt.subplots(2, 2)
+
+                for env_id in range(2):
+                    image = image_dict[camera_name][env_id].cpu().numpy()
+
+                    from detectron2.utils.visualizer import Visualizer
+                    from detectron2.structures import Boxes, Instances
+
+                    synthetic_instances = Instances(image_size=image.shape[0:2])
+                    synthetic_instances.pred_boxes = Boxes(synthetic_bounding_box[env_id].unsqueeze(0))
+                    axs[0, env_id].set_title(f'Env {env_id}')
+                    axs[0, env_id].imshow(image)
+                    axs[1, env_id].imshow(Visualizer(image, scale=1.2).draw_instance_predictions(synthetic_instances.to("cpu")).get_image())
+
+                axs[0, 0].set(ylabel='Original RGB image')
+                axs[1, 0].set(ylabel='Synthetic 2D bounding box')
+                plt.show()
+
+    def _refresh_synthetic_2d_bounding_box_world(self) -> None:
+        self._refresh_object_synthetic_pointcloud()
+
+        for camera_name in self.used_2d_cameras:
+            camera_properties = getattr(self, camera_name + "_properties")
+
+            # Compute view matrix and projection matrix manually so Isaac Gym
+            # does not need to create a camera sensor.
+            if not hasattr(self, camera_name + "_view_matrix"):
+                setattr(self, camera_name + "_view_matrix",
+                        camera_properties.compute_view_matrix(
+                            self.num_envs * self.synthetic_pointcloud_dimension,
+                            self.device))
+
+            if not hasattr(self, camera_name + "_inverse_view_matrix"):
+                setattr(self, camera_name + "_inverse_view_matrix",
+                        getattr(self, camera_name + "_view_matrix").transpose(1, 2).inverse())
+
+            if not hasattr(self, camera_name + "_projection_matrix"):
+                setattr(self, camera_name + "_projection_matrix",
+                        camera_properties.compute_projection_matrix(
+                            self.num_envs * self.synthetic_pointcloud_dimension,
+                            self.device))
+
+            xyz_camera = xyz_world_to_camera(
+                self.object_synthetic_pointcloud_pos,
+                getattr(self, camera_name + '_view_matrix'))
+
+            x_min_value, x_min_idx = torch.min(xyz_camera[..., 0], dim=1)
+            x_max_value, x_max_idx = torch.max(xyz_camera[..., 0], dim=1)
+            y_min_value, y_min_idx = torch.min(xyz_camera[..., 1], dim=1)
+            y_max_value, y_max_idx = torch.max(xyz_camera[..., 1], dim=1)
+            z_mean = torch.mean(xyz_camera[..., 2], dim=1)
+
+            top_left = torch.stack([x_min_value, y_max_value, z_mean], dim=-1)
+            top_right = torch.stack([x_max_value, y_max_value, z_mean], dim=-1)
+            bottom_left = torch.stack([x_min_value, y_min_value, z_mean], dim=-1)
+            bottom_right = torch.stack([x_max_value, y_min_value, z_mean], dim=-1)
+
+            bounding_box_corners_camera = torch.stack([top_left, top_right, bottom_right, bottom_left], dim=1)
+            bounding_box_corners_world = xyz_camera_to_world(bounding_box_corners_camera, getattr(self, camera_name + "_inverse_view_matrix")[:self.num_envs * 4])
+
+            getattr(self, 'synthetic_2d_bounding_box_world_' + camera_name)[:] = \
+                bounding_box_corners_world
+
+    def _refresh_detected_segmented_point_cloud(
+            self, draw_debug_visualization: bool = False):
+        if not hasattr(self, 'segtrackers'):
+            return
+
+        self.gym.clear_lines(self.viewer)
+        image_dict = self.get_images()
+        for camera_name in self.segmented_point_cloud_cameras:
+            camera = self._camera_dict[camera_name]
+            xyz = camera.depth_to_xyz(self.env_ptrs, list(range(self.num_envs)))
+
+            for env_id in range(self.num_envs):
+                # Get image.
+                color_image_numpy = (image_dict[camera_name][
+                                         env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(np.uint8)
+                depth_image = image_dict[camera_name][env_id][..., 3]
+                # Update tracker.
+                pred_mask = self.segtrackers[camera_name][env_id].track(
+                    color_image_numpy, update_memory=True)
+
+                # Update segmented point-cloud.
+                idxs = np.where(self.pred_mask.flatten())[0]
+
+                #print("idxs:", idxs)
+
+                #idxs = torch.from_numpy(self.pred_mask).view(-1).nonzero().squeeze()
+                #print("idxs:", idxs)
+                getattr(self, 'detected_segmented_point_cloud_' + camera_name + '_testing')[env_id] = xyz[env_id] #[idxs]
+                getattr(self,
+                        'detected_segmented_point_cloud_' + camera_name + '_testing_subset')[env_id] = xyz[env_id][idxs]
+
+                if draw_debug_visualization:
+                    selected_segmentation = draw_mask(color_image_numpy, pred_mask,
+                                                      id_countour=False)
+                    fig = plt.figure()
+                    plt.axis('off')
+                    ax = fig.add_subplot(111)
+                    ax.set_title(
+                        f'Tracked segmentation for camera {camera_name} on env {env_id}.')
+                    plt.imshow(selected_segmentation)
+                    plt.show()
+
+    def _refresh_detected_2d_bounding_box_image(
+            self, pipeline: str = 'sam',
+            draw_debug_visualization: bool = False) -> None:
+        image_dict = self.get_images()
+
+        if pipeline == 'yolov8':
+            from isaacgymenvs.tasks.dexterity.tools.yolov8_tracking.yolov8.ultralytics.nn.autobackend import AutoBackend
+            from isaacgymenvs.tasks.dexterity.tools.yolov8_tracking.yolov8.ultralytics.yolo.utils.checks import check_file, \
+                check_imgsz, check_imshow, print_args, check_requirements
+            from isaacgymenvs.tasks.dexterity.tools.yolov8_tracking.yolov8.ultralytics.yolo.utils.ops import Profile, \
+                non_max_suppression, scale_boxes, process_mask, \
+                process_mask_native
+            from isaacgymenvs.tasks.dexterity.tools.yolov8_tracking.yolov8.ultralytics.yolo.utils.plotting import Annotator, \
+                colors, save_one_box
+            from isaacgymenvs.tasks.dexterity.tools.yolov8_tracking.trackers.multi_tracker_zoo import create_tracker
+            from pathlib import Path
+
+            # Setup model and tracker.
+            if not hasattr(self, "yolov8_model"):
+                # Create YOLO model.
+                yolo_weights = Path('yolov8s.pt')
+                yolo_weights = Path('/home/user/mosbach/tools/yolo_ycb/yolov5/exp2/weights/best.pt')
+                imgsz = list(image_dict['closeup'][0].shape[0:2])
+                self.yolov8_model = AutoBackend(yolo_weights, device=torch.device(self.device), dnn=False, fp16=False)
+                #stride, names, pt = self.model.stride, self.model.names, self.model.pt
+                imgsz = check_imgsz(imgsz, stride=self.yolov8_model.stride)
+                bs = 1
+                self.yolov8_model.warmup(imgsz=(1 if self.yolov8_model.pt or self.yolov8_model.triton else bs, 3, *imgsz))  # warmup
+                self.windows = []
+
+                # Create tracker.
+                tracking_method = 'deepocsort'
+                tracking_config = './tasks/dexterity/tools/yolov8_tracking/trackers/deepocsort/configs/deepocsort.yaml'
+                reid_weights = Path('osnet_x0_25_msmt17.pt')
+                device = torch.device(self.device)
+                self.tracker = create_tracker(tracking_method, tracking_config,
+                                         reid_weights, device, False)
+
+            # Retrieve and normalize image.
+            im = image_dict['closeup'].permute(0, 3, 1, 2).to(self.device)
+            im0 = image_dict['closeup'][0].detach().cpu().numpy()
+            im = im.float()  # uint8 to fp32
+            im /= 255.0  # 0 - 255 to 0.0 - 1.0
+
+            print("im.shape:", im.shape)
+
+            # Run YOLOv8 inference.
+            preds = self.yolov8_model(im, augment=False, visualize=False)
+
+            # Apply Non-maximum suppression (NMS).
+            conf_thres = 0.5
+            iou_thres = 0.5
+            classes = None
+            agnostic_nms = False
+            max_det = 1000
+            p = non_max_suppression(preds, conf_thres, iou_thres, classes,
+                                    agnostic_nms, max_det=max_det)
+
+            s = ''
+
+            # Process detections.
+            for i, det in enumerate(p):
+                print("i:", i)
+                print("det:", det)
+
+
+                line_thickness = 2
+                annotator = Annotator(im0, line_width=line_thickness,
+                                      example=str(self.yolov8_model.names))
+
+                if det is not None and len(det):
+
+                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4],
+                                             im0.shape).round()  # rescale boxes to im0 size
+
+                    # Print results.
+                    for c in det[:, 5].unique():
+                        n = (det[:, 5] == c).sum()
+                        s += f"{n} {self.yolov8_model.names[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                    # Pass detections to strongsort.
+                    print("im0.shape:", im0.shape)
+                    print("det:", det)
+                    print("det.requires_grad:", det.requires_grad)
+                    self.outputs = self.tracker.update(det.detach().cpu(), im0)
+                    print("outputs:", self.outputs)
+
+                    # Draw boxes for visualization.
+                    if len(self.outputs) > 0:
+
+                        for j, (output) in enumerate(self.outputs):
+                            bbox = output[0:4]
+                            id = output[4]
+                            cls = output[5]
+                            conf = output[6]
+
+                            save_vid = True
+
+                            if save_vid:
+                                hide_labels = False
+                                hide_class = False
+                                hide_conf = True
+                                c = int(cls)
+                                id = int(id)
+                                label = self.yolov8_model.names[c]
+                                label = None if hide_labels else (
+                                    f'{id} {self.yolov8_model.names[c]}' if hide_conf else \
+                                        (f'{id} {conf:.2f}' if hide_class else f'{id} {self.yolov8_model.names[c]} {conf:.2f}'))
+
+                                color = colors(c, True)
+
+                                annotator.box_label(bbox, label, color=color)
+
+                im0 = annotator.result()
+
+            plt.imshow(im0)
+            plt.show()
+
+            #import time
+            #time.sleep(1000)
+
+        elif pipeline == 'sam':
+
+
+
+            from scipy.ndimage import binary_dilation
+            from PIL import Image
+            from aot_tracker import _palette
+            import gc
+
+            def colorize_mask(pred_mask):
+                save_mask = Image.fromarray(pred_mask.astype(np.uint8))
+                save_mask = save_mask.convert(mode='P')
+                save_mask.putpalette(_palette)
+                save_mask = save_mask.convert(mode='RGB')
+                return np.array(save_mask)
+
+            def draw_mask(img, mask, alpha=0.5, id_countour=False):
+                img_mask = np.zeros_like(img)
+                img_mask = img
+                if id_countour:
+                    # very slow ~ 1s per image
+                    obj_ids = np.unique(mask)
+                    obj_ids = obj_ids[obj_ids != 0]
+
+                    for id in obj_ids:
+                        # Overlay color on  binary mask
+                        if id <= 255:
+                            color = _palette[id * 3:id * 3 + 3]
+                        else:
+                            color = [0, 0, 0]
+                        foreground = img * (1 - alpha) + np.ones_like(
+                            img) * alpha * np.array(color)
+                        binary_mask = (mask == id)
+
+                        # Compose image
+                        img_mask[binary_mask] = foreground[binary_mask]
+
+                        countours = binary_dilation(binary_mask,
+                                                    iterations=1) ^ binary_mask
+                        img_mask[countours, :] = 0
+                else:
+                    binary_mask = (mask != 0)
+                    countours = binary_dilation(binary_mask,
+                                                iterations=1) ^ binary_mask
+                    foreground = img * (1 - alpha) + colorize_mask(mask) * alpha
+                    img_mask[binary_mask] = foreground[binary_mask]
+                    img_mask[countours, :] = 0
+
+                return img_mask.astype(img.dtype)
+
+            im0 = image_dict['closeup'][0].detach().cpu().numpy()
+            pred_mask = self.segtracker.track(im0, update_memory=True)
+            selected_segmentation = draw_mask(im0, pred_mask, id_countour=False)
+
+
+            plt.imshow(selected_segmentation)
+            plt.show()
+
+        '''
+
+        # Some basic setup:
+        # Setup detectron2 logger
+        import detectron2
+        from detectron2.utils.logger import setup_logger
+        setup_logger()
+
+        # import some common libraries
+        import numpy as np
+        import os, json, cv2, random
+
+        # import some common detectron2 utilities
+        from detectron2 import model_zoo
+        from detectron2.engine import DefaultPredictor
+        from detectron2.config import get_cfg
+        from detectron2.utils.visualizer import Visualizer
+        from detectron2.data import MetadataCatalog, DatasetCatalog
+
+        for camera_name in self.used_2d_cameras:
+            assert camera_name in self.cfg["env"]["observations"], \
+                f"Camera '{camera_name}' is needed detect bounding boxes in " \
+                f"'detected_2d_bounding_box_image_{camera_name}'."
+
+            test_image = image_dict[camera_name][0].cpu().numpy()
+            print("showing image for camera:", camera_name)
+            #cv2.imshow('image', test_image)
+            #cv2.waitKey(0)
+
+            cfg = get_cfg()
+            # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+            cfg.merge_from_file(model_zoo.get_config_file(
+                "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+            cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+            # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
+                "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
+            predictor = DefaultPredictor(cfg)
+            outputs = predictor(test_image)
+
+            # We can use `Visualizer` to draw the predictions on the image.
+            v = Visualizer(test_image,
+                           MetadataCatalog.get(cfg.DATASETS.TRAIN[0]),
+                           scale=1.2)
+
+            print("outputs:", outputs)
+
+            print("outputs['instances']:", outputs['instances'])
+
+            
+            out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+
+            fig, axs = plt.subplots(2)
+
+            axs[0].imshow(test_image)
+            axs[0].set_title("Input image")
+            axs[1].imshow(out.get_image())
+            axs[1].set_title("Detections")
+
+            plt.show()
+            
+        '''
+
+        for camera_name in self.segmented_point_cloud_cameras:
+            print("camera_name:", camera_name)
+
+            camera_properties = getattr(self, camera_name + "_properties")
+
+            print(camera_properties)
+
+            import time
+            time.sleep(1000)
+
+    def _reset_segmentation_tracking(self, env_ids):
+        if not hasattr(self, 'segtracker'):
+            self._acquire_segtracker()
+
+        self.gym.clear_lines(self.viewer)
+        image_dict = self.get_images()
+        for camera_name in self.segmented_point_cloud_cameras:
+            camera = self._camera_dict[camera_name]
+            xyz = camera.depth_to_xyz(self.env_ptrs, env_ids)
+
+            for env_id in env_ids:
+                self.segtrackers[camera_name][env_id].restart_tracker()
+
+                self.input_points = []
+                self.input_labels = []
+                self.pred_mask = None
+
+                color_image_numpy = (image_dict[camera_name][env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(np.uint8)
+                depth_image = image_dict[camera_name][env_id][..., 3]
+
+                def update_mask(event):
+                    ax.cla()
+                    self.input_points.append([event.xdata, event.ydata])
+                    self.input_labels.append(int(event.button == MouseButton.LEFT))
+                    for point, label in zip(self.input_points, self.input_labels):
+                        col = 'green' if label == 1 else 'red'
+                        plt.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+
+                    self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].refine_first_frame_click(
+                        color_image_numpy.copy(), np.array(self.input_points).astype(np.int), np.array(self.input_labels), True)
+                    self.segtrackers[camera_name][env_id].sam.reset_image()
+
+                    torch.cuda.empty_cache()
+                    gc.collect()
+                    selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
+
+                    ax.imshow(selected_segmentation)
+                    fig.canvas.draw()
+
+                fig = plt.figure()
+                plt.axis('off')
+                ax = fig.add_subplot(111)
+                ax.set_title(f'Select segmentation for camera {camera_name} on env {env_id}.')
+                ax.imshow(color_image_numpy)
+                cid = fig.canvas.mpl_connect('button_press_event', update_mask)
+                plt.show()
+
+                idxs = np.where(self.pred_mask.flatten())
+                print("idxs:", idxs)
+
+                print("xyz.shape:", xyz.shape)
+
+
+                getattr(self, 'detected_segmented_point_cloud_' + camera_name + '_testing')[env_id] = xyz[env_id][idxs]
+
+
+
+                #self.detected_segemented_point_clouds[camera_name][env_id] = xyz[env_id][idxs]
+
+                # Set tracker reference once the segmentation is selected.
+                self.segtrackers[camera_name][env_id].add_reference(
+                    color_image_numpy, self.pred_mask)
+
+    def _acquire_segtracker(self):
+        from SegTracker import SegTracker
+        from model_args import aot_args, sam_args, segtracker_args
+
+        sam_args['generator_args'] = {
+            'points_per_side': 30,
+            'pred_iou_thresh': 0.8,
+            'stability_score_thresh': 0.9,
+            'crop_n_layers': 1,
+            'crop_n_points_downscale_factor': 2,
+            'min_mask_region_area': 200,
+        }
+        sam_args['sam_checkpoint'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/sam_vit_b_01ec64.pth'
+        aot_args['model_path'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/R50_DeAOTL_PRE_YTB_DAV.pth'
+
+        # Create a tracker per camera and environment.
+        self.segtrackers = {}
+        for camera_name in self.segmented_point_cloud_cameras:
+            self.segtrackers[camera_name] = [SegTracker(segtracker_args, sam_args, aot_args) for _ in range(self.num_envs)]
+
     def refresh_env_tensors(self):
         """Refresh tensors."""
         # NOTE: Tensor refresh functions should be called once per step, before
@@ -418,9 +1025,26 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         if "object_bounding_box_pos" in self.cfg["env"]["observations"]:
             self._refresh_object_bounding_box()
 
+        # Refresh synthetic 2D bounding boxes (image space).
+        if any(obs.startswith("synthetic_2d_bounding_box_image") for obs in self.cfg["env"]["observations"]):
+            self._refresh_synthetic_2d_bounding_box_image()
+
+        # Refresh synthetic 2D bounding boxes (image space).
+        if any(obs.startswith("synthetic_2d_bounding_box_world") for obs in self.cfg["env"]["observations"]):
+            self._refresh_synthetic_2d_bounding_box_world()
+
+        # Refresh 2D bounding boxes detected by SAM.
+        if any(obs.startswith("detected_2d_bounding_box_image") for obs in self.cfg["env"]["observations"]):
+            self._refresh_detected_2d_bounding_box_image()
+
+        # Refresh segmented point-clouds enabled by SAM.
+        if any(obs.startswith("detected_segmented_point_cloud") for obs in
+               self.cfg["env"]["observations"]):
+            self._refresh_detected_segmented_point_cloud()
+
     def _get_random_drop_pos(self, env_ids) -> torch.Tensor:
         object_pos_drop = torch.tensor(
-            self.cfg_task.randomize.object_pos_drop, device=self.device
+            self.object_pos_drop, device=self.device
         ).unsqueeze(0).repeat(len(env_ids), 1)
         object_pos_drop_noise = \
             2 * (torch.rand((len(env_ids), 3), dtype=torch.float32,
@@ -444,10 +1068,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         return object_quat_drop
 
     def _object_in_workspace(self, object_pos) -> torch.Tensor:
-        x_lower = self.cfg_task.randomize.workspace_extent_xy[0][0] + self.cfg_task.randomize.object_pos_drop[0]
-        x_upper = self.cfg_task.randomize.workspace_extent_xy[1][0] + self.cfg_task.randomize.object_pos_drop[0]
-        y_lower = self.cfg_task.randomize.workspace_extent_xy[0][1] + self.cfg_task.randomize.object_pos_drop[1]
-        y_upper = self.cfg_task.randomize.workspace_extent_xy[1][1] + self.cfg_task.randomize.object_pos_drop[1]
+        x_lower = self.workspace_extent_xy[0][0] + self.object_pos_drop[0]
+        x_upper = self.workspace_extent_xy[1][0] + self.object_pos_drop[0]
+        y_lower = self.workspace_extent_xy[0][1] + self.object_pos_drop[1]
+        y_upper = self.workspace_extent_xy[1][1] + self.object_pos_drop[1]
         object_in_workspace = x_lower <= object_pos[:, 0]
         object_in_workspace = torch.logical_and(
             object_in_workspace, object_pos[:, 0] <= x_upper)
@@ -457,14 +1081,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             object_in_workspace, object_pos[:, 1] <= y_upper)
         return object_in_workspace
 
-    def visualize_object_pose(self, env_id: int, axis_length: float = 0.3
-                              ) -> None:
-        self.visualize_body_pose("object", env_id, axis_length)
-
     def visualize_workspace_xy(self, env_id: int) -> None:
         # Set extent in z-direction to 0
-        lower = self.cfg_task.randomize.workspace_extent_xy[0] + [0.]
-        upper = self.cfg_task.randomize.workspace_extent_xy[1] + [0.]
+        lower = self.workspace_extent_xy[0] + [0.]
+        upper = self.workspace_extent_xy[1] + [0.]
         extent = torch.tensor([lower, upper])
         drop_pose = gymapi.Transform(
             p=gymapi.Vec3(self.cfg_task.randomize.object_pos_drop[0],
@@ -472,6 +1092,23 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                           0.))
         bbox = gymutil.WireframeBBoxGeometry(extent, pose=drop_pose,
                                              color=(0, 1, 1))
+        gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
+                           pose=gymapi.Transform())
+
+    def visualize_synthetic_2d_bounding_box_world_closeup(self, env_id: int) -> None:
+        self.visualize_pos('synthetic_2d_bounding_box_world_closeup', env_id)
+        self.visualize_polygon('synthetic_2d_bounding_box_world_closeup', env_id)
+
+    def visualize_detected_segmented_point_cloud_closeup(self, env_id: int) -> None:
+        if getattr(self, 'detected_segmented_point_cloud_closeup_testing')[env_id] is not None:
+            self.visualize_pos('detected_segmented_point_cloud_closeup_testing', env_id)
+
+            self.visualize_pos('detected_segmented_point_cloud_closeup_testing_subset', env_id, color=(1, 0, 1))
+
+    def visualize_real_robot_table(self, env_id: int) -> None:
+        extent = torch.tensor([[-0.07, -0.17, 0.], [0.63, 0.83, 0.]])
+        bbox = gymutil.WireframeBBoxGeometry(extent, pose=gymapi.Transform(),
+                                             color=(0.8, 0.35, 0.))
         gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
                            pose=gymapi.Transform())
 

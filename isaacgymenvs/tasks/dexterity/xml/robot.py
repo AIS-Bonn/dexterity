@@ -62,3 +62,7 @@ class DexterityRobot(DexterityABCRobot):
     @property
     def rigid_shape_count(self) -> int:
         return self._gym.get_asset_rigid_shape_count(self._asset)
+
+    @property
+    def dof_names(self) -> int:
+        return self._gym.get_asset_dof_names(self._asset)

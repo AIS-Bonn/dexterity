@@ -1,0 +1,365 @@
+<mujoco model="right_schunk_sih_hand-manipulator">
+    <compiler angle="radian" meshdir="assets/right" autolimits="true" />
+
+    <custom>
+        <!-- define ROS topics to listen and publish to -->
+        <text name="ros_state_topic" data="joint_states" />
+        <text name="ros_target_topic" data="sih/command" />
+        <!-- define joint names and joint position to command mapping -->
+        <numeric name="ros_joint schunk_sih_right_thumb_opposition" data="1. 0.63662"/>
+        <numeric name="ros_joint schunk_sih_right_thumb_flexion" data="0. 0.63662"/>
+        <numeric name="ros_joint schunk_sih_right_index_finger" data="0. -0.63662"/>
+        <numeric name="ros_joint schunk_sih_right_middle_finger" data="0. -0.63662"/>
+        <numeric name="ros_joint schunk_sih_right_ring_finger" data="0. -0.63662"/>
+    </custom>
+
+    <default>
+        <default class="right_hand">
+            <mesh scale="0.001 0.001 0.001"/>
+            <joint axis="1 0 0" damping="0.1" armature="0.01"/>
+            <position kp="5" forcerange="-5 5"/>
+
+            <!-- default joint and actuator attributes -->
+            <default class="thumb_rotating">
+                <joint range="-1.571 0" pos="0 0 0" axis="0 0 1"/>
+                <position ctrlrange="-1.571 0"/>
+            </default>
+            <default class="thumb_bending">
+                <joint range="0 1.571" pos="0 0 0" axis="0 1 0"/>
+                <position ctrlrange="0 1.571"/>
+            </default>
+            <default class="finger_bending">
+                <joint range="-1.571 0" pos="0 0 0" axis="1 0 0"/>
+                <position ctrlrange="-1.571 0"/>
+            </default>
+
+            <!-- default visual and collision attributes -->
+            <default class="plastic">
+                <geom solimp="0.5 0.99 0.0001" solref="0.005 1"/>
+                <default class="plastic_visual">
+                    <geom type="mesh" material="black" contype="0" conaffinity="0" group="2"/>
+                </default>
+                <default class="brushed_metal_visual">
+                    <geom type="mesh" material="brushed_metal" contype="0" conaffinity="0" group="2"/>
+                </default>
+                <default class="shiny_metal_visual">
+                    <geom type="mesh" material="shiny_metal" contype="0" conaffinity="0" group="2"/>
+                </default>
+                <default class="gold_metal_visual">
+                    <geom type="mesh" material="gold_metal" contype="0" conaffinity="0" group="2"/>
+                </default>
+                <default class="screws_visual">
+                    <geom type="mesh" material="screws" contype="0" conaffinity="0" group="2"/>
+                </default>
+                <default class="plastic_collision">
+                    <geom group="3" material="gray"/>
+                </default>
+            </default>
+        </default>
+    </default>
+
+
+    <asset>
+        <material name="black" specular="0.5" shininess="0.25" rgba="0.16355 0.16355 0.16355 1"/>
+        <material name="gray" specular="0.0" shininess="0.25" rgba="0.80848 0.80848 0.80848 1"/>
+        <material name="brushed_metal" specular="0" shininess="0.25" rgba="0.863 0.863 0.863 1"/>
+        <material name="screws" specular="0" shininess="0.25" rgba="0.7 0.7 0.7 1"/>
+        <material name="shiny_metal" specular="0" shininess="0.85" rgba="0.91 0.91 0.98 1"/>
+        <material name="gold_metal" specular="0" shininess="0.25" rgba="0.917 0.882 0.761 1"/>
+
+        <mesh class="right_hand" file="palm.stl"/>
+        <mesh class="right_hand" file="if_proximal.stl"/>
+        <mesh class="right_hand" file="if_distal.stl"/>
+        <mesh class="right_hand" file="mf_proximal.stl"/>
+        <mesh class="right_hand" file="mf_distal.stl"/>
+        <mesh class="right_hand" file="rf_proximal.stl"/>
+        <mesh class="right_hand" file="rf_distal.stl"/>
+        <mesh class="right_hand" file="lf_proximal.stl"/>
+        <mesh class="right_hand" file="lf_distal.stl"/>
+        <mesh class="right_hand" file="th_proximal.stl"/>
+        <mesh class="right_hand" file="th_inter.stl"/>
+        <mesh class="right_hand" file="th_inter_cvx.stl"/>
+        <mesh class="right_hand" file="th_distal.stl"/>
+
+        <mesh class="right_hand" file="visual/palm_axes.stl"/>
+        <mesh class="right_hand" file="visual/palm_back_base.stl"/>
+        <mesh class="right_hand" file="visual/palm_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/palm_connector.stl"/>
+        <mesh class="right_hand" file="visual/palm_flange_screws.stl"/>
+        <mesh class="right_hand" file="visual/palm_flange.stl"/>
+        <mesh class="right_hand" file="visual/palm_front_base.stl"/>
+        <mesh class="right_hand" file="visual/palm_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/palm_pins.stl"/>
+        <mesh class="right_hand" file="visual/palm_rolls.stl"/>
+        <mesh class="right_hand" file="visual/palm_springs.stl"/>
+        <mesh class="right_hand" file="visual/palm_thumb_base.stl"/>
+
+        <mesh class="right_hand" file="visual/if_distal_top.stl"/>
+        <mesh class="right_hand" file="visual/if_distal_bottom.stl"/>
+        <mesh class="right_hand" file="visual/if_distal_nail.stl"/>
+        <mesh class="right_hand" file="visual/if_distal_axis.stl"/>
+        <mesh class="right_hand" file="visual/if_distal_spring.stl"/>
+        <mesh class="right_hand" file="visual/if_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/if_proximal_base.stl"/>
+        <mesh class="right_hand" file="visual/if_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/if_proximal_roll.stl"/>
+        <mesh class="right_hand" file="visual/if_proximal_screws.stl"/>
+
+        <mesh class="right_hand" file="visual/mf_distal_top.stl"/>
+        <mesh class="right_hand" file="visual/mf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="visual/mf_distal_nail.stl"/>
+        <mesh class="right_hand" file="visual/mf_distal_axis.stl"/>
+        <mesh class="right_hand" file="visual/mf_distal_spring.stl"/>
+        <mesh class="right_hand" file="visual/mf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/mf_proximal_base.stl"/>
+        <mesh class="right_hand" file="visual/mf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/mf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="visual/mf_proximal_screws.stl"/>
+
+        <mesh class="right_hand" file="visual/rf_distal_top.stl"/>
+        <mesh class="right_hand" file="visual/rf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="visual/rf_distal_nail.stl"/>
+        <mesh class="right_hand" file="visual/rf_distal_axis.stl"/>
+        <mesh class="right_hand" file="visual/rf_distal_spring.stl"/>
+        <mesh class="right_hand" file="visual/rf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/rf_proximal_base.stl"/>
+        <mesh class="right_hand" file="visual/rf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/rf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="visual/rf_proximal_screws.stl"/>
+
+        <mesh class="right_hand" file="visual/lf_distal_top.stl"/>
+        <mesh class="right_hand" file="visual/lf_distal_bottom.stl"/>
+        <mesh class="right_hand" file="visual/lf_distal_nail.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_axis.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_base.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_roll.stl"/>
+        <mesh class="right_hand" file="visual/lf_proximal_screws.stl"/>
+
+        <mesh class="right_hand" file="visual/th_distal_top.stl"/>
+        <mesh class="right_hand" file="visual/th_distal_bottom.stl"/>
+        <mesh class="right_hand" file="visual/th_distal_nail.stl"/>
+        <mesh class="right_hand" file="visual/th_distal_axis.stl"/>
+
+        <mesh class="right_hand" file="visual/th_inter_back_plate.stl"/>
+        <mesh class="right_hand" file="visual/th_inter_base.stl"/>
+        <mesh class="right_hand" file="visual/th_inter_front_plate.stl"/>
+        <mesh class="right_hand" file="visual/th_inter_roll.stl"/>
+        <mesh class="right_hand" file="visual/th_inter_screws.stl"/>
+        <mesh class="right_hand" file="visual/th_inter_spring.stl"/>
+
+        <mesh class="right_hand" file="visual/th_proximal_axis.stl"/>
+        <mesh class="right_hand" file="visual/th_proximal_base.stl"/>
+        <mesh class="right_hand" file="visual/th_proximal_guides.stl"/>
+        <mesh class="right_hand" file="visual/th_proximal_roll.stl"/>
+        <mesh class="right_hand" file="visual/th_proximal_screws.stl"/>
+        <mesh class="right_hand" file="visual/th_proximal_spring.stl"/>
+
+    </asset>
+
+    <worldbody>
+            <body name="palm" childclass="right_hand" pos="0 0 0" quat="0.707 0 0 0.707">
+                <!-- attachment site for a vive tracker to visualize the tracker pose -->
+                <site name="attachment_site" pos="0 -0.04 0.08" quat="0 0 0 1"/>
+                <geom class="shiny_metal_visual" type="mesh" mesh="palm_axes" />
+                <geom class="plastic_visual" type="mesh" mesh="palm_back_base" />
+                <geom class="plastic_visual" type="mesh" mesh="palm_back_plate" />
+                <geom class="gold_metal_visual" type="mesh" mesh="palm_connector" />
+                <geom class="screws_visual" type="mesh" mesh="palm_flange_screws" />
+                <geom class="brushed_metal_visual" type="mesh" mesh="palm_flange" />
+                <geom class="brushed_metal_visual" type="mesh" mesh="palm_front_base" />
+                <geom class="plastic_visual" type="mesh" mesh="palm_front_plate" />
+                <geom class="shiny_metal_visual" type="mesh" mesh="palm_pins" />
+                <geom class="screws_visual" type="mesh" mesh="palm_rolls" />
+                <geom class="screws_visual" type="mesh" mesh="palm_springs" />
+                <geom class="brushed_metal_visual" type="mesh" mesh="palm_thumb_base" />
+                <geom class="plastic_collision" type="mesh" mesh="palm" />
+
+                <!-- site that can be used to query the palm position-->
+                <site name="keypoint-hand_bodies-palm" pos="0 0.018 0.09"/>
+                <site name="keypoint-palm-palm" pos="-0.02 0.018 0.11"/>
+
+                <!-- thumb -->
+                <body name="th_proximal" pos="-0.034 0.019 0.08">
+                    <site name="teleop-rh_th_angle0" user="-1.571 -1 0 0 0"/>
+                    <site name="keypoint-hand_bodies-th_proximal" pos="-0.0115 0.005 0.011"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_th_proximal" class="thumb_rotating"/>
+                    <geom class="shiny_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_axis" />
+                    <geom class="brushed_metal_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_base" />
+                    <geom class="plastic_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_guides" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_roll" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_screws" />
+                    <geom class="screws_visual" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal_spring" />
+                    <geom class="plastic_collision" pos="0.034 -0.019 -0.08" type="mesh" mesh="th_proximal" />
+                    <body name="th_inter" pos="-0.024 0.005 0.001">
+                        <site name="teleop-rh_th_flexion" user="0 1.571 0 0 0"/>
+                        <site name="keypoint-hand_bodies-th_inter" pos="-0.0175 0 0.016"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                        <joint name="th_proximal_to_th_inter" class="thumb_bending"/>
+                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_back_plate" />
+                        <geom class="brushed_metal_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_base" />
+                        <geom class="plastic_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_front_plate" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_roll" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_screws" />
+                        <geom class="screws_visual" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_spring" />
+                        <geom class="plastic_collision" pos="0.058 -0.024 -0.081" type="mesh" mesh="th_inter_cvx" />
+                        <body name="th_distal" pos="-0.0391 0 0">
+                            <site name="keypoint-hand_bodies-th_distal" pos="-0.023 0 0.015"/>
+                            <site name="keypoint-fingertips-th" pos="-0.023 0 0.015"/>
+                            <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                            <joint name="th_inter_to_th_distal" class="thumb_bending"/>
+                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_top" />
+                            <geom class="brushed_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_bottom" />
+                            <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_nail" />
+                            <geom class="shiny_metal_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_axis" />
+                            <geom class="plastic_collision" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal" />
+                        </body>
+                    </body>
+                </body>
+
+                <!-- index finger -->
+                <body name="if_proximal" pos="0.0435 0 0.141">
+                    <site name="keypoint-hand_bodies-if_proximal" pos="-0.087 0.016 0.022"/>
+                    <site name="teleop-rh_if_flexion" user="0 -1.571 0 0 0"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_if_proximal" class="finger_bending"/>
+                    <geom class="plastic_visual" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal_back_plate" />
+                    <geom class="brushed_metal_visual" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal_base" />
+                    <geom class="plastic_visual" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal_front_plate" />
+                    <geom class="screws_visual" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal_roll" />
+                    <geom class="screws_visual" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal_screws" />
+                    <geom class="plastic_collision" pos="-0.0435 0 -0.141" type="mesh" mesh="if_proximal" />
+                    <body name="if_distal" pos="0 0 0.048">
+                        <site name="keypoint-hand_bodies-if_distal" pos="-0.087 0.0175 0.041"/>
+                        <site name="keypoint-fingertips-if" pos="-0.087 0.0175 0.041"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                        <joint name="if_proximal_to_if_distal" class="finger_bending"/>
+                        <geom class="plastic_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_top" />
+                        <geom class="brushed_metal_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_bottom" />
+                        <geom class="plastic_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_nail" />
+                        <geom class="shiny_metal_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_axis" />
+                        <geom class="screws_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_spring" />
+                        <geom class="plastic_collision" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal" />
+                    </body>
+                </body>
+
+                <!-- middle finger -->
+                <body name="mf_proximal" pos="0.0187 0 0.141">
+                    <site name="keypoint-hand_bodies-mf_proximal" pos="-0.0375 0.016 0.024"/>
+                    <site name="teleop-rh_mf_flexion" user="0 -1.571 0 0 0"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_mf_proximal" class="finger_bending"/>
+                    <geom class="plastic_visual" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal_back_plate" />
+                    <geom class="brushed_metal_visual" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal_base" />
+                    <geom class="plastic_visual" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal_front_plate" />
+                    <geom class="screws_visual" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal_roll" />
+                    <geom class="screws_visual" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal_screws" />
+                    <geom class="plastic_collision" pos="-0.0187 0 -0.141" type="mesh" mesh="mf_proximal"/>
+                    <body name="mf_distal" pos="0 0 0.0525">
+                        <site name="keypoint-hand_bodies-mf_distal" pos="-0.0375 0.0175 0.049"/>
+                        <site name="keypoint-fingertips-mf" pos="-0.0375 0.0175 0.049"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/-->
+                        <joint name="mf_proximal_to_mf_distal" class="finger_bending"/>
+                        <geom class="plastic_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_top" />
+                        <geom class="brushed_metal_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_bottom" />
+                        <geom class="plastic_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_nail" />
+                        <geom class="shiny_metal_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_axis" />
+                        <geom class="screws_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_spring" />
+                        <geom class="plastic_collision" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal"/>
+                    </body>
+                </body>
+
+                <!-- ring finger -->
+                <body name="rf_proximal" pos="-0.0069 0 0.134">
+                    <site name="keypoint-hand_bodies-rf_proximal" pos="0.014 0.016 0.0215"/>
+                    <site name="teleop-rh_rf_flexion" user="0 -1.571 0 0 0"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_rf_proximal" class="finger_bending"/>
+                    <geom class="plastic_visual" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal_back_plate" />
+                    <geom class="brushed_metal_visual" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal_base" />
+                    <geom class="plastic_visual" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal_front_plate" />
+                    <geom class="screws_visual" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal_roll" />
+                    <geom class="screws_visual" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal_screws" />
+                    <geom class="plastic_collision" pos="0.0069 0 -0.134" type="mesh" mesh="rf_proximal" />
+                    <body name="rf_distal" pos="0 0 0.048">
+                        <site name="keypoint-hand_bodies-rf_distal" pos="0.014 0.0175 0.041"/>
+                        <site name="keypoint-fingertips-rf" pos="0.014 0.0175 0.041"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                        <joint name="rf_proximal_to_rf_distal" class="finger_bending"/>
+                        <geom class="plastic_visual" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal_top" />
+                        <geom class="brushed_metal_visual" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal_bottom" />
+                        <geom class="plastic_visual" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal_nail" />
+                        <geom class="shiny_metal_visual" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal_axis" />
+                        <geom class="screws_visual" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal_spring" />
+                        <geom class="plastic_collision" pos="0.0069 0 -0.182" type="mesh" mesh="rf_distal" />
+                    </body>
+                </body>
+
+                <!-- little finger -->
+                <body name="lf_proximal" pos="-0.032 0 0.1254">
+                    <site name="keypoint-hand_bodies-lf_proximal" pos="0.064 0.016 0.01685"/>
+                    <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                    <joint name="palm_to_lf_proximal" class="finger_bending"/>
+                    <geom class="shiny_metal_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_axis" />
+                    <geom class="plastic_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_back_plate" />
+                    <geom class="brushed_metal_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_base" />
+                    <geom class="plastic_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_front_plate" />
+                    <geom class="screws_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_roll" />
+                    <geom class="screws_visual" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal_screws" />
+                    <geom class="plastic_collision" pos="0.032 0 -0.1254" type="mesh" mesh="lf_proximal" />
+                    <body name="lf_distal" pos="0 0 0.0401">
+                        <site name="keypoint-hand_bodies-lf_distal" pos="0.064 0.0175 0.034"/>
+                        <site name="keypoint-fingertips-lf" pos="0.064 0.0175 0.034"/>
+                        <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
+                        <joint name="lf_proximal_to_lf_distal" class="finger_bending"/>
+                        <geom class="plastic_visual" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal_top" />
+                        <geom class="brushed_metal_visual" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal_bottom" />
+                        <geom class="plastic_visual" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal_nail" />
+                        <geom class="plastic_collision" pos="0.032 0 -0.1655" type="mesh" mesh="lf_distal" />
+                    </body>
+                </body>
+            </body>
+    </worldbody>
+
+
+    <!-- exclude some problematic self-collisions -->
+    <contact>
+        <exclude body1="if_proximal" body2="if_distal"/>
+        <exclude body1="mf_proximal" body2="mf_distal"/>
+        <exclude body1="rf_proximal" body2="rf_distal"/>
+        <exclude body1="lf_proximal" body2="lf_distal"/>
+        <exclude body1="th_proximal" body2="th_distal"/>
+
+        <exclude body1="palm" body2="if_proximal"/>
+        <exclude body1="palm" body2="mf_proximal"/>
+        <exclude body1="palm" body2="rf_proximal"/>
+        <exclude body1="palm" body2="lf_proximal"/>
+        <exclude body1="palm" body2="th_proximal"/>
+    </contact>
+
+    <actuator>
+        <position name="a_th_rot" joint="palm_to_th_proximal" class="thumb_rotating"/>
+        <position name="a_th_bend" joint="th_proximal_to_th_inter" class="thumb_bending"/>
+        <position name="a_if_bend" joint="palm_to_if_proximal" class="finger_bending"/>
+        <position name="a_mf_bend" joint="palm_to_mf_proximal" class="finger_bending"/>
+        <position name="a_rf_lf_bend" joint="palm_to_rf_proximal" class="finger_bending"/>
+    </actuator>
+
+    <!-- define equalities to position joints that cannot be actuated directly -->
+    <equality>
+        <joint name="th_bend_equality" joint1="th_proximal_to_th_inter" joint2="th_inter_to_th_distal" polycoef="0 1 0 0 0"/>
+        <joint name="if_bend_equality" joint1="palm_to_if_proximal" joint2="if_proximal_to_if_distal" polycoef="0 1 0 0 0"/>
+        <joint name="mf_bend_equality" joint1="palm_to_mf_proximal" joint2="mf_proximal_to_mf_distal" polycoef="0 1 0 0 0"/>
+        <joint name="rf_bend_equality" joint1="palm_to_rf_proximal" joint2="rf_proximal_to_rf_distal" polycoef="0 1 0 0 0"/>
+        <joint name="rf_lf_equality1" joint1="palm_to_rf_proximal" joint2="palm_to_lf_proximal" polycoef="0 1 0 0 0"/>
+        <joint name="rf_lf_equality2" joint1="palm_to_rf_proximal" joint2="lf_proximal_to_lf_distal" polycoef="0 1 0 0 0"/>
+    </equality>
+
+    <keyframe>
+        <key name="home" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
+        <key name="default_initial" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
+        <key name="real_robot_initial" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
+    </keyframe>
+</mujoco>

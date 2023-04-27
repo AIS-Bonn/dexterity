@@ -214,6 +214,14 @@ def compute_dof_torque(
     return dof_torque
 
 
+@torch.jit.script
+def quat_dot(a, b):
+    x1, y1, z1, w1 = a[:, 0], a[:, 1], a[:, 2], a[:, 3]
+    x2, y2, z2, w2 = b[:, 0], b[:, 1], b[:, 2], b[:, 3]
+    dot = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2
+    return dot
+
+
 def get_pose_error(ik_body_pos,
                    ik_body_quat,
                    ctrl_target_ik_body_pos,
@@ -231,6 +239,16 @@ def get_pose_error(ik_body_pos,
     if jacobian_type == 'geometric':  # See example 2.9.8; note use of J_g and transformation between rotation vectors
         # Compute quat error (i.e., difference quat)
         # Reference: https://personal.utdallas.edu/~sxb027100/dock/quat.html
+
+        #print("ctrl_target_ik_body_quat:", ctrl_target_ik_body_quat)
+        #ctrl_target_inverted = (ctrl_target_ik_body_quat[:, 3] < 0.).unsqueeze(
+        #    1).repeat(1, 4)
+        #ctrl_target_ik_body_quat = torch.where(ctrl_target_inverted,
+        #                                       -ctrl_target_ik_body_quat,
+        #                                       ctrl_target_ik_body_quat)
+
+        #print("ctrl_target_ik_body_quat (adjusted):", ctrl_target_ik_body_quat)
+
         ik_body_quat_norm = torch_utils.quat_mul(
             ik_body_quat,
             torch_utils.quat_conjugate(ik_body_quat))[:, 3]  # scalar component
@@ -239,8 +257,25 @@ def get_pose_error(ik_body_pos,
         quat_error = torch_utils.quat_mul(
             ctrl_target_ik_body_quat, ik_body_quat_inv)
 
+        #print("ik_body_quat_inv:", ik_body_quat_inv)
+        #print("ctrl_target_ik_body_quat:", ctrl_target_ik_body_quat)
+
         # Convert to axis-angle error
         axis_angle_error = axis_angle_from_quat(quat_error)
+
+        #print("axis_angle_error:", axis_angle_error)
+
+        # Always return the rotation difference the "short way" around.
+        #axis_angle_error = torch.where(axis_angle_error > torch.pi,
+        #                               axis_angle_error - 2 * torch.pi,
+        #                               axis_angle_error)
+        #axis_angle_error = torch.where(axis_angle_error < -torch.pi,
+        #                               axis_angle_error + 2 * torch.pi,
+        #                               axis_angle_error)
+
+        #print("quat_dot(ik_body_quat_inv, ctrl_target_ik_body_quat):", quat_dot(ik_body_quat_inv, ctrl_target_ik_body_quat))
+
+        #print("axis_angle_error (clamped):", axis_angle_error)
 
     elif jacobian_type == 'analytic':  # See example 2.9.7; note use of J_a and difference of rotation vectors
         # Compute axis-angle error

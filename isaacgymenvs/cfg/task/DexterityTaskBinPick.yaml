@@ -8,29 +8,40 @@ name: DexterityTaskBinPick
 physics_engine: ${..physics_engine}
 full_experiment_name: ${..experiment}
 
+enableCameraSensors: True  # Set to true to test visual observations
+
 sim:
     use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
     up_axis: "z"
-    dt: 0.016667  # required, but overridden in DexterityBase.yaml
+    dt: 0.066666666666  # required, but overridden in DexterityBase.yaml
     gravity: [0.0, 0.0, -9.81]  # required, but overridden in base DexterityBase.yaml
-
     disable_gravity: False
 
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'fingertips_quat', 'frontview']
+    observations: ['ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'frontview', 'synthetic_2d_bounding_box_image_frontview' ]
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
-    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
-    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
-    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
+    # ik_body start pose.
+    ik_body_pos_initial:  # initial position of ik_body
+        default: [0.6, 0., 0.5]
+        real_robot: [0.28, 0.58, 0.3]
+    ik_body_euler_initial:  # initial rotation of ik_body
+        default: [0., 0., 0.]
+        real_robot: [0.0, 0.0, 1.571]
     ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
-    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
-    fingertip_midpoint_rot_noise: [0.0, 0.0, 0.0]  # noise on rotation
-    object_pos_drop: [0.0, 0.0, 0.5]  # position from which object is dropped
-    object_pos_drop_noise: [0.2, 0.2, 0.0]  # noise on object drop position
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+
+    num_ik_body_initial_move_steps: 5  # number of steps to reach initial pose
+
+    # object drop position.
+    object_pos_drop:  # position from which object is dropped
+        default: [0.6, 0.0, 0.5]
+        real_robot: [0.28, 0.58, 0.5]
+    object_pos_drop_noise: [0.15, 0.15, 0.0]
+
     num_object_drop_steps: 100  # number of steps to drop objects
 
 rl:

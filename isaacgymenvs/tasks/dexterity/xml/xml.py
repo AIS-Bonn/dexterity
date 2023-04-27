@@ -43,16 +43,48 @@ class DexterityXML(DexterityABCXML):
         return self._robot_type
 
     @property
-    def ros_topic(self) -> str:
-        if not hasattr(self, "_ros_topic"):
+    def ros_state_topic(self) -> str:
+        if not hasattr(self, "_ros_state_topic"):
             self._init_model_info()
-        return self._ros_topic
+        return self._ros_state_topic
 
     @property
-    def initial_dof_pos(self) -> List[float]:
+    def ros_target_topic(self) -> str:
+        if not hasattr(self, "_ros_target_topic"):
+            self._init_model_info()
+        return self._ros_target_topic
+
+    @property
+    def ros_joint_names(self) -> List[str]:
+        if not hasattr(self, "_ros_joint_mapping"):
+            self._init_model_info()
+        return list(self._ros_joint_mapping.keys())
+
+    @property
+    def ros_joint_mapping(self) -> Dict[str, List[float]]:
+        if not hasattr(self, "_ros_joint_mapping"):
+            self._init_model_info()
+        return self._ros_joint_mapping
+
+    @property
+    def home_dof_pos(self) -> List[float]:
         initial_qpos = self._findall_rec(
             node=self.keyframe, tags="key",
-            attribs={"name": "initial"}, return_first=True).attrib["qpos"]
+            attribs={"name": "home"}, return_first=True).attrib["qpos"]
+        return list(map(float, initial_qpos.split(" ")))
+
+    @property
+    def default_initial_dof_pos(self) -> List[float]:
+        initial_qpos = self._findall_rec(
+            node=self.keyframe, tags="key",
+            attribs={"name": "default_initial"}, return_first=True).attrib["qpos"]
+        return list(map(float, initial_qpos.split(" ")))
+
+    @property
+    def real_robot_initial_dof_pos(self) -> List[float]:
+        initial_qpos = self._findall_rec(
+            node=self.keyframe, tags="key",
+            attribs={"name": "real_robot_initial"}, return_first=True).attrib["qpos"]
         return list(map(float, initial_qpos.split(" ")))
 
     @property
@@ -563,11 +595,18 @@ class DexterityXML(DexterityABCXML):
         self._model_name = model_name
         self._robot_type = robot_type
 
-        # Set ROS topic if it is specified.
-        self._ros_topic = None
+        # Set ROS topics if they are specified.
+        self._ros_state_topic = None
+        self._ros_target_topic = None
+        self._ros_joint_mapping = {}
         for child in self.custom:
-            if child.tag == 'text' and child.attrib['name'] == 'ros_topic':
-                self._ros_topic = child.attrib['data']
+            if child.tag == 'text' and child.attrib['name'] == 'ros_state_topic':
+                self._ros_state_topic = child.attrib['data']
+            elif child.tag == 'text' and child.attrib['name'] == 'ros_target_topic':
+                self._ros_target_topic = child.attrib['data']
+            elif child.tag == 'numeric' and child.attrib['name'].startswith('ros_joint'):
+                _, joint_name = child.attrib['name'].split(" ")
+                self._ros_joint_mapping[joint_name] = [float(num) for num in child.attrib['data'].split(" ")]
 
     def _save_xml(self, file_path: str, collect_meshes: bool = True) -> None:
         file_path = os.path.normpath(file_path)

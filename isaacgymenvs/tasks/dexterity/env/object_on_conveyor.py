@@ -232,15 +232,15 @@ class DexterityEnvObjectOnConveyor(DexterityEnvObject):
     def reset_conveyor_elements(self):
         conveyor_elements_pos = 0.16 * torch.arange(0, 9).unsqueeze(0).repeat(
             self.num_envs, 1).to(self.device) + self.dof_pos[:,
-                                                self.robot_dof_count:] - 0.64
+                                                self.robot_dof_count:self.robot_dof_count + 9] - 0.64
         conveyor_elements_out_of_reach = conveyor_elements_pos > 0.72
 
         if torch.any(conveyor_elements_out_of_reach):
-            conveyor_dof_pos = self.dof_pos[:, self.robot_dof_count:].clone()
+            conveyor_dof_pos = self.dof_pos[:, self.robot_dof_count:self.robot_dof_count+9].clone()
             conveyor_dof_pos = torch.where(
                 conveyor_elements_out_of_reach,
-                conveyor_dof_pos - 1.44, conveyor_dof_pos)
-            self.dof_pos[:, self.robot_dof_count:] = conveyor_dof_pos
+                conveyor_dof_pos + 0., conveyor_dof_pos)
+            self.dof_pos[:, self.robot_dof_count:self.robot_dof_count+9] = conveyor_dof_pos
             self.gym.set_dof_state_tensor_indexed(
                 self.sim,
                 gymtorch.unwrap_tensor(self.dof_state),

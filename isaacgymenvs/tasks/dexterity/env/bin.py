@@ -115,8 +115,8 @@ class DexterityEnvBin(DexterityEnvObject):
         table_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         bin_pose = gymapi.Transform(
-            p=gymapi.Vec3(*self.cfg_env['env']['bin_pos']),
-            r=gymapi.Quat(*self.cfg_env['env']['bin_quat']))
+            p=gymapi.Vec3(*self.cfg_env.env.bin_pos[self.cfg_env.env.setup]),
+            r=gymapi.Quat(*self.cfg_env.env.bin_quat[self.cfg_env.env.setup]))
 
         self.env_ptrs = []
         self.object_handles = [[] for _ in range(self.num_envs)]
@@ -268,12 +268,12 @@ class DexterityEnvBin(DexterityEnvObject):
                 1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
 
     def _object_in_bin(self, object_pos) -> torch.Tensor:
-        x_lower = self.bin_info['extent'][0][0]
-        x_upper = self.bin_info['extent'][1][0]
-        y_lower = self.bin_info['extent'][0][1]
-        y_upper = self.bin_info['extent'][1][1]
-        z_lower = self.bin_info['extent'][0][2]
-        z_upper = self.bin_info['extent'][1][2]
+        x_lower = self.bin_info['extent'][0][0] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][0]
+        x_upper = self.bin_info['extent'][1][0] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][0]
+        y_lower = self.bin_info['extent'][0][1] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][1]
+        y_upper = self.bin_info['extent'][1][1] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][1]
+        z_lower = self.bin_info['extent'][0][2] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][2]
+        z_upper = self.bin_info['extent'][1][2] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][2]
         in_bin = x_lower <= object_pos[..., 0]
         in_bin = torch.logical_and(in_bin, object_pos[..., 0] <= x_upper)
         in_bin = torch.logical_and(in_bin, y_lower <= object_pos[..., 1])
@@ -304,7 +304,7 @@ class DexterityEnvBin(DexterityEnvObject):
 
     def _place_objects_before_bin(self):
         # Place the objects in front of the bin
-        self.root_pos[:, self.object_actor_id_env, 0] = 0.5
+        self.root_pos[:, self.object_actor_id_env, 0] = 1.1
         self.root_pos[:, self.object_actor_id_env, 1] = 0.0
         self.root_pos[:, self.object_actor_id_env, 2] = 0.5
         self.root_linvel[:, self.object_actor_id_env] = 0.0
@@ -342,7 +342,7 @@ class DexterityEnvBin(DexterityEnvObject):
     def visualize_bin_extent(self, env_id) -> None:
         extent = torch.tensor(self.bin_info['extent'])
         bin_pose = gymapi.Transform(
-            p=gymapi.Vec3(*self.cfg_env['env']['bin_pos']))
+            p=gymapi.Vec3(*self.bin_pos))
         bbox = gymutil.WireframeBBoxGeometry(extent, pose=bin_pose,
                                              color=(0, 1, 1))
         gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],

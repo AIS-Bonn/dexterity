@@ -76,12 +76,18 @@ def xyz_to_image(xyz, proj_mat, view_mat, width, height):
     return image_plane
 
 
-def image_plane_to_bounding_box(image_plane):
-    x = torch.min(image_plane[..., 1], dim=1)[0] - 1
-    y = torch.min(image_plane[..., 0], dim=1)[0] - 1
-    w = torch.max(image_plane[..., 1], dim=1)[0] - x
-    h = torch.max(image_plane[..., 0], dim=1)[0] - y
-    return torch.stack([x, y, w, h], dim=-1)
+def image_plane_to_bounding_box(image_plane, format: str = 'tlbr'):
+    x_min = torch.min(image_plane[..., 1], dim=1)[0]
+    y_min = torch.min(image_plane[..., 0], dim=1)[0]
+    x_max = torch.max(image_plane[..., 1], dim=1)[0]
+    y_max = torch.max(image_plane[..., 0], dim=1)[0]
+    if format == 'xywh':
+        bounding_box = torch.stack([x_min, y_min, x_max - x_min, y_max - y_min], dim=-1)
+    elif format == 'tlbr':
+        bounding_box = torch.stack([x_min, y_min, x_max, y_max], dim=-1)
+    else:
+        assert False
+    return bounding_box
 
 
 def draw_square(image, point, size: int, color: Tuple[int, int, int]):

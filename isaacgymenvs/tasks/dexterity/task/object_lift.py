@@ -41,9 +41,10 @@ from isaacgymenvs.tasks.dexterity.env.object import DexterityEnvObject
 from isaacgymenvs.tasks.dexterity.task.schema_class_task import DexterityABCTask
 from isaacgymenvs.tasks.dexterity.task.schema_config_task import DexteritySchemaConfigTask
 from isaacgymenvs.tasks.dexterity.task.task_utils import *
+from isaacgymenvs.tasks.dexterity.task.sim2real_utils import CalibrationUtils
 
 
-class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
+class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationUtils):
 
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless,
                  virtual_screen_capture, force_render):
@@ -53,6 +54,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
 
         self.cfg = cfg
         self._get_task_yaml_params()
+        self.acquire_setup_params()
         self._acquire_task_tensors()
         self.parse_controller_spec()
 
@@ -81,6 +83,18 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
         self.cfg_ppo = hydra.compose(config_name=ppo_path)
         self.cfg_ppo = self.cfg_ppo['train']  # strip superfluous nesting
 
+    def acquire_setup_params(self) -> None:
+        # Find object drop pose and workspace extent based on setup.
+        self.object_pos_drop = \
+            self.cfg['randomize']['object_pos_drop'][self.cfg_env.env.setup]
+        self.workspace_extent_xy = \
+            self.cfg['randomize']['workspace_extent_xy'][self.cfg_env.env.setup]
+
+        self.cfg_task.randomize.ik_body_pos_initial = \
+            self.cfg['randomize']['ik_body_pos_initial'][self.cfg_env.env.setup]
+        self.cfg_task.randomize.ik_body_euler_initial = \
+            self.cfg['randomize']['ik_body_euler_initial'][self.cfg_env.env.setup]
+
     def _acquire_task_tensors(self):
         """Acquire tensors."""
         pass
@@ -88,6 +102,11 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
     def _refresh_task_tensors(self):
         """Refresh tensors."""
         pass
+
+    def pre_physics_step(self, actions):
+        if self.cfg_task['calibrate']:
+            actions = self.run_calibration_procedure(actions)
+        super().pre_physics_step(actions)
 
     def _update_reset_buf(self):
         """Assign environments for reset if successful or failed."""
@@ -101,13 +120,15 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
             self.reset_buf)
 
         # If the object has been lifted to the target height
+        '''
         object_height = object_pos[:, 2]
         object_height_initial = object_pos_initial[:, 2]
         object_lifted = (object_height - object_height_initial) > \
                         self.cfg_task.rl.target_height
         self.reset_buf[:] = torch.where(object_lifted,
                                         torch.ones_like(self.reset_buf),
-                                        self.reset_buf)
+                                        self.reset_buf)                          
+        
 
         # Log exponentially weighted moving average (EWMA) of the success rate
         if "success_rate_ewma" in self.cfg_base.logging.keys():
@@ -141,6 +162,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
                                 self, obj.name + "_success_rate_ewma"))
                         self.log({obj.name + "_success_rate_ewma": getattr(
                             self, obj.name + "_success_rate_ewma")})
+        '''
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
@@ -166,17 +188,25 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
         for reward_term, scale in self.cfg_task.rl.reward.items():
             # Penalize distance of keypoint groups to object
             if reward_term.startswith(tuple(self.keypoint_dict.keys())):
-                keypoint_group_name = reward_term.split('_')[0]
-                assert reward_term.endswith('_dist_penalty'), \
-                    f"Reward term {reward_term} depends on " \
-                    f"keypoint_group {keypoint_group_name}, but is not " \
-                    f"a distance penalty."
-                keypoint_pos = getattr(self, keypoint_group_name + '_pos')
-                object_pos_expanded = object_pos.unsqueeze(1).repeat(
-                    1, keypoint_pos.shape[1], 1)
-                keypoint_dist = torch.norm(
-                    keypoint_pos - object_pos_expanded, dim=-1).mean(dim=-1)
-                reward = -scale * keypoint_dist
+                if reward_term.endswith('_dist_penalty'):
+                    keypoint_group_name = reward_term[:-len('_dist_penalty')]
+                    keypoint_pos = getattr(self, keypoint_group_name + '_pos')
+                    object_pos_expanded = object_pos.unsqueeze(1).repeat(
+                        1, keypoint_pos.shape[1], 1)
+                    keypoint_dist = torch.norm(
+                        keypoint_pos - object_pos_expanded, dim=-1).mean(dim=-1)
+                    reward = -scale * keypoint_dist
+                elif reward_term.endswith('_proximity'):
+                    keypoint_group_name = reward_term[:-len('_proximity')]
+                    keypoint_pos = getattr(self, keypoint_group_name + '_pos')
+                    object_pos_expanded = object_pos.unsqueeze(1).repeat(
+                        1, keypoint_pos.shape[1], 1)
+                    keypoint_dist = torch.norm(
+                        keypoint_pos - object_pos_expanded, dim=-1).mean(dim=-1)
+                    in_proximity = keypoint_dist < 0.05
+                    reward = torch.where(in_proximity, 0. * keypoint_dist, -scale * keypoint_dist)
+                else:
+                    assert False
 
             # Penalize large actions
             elif reward_term == 'action_penalty':
@@ -208,6 +238,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
             reward_terms["reward_terms/" + reward_term] = reward.mean()
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
+            #print(reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
@@ -215,16 +246,19 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask):
         if self.objects_dropped:
             self._reset_object(env_ids)
         else:
+            self._reset_robot(env_ids, reset_to="home",
+                              randomize_ik_body_pose=False)
             self._drop_object(
                 env_ids,
                 sim_steps=self.cfg_task.randomize.num_object_drop_steps)
             self.objects_dropped = True
 
-        self._reset_robot(env_ids)
+        self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
 
-        #self._randomize_ik_body_pose(
-        #    env_ids,
-        #    sim_steps=self.cfg_task.randomize.num_ik_body_initial_move_steps)
+        # Initialize SAM segmentation at the start of each episode.
+        if any(obs.startswith("detected_segmented_point_cloud") for obs in
+               self.cfg["env"]["observations"]):
+            self._reset_segmentation_tracking(env_ids)
 
         self._reset_buffers(env_ids)
 

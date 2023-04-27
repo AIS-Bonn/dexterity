@@ -77,11 +77,6 @@ class DexterityABCBase(ABC):
         pass
 
     @abstractmethod
-    def generate_ctrl_signals(self):
-        """Get Jacobian. Set Franka DOF position targets or DOF torques."""
-        pass
-
-    @abstractmethod
     def enable_gravity(self):
         """Enable gravity."""
         pass

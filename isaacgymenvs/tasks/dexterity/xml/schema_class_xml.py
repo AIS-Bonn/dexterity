@@ -41,9 +41,9 @@ class DexterityABCXML(ABC):
 
     @property
     @abstractmethod
-    def initial_dof_pos(self) -> List[float]:
+    def default_initial_dof_pos(self) -> List[float]:
         """Return the initial state the robot DOFs should be reset to as defined
-        in the MuJoCo keyframe entry 'initial'.
+        in the MuJoCo keyframe entry 'default_initial'.
         """
         pass
 

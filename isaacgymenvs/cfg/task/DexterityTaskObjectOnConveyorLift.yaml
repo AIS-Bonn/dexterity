@@ -26,7 +26,7 @@ randomize:
     ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
     ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
     ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
-    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+    num_ik_body_initial_move_steps: 5  # number of steps to reach initial pose
     fingertip_midpoint_rot_noise: [0.0, 0.0, 0.0]  # noise on rotation
     object_pos_drop: [0.0, -0.4, 0.5]  # position from which object is dropped
     object_pos_drop_noise: [0.05, 0.05, 0.0]  # noise on object drop position

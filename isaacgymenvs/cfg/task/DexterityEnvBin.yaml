@@ -14,9 +14,15 @@ env:
         ycb: [ '002_master_chef_can', '01*' ]
         egad: []
 
-    # bin options
-    bin_pos: [0, 0, 0.001]  # Position of the bin
-    bin_quat: [0, 0, -0.707, 0.707]  # Quaterion rotation of the bin
+    setup: 'default'  # Should be in ['default', 'real_robot']
+
+    # pose of the bin.
+    bin_pos:
+        default: [0.6, 0, 0.001]
+        real_robot: [0.28, 0.58, 0.001]
+    bin_quat:
+        default: [0, 0, -0.707, 0.707]
+        real_robot: [0, 0, -0.707, 0.707]
 
     highlight_target_object: True
     target_object_color: [0, 1, 0]

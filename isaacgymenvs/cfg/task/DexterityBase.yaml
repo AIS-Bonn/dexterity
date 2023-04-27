@@ -9,7 +9,7 @@ mode:
     export_states: False
 
 sim:
-    dt: 0.03333333333
+    dt: 0.066666666666  # Aim for 15 Hz control on the real robot
     num_substeps: 8  # Number of substeps has the largest impact on FPS performance. Using a very low number of substeps causes large penetrations of the robot and objects making the simulation less realistic and less stable. Increasing the number of substeps or position iterations appears to be the best remedy.
     num_pos_iters: 16
     num_vel_iters: 0
@@ -17,11 +17,17 @@ sim:
     add_damping: False
     override_robot_com_and_inertia: True  # Whether to recompute the center of mass and inertia based on the robot body's geometry and override the values given in the XML file
     aggregate_mode: 2  # Whether to create aggregate groups 0: don't aggregate; 1: aggregate only task-specific actors; >1: aggregate all actors
+
+
+# Publish to ROS in parallel for sim2real transfer.
+ros_activate: False  # Whether to publish commands to ROS.
+ros_master_uri: http://robo15:11311/  # Set URI of the ROS master.
+
     
 env:
     env_spacing: 1.0
-    robot: [ 'franka_emika_panda/panda_limited.xml', 'schunk_sih/right_hand.xml', 'vive_tracker/tracker.xml']
-    robot_depth: 0.6
+    robot: [ 'ur5/ur5_optoforce.xml', 'schunk_sih/right_hand_default_mount.xml', 'vive_tracker/tracker.xml']
+    robot_depth: 0.0
     robot_friction: 1.0
     has_table: False
     table_height: 0.2
@@ -30,8 +36,13 @@ env:
 ctrl:
     ctrl_type: gym_default  # {gym_default, joint_space_id}
     ik_body: tracker
-    add_pose_actions_to: pose # {target, pose}
+    add_pose_actions_to: pose  # {target, pose}
     neglect_attached_weights: True  # Whether to ignore the weights of rigid bodies attached to the robot arm, such as fingers of a robotic hand. This drastically improves the inverse kinematics.
+
+    workspace:
+        limit_ik_body_pose: False
+        pos: [[0.18, 0.48, 0.15], [0.38, 0.68, 0.325]]  # Absolute
+        angle: [[-0.1, -0.5, -0.5], [0.1, 0.5, 0.5]]  # Relative to initial hand-orientation
 
     all:
         jacobian_type: geometric
@@ -45,7 +56,7 @@ ctrl:
 
         residual_prop_gain: 10.
         residual_deriv_gain: 4
-        residual_max_effort: 1.
+        residual_max_effort: 0.1
 
     joint_space_id:
         ik_method: dls
@@ -57,8 +68,8 @@ ctrl:
         residual_damping: 5.0
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
-    pos_action_scale: [ 0.1, 0.1, 0.1 ]
-    rot_action_scale: [ 0.2, 0.2, 0.2 ]
+    pos_action_scale: [ 0.025, 0.025, 0.025 ]
+    rot_action_scale: [ 0.1, 0.1, 0.1 ]
     torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True
@@ -71,11 +82,30 @@ debug:
     override_target_pose: False
     # target poses are specified as [[x, y, z], [x, y, z, w], duration (ts)]
     target_poses: [
-        [[0, 0, 0.6], [0, 0, 0, 1], 200], # base pose
-        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.5], [0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [0.707, 0., 0., 0.707], 200], [[0, 0, 0.5], [0.924, 0., 0., 0.383], 200], [[0, 0, 0.5], [0.707, 0., 0., 0.707], 200], [[0, 0, 0.6], [0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [-0.383, 0., 0., 0.924], 200], [[0, 0, 0.6], [-0.707, 0., 0., 0.707], 200], [[0, 0, 0.6], [-0.924, 0., 0., 0.383], 200],   # x-axis rotation
-        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0.383, 0., 0.924], 200], [[0, 0, 0.6], [0., 0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., 0.924, 0., 0.383], 200], [[0, 0, 0.6], [0., 0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., 0.383, 0., 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., -0.383, 0., 0.924], 200], [[0, 0, 0.6], [0., -0.707, 0., 0.707], 200], [[0, 0, 0.6], [0., -0.924, 0., 0.383], 200],   # y-axis rotation
-        [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0., 0.383, 0.924], 200], [[0, 0, 0.6], [0., 0., 0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., 0.924, 0.383], 200], [[0, 0, 0.6], [0., 0., 0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., 0.383, 0.924], 200], [[0, 0, 0.6], [0, 0, 0, 1], 200], [[0, 0, 0.6], [0., 0., -0.383, 0.924], 200], [[0, 0, 0.6], [0., 0., -0.707, 0.707], 200], [[0, 0, 0.6], [0., 0., -0.924, 0.383], 200],   # z-axis rotation
+        [[0.28, 0.58, 0.3], [0, 0, 0.707, 0.707], 60],
+        [[0.28, 0.53, 0.25], [0, 0, 0.707, 0.707], 60],
+        [[0.28, 0.58, 0.2], [0, 0, 0.707, 0.707], 60],
+        [[0.28, 0.63, 0.25], [0, 0, 0.707, 0.707], 60],
+        [[0.28, 0.58, 0.3], [0, 0, 0.707, 0.707], 60],
     ]
+
+    override_ik_body_dof_target: False
+    # ik_body dof targets are specified as [[q0, ..., qn], duration (ts)]
+    ik_body_dof_targets: [
+        # Test shoulder_pan_joint
+        [[0.7614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709], 40],
+        [[0.8614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709], 40],
+        [[0.6614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709], 40],
+        [[0.7614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709], 40],
+
+        # Test shoulder_lift_joint
+        [ [ 0.7614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709 ], 40 ],
+        [ [ 0.7614,  -1.1729,  1.6400,  -0.3671,  0.7612,  1.5709 ], 40 ],
+        [ [ 0.7614,  -1.3729,  1.6400,  -0.3671,  0.7612,  1.5709 ], 40 ],
+        [ [ 0.7614,  -1.2729,  1.6400,  -0.3671,  0.7612,  1.5709 ], 40 ],
+
+    ]
+
 
     override_residual_dof_target: False
     # residual dof targets are specified as [[q0, ..., qn], duration (ts)]

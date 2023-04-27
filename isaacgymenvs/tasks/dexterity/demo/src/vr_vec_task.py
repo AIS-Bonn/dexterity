@@ -93,7 +93,8 @@ class GymVR:
         self._fps = 0
 
         # y coordinate is mapped to IsaacGym's z coordinate
-        self._tracker_base_pos = np.array([0, 0.5, 0])
+        tracker_base_pos = self._task.cfg_task.randomize.ik_body_pos_initial
+        self._tracker_base_pos = np.array([-tracker_base_pos[1], tracker_base_pos[2], -tracker_base_pos[0]])
 
         input("\n Press Enter to set reference frame ...")
         self._set_reference_frame()
@@ -178,7 +179,6 @@ class GymVR:
             thumb_force_feedback = -10 * self._task.fingertips_contact_force_local_coords[0, 0, 2].cpu().numpy().astype(int)
             force_feedback = -10 * self._task.fingertips_contact_force_local_coords[0, :, 1].cpu().numpy().astype(int)
             force_feedback[0] = thumb_force_feedback
-            print(force_feedback)
 
             self._vr_viewer.send_haptic_feedback(True, buzz, force_feedback)
 

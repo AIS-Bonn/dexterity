@@ -52,7 +52,7 @@ def on_press(key):
         space_pressed = True
 
 
-def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
+def record_keypoint_pose(task: str = "DexterityTaskObjectLift"):
     initialize(config_path="../../../cfg/")
     cfg = compose(config_name="config",
                   overrides=["num_envs=1", "headless=False", "sim_device=cpu",
@@ -69,7 +69,7 @@ def record_keypoint_pose(task: str = "DexterityTaskDrillPickAndPlace"):
         tool_name = "drill"
     elif cfg.task.name == "DexterityTaskHammerDriveNail":
         tool_name = "hammer"
-    elif cfg.task.name == "DexterityTaskObjectLift":
+    elif cfg.task.name.startswith("DexterityTaskObject"):
         tool_name = "object"
     elif cfg.task.name == "DexterityTaskBinPick":
         tool_name = "target_object"

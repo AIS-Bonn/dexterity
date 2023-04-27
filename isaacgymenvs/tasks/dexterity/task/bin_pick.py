@@ -82,6 +82,26 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         self.cfg_ppo = hydra.compose(config_name=ppo_path)
         self.cfg_ppo = self.cfg_ppo['train']  # strip superfluous nesting
 
+        self.acquire_setup_params()
+
+    def acquire_setup_params(self) -> None:
+        # Find object drop pose and workspace extent based on setup.
+        self.object_pos_drop = \
+            self.cfg['randomize']['object_pos_drop'][self.cfg_env.env.setup]
+
+        self.cfg_task.randomize.ik_body_pos_initial = \
+            self.cfg['randomize']['ik_body_pos_initial'][self.cfg_env.env.setup]
+        self.cfg_task.randomize.ik_body_euler_initial = \
+            self.cfg['randomize']['ik_body_euler_initial'][
+                self.cfg_env.env.setup]
+
+
+        print("acquire_setup_params called")
+        print('self.cfg_task.randomize.ik_body_pos_initial:', self.cfg_task.randomize.ik_body_pos_initial)
+
+        #import time
+        #time.sleep(1000)
+
     def _acquire_task_tensors(self):
         """Acquire tensors."""
         pass
@@ -106,18 +126,15 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         if self.objects_dropped:
             self._reset_object(env_ids)
         else:
+            self._reset_robot(env_ids, reset_to="home",
+                              randomize_ik_body_pose=False)
             self._drop_objects(
                 env_ids,
                 sim_steps=self.cfg_task.randomize.num_object_drop_steps)
             self.objects_dropped = True
 
         self._reset_goal(env_ids)
-        self._reset_robot(env_ids)
-
-        #self._randomize_ik_body_pose(
-        #    env_ids,
-        #    sim_steps=self.cfg_task.randomize.num_ik_body_initial_move_steps)
-
+        self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
         self._reset_buffers(env_ids)
 
     def _reset_object(self, env_ids):

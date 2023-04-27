@@ -18,7 +18,8 @@ class DexterityBaseVisualizations:
                 else:
                     getattr(self, "visualize_" + visualization)(env_id)
 
-    def visualize_pos(self, name: str, env_id: int, sphere_size: float = 0.003):
+    def visualize_pos(self, name: str, env_id: int, sphere_size: float = 0.003,
+                      color: Tuple[float, float, float] = (1, 1, 0)) -> None:
         pos = getattr(self, name)[env_id]
 
         if len(pos.shape) == 1:
@@ -27,7 +28,7 @@ class DexterityBaseVisualizations:
         for point_idx in range(pos.shape[0]):
             pose = gymapi.Transform(gymapi.Vec3(*pos[point_idx]))
             sphere_geom = gymutil.WireframeSphereGeometry(
-                sphere_size, 12, 12, gymapi.Transform(), color=(1, 1, 0))
+                sphere_size, 12, 12, gymapi.Transform(), color=color)
             gymutil.draw_lines(sphere_geom, self.gym, self.viewer,
                                self.env_ptrs[env_id], pose)
 
