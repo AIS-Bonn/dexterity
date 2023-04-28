@@ -124,6 +124,9 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_actor_ids_sim = [[] for _ in range(self.num_envs)]  # within-sim indices
         self.bin_actor_ids_sim = []  # within-sim indices
 
+        self.object_ids_in_each_bin = []
+        self.object_names_in_each_bin = [[] for _ in range(self.num_envs)]
+
         actor_count = 0
         for i in range(self.num_envs):
             # Create new env
@@ -135,6 +138,8 @@ class DexterityEnvBin(DexterityEnvObject):
                 "number of objects used."
             objects_idx = random.sample(list(range(self.object_count)),
                                         self.cfg_env['env']['num_objects'])
+            self.object_ids_in_each_bin.append(objects_idx)
+
             # Get rigid body and shape count of selected subset
             objects_rigid_body_count = sum(
                 [o.rigid_body_count for o in [self.objects[i] for i in
@@ -191,6 +196,7 @@ class DexterityEnvBin(DexterityEnvObject):
                     used_object.name, i, 0, 3)
                 self.object_actor_ids_sim[i].append(actor_count)
                 self.object_handles[i].append(object_handle)
+                self.object_names_in_each_bin[i].append(used_object.name)
                 actor_count += 1
 
             # Finish aggregation group
@@ -204,10 +210,12 @@ class DexterityEnvBin(DexterityEnvObject):
         self.num_dofs = self.gym.get_env_dof_count(env_ptr)  # per env
 
         # For setting targets
-        self.robot_actor_ids_sim = torch.tensor(
-            self.robot_actor_ids_sim, dtype=torch.int32, device=self.device)
-        self.object_actor_ids_sim = torch.tensor(
-            self.object_actor_ids_sim, dtype=torch.int32, device=self.device)
+        self.robot_actor_ids_sim = torch.tensor(self.robot_actor_ids_sim, dtype=torch.int32, device=self.device)
+        self.object_actor_ids_sim = torch.tensor(self.object_actor_ids_sim, dtype=torch.int32, device=self.device)
+
+        # To access object-specific information about the target objects.
+        self.object_ids_in_each_bin = torch.tensor(self.object_ids_in_each_bin, dtype=torch.long, device=self.device)
+        self.target_object_instance = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
 
         # For extracting root pos/quat
         self.robot_actor_id_env = self.gym.find_actor_index(
@@ -236,6 +244,22 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_quat_initial = \
             self.root_quat[:, self.object_actor_id_env, 0:4].detach().clone()
 
+        self._acquire_pointcloud_tensors()
+
+    def _acquire_synthetic_pointcloud(self) -> torch.Tensor:
+        object_mesh_samples_pos = []
+        for obj in self.objects:
+            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=self.synthetic_pointcloud_dimension))
+        object_mesh_samples_pos = np.stack(object_mesh_samples_pos)
+        self.object_mesh_samples_pos = torch.from_numpy(object_mesh_samples_pos).to(
+            self.device, dtype=torch.float32).unsqueeze(0).repeat(self.num_envs, 1, 1, 1)  # shape: (num_envs, total_num_objects, syn_pc_dim, 3)
+
+        self.target_object_mesh_samples_pos = torch.zeros((self.num_envs, self.synthetic_pointcloud_dimension, 3),
+                                                          device=self.device)
+        object_synthetic_pointcloud_pos = torch.zeros((self.num_envs, self.synthetic_pointcloud_dimension, 3),
+                                                      device=self.device)
+        return object_synthetic_pointcloud_pos
+
     def refresh_env_tensors(self):
         """Refresh tensors."""
         # NOTE: Tensor refresh functions should be called once per step, before
@@ -251,21 +275,18 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_angvel[:] = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
         # Refresh pose and velocities of target object
-        self.target_object_pos = self.object_pos.gather(
-            1, self.target_object_id.unsqueeze(
-                1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
-        self.target_object_pos_initial = self.object_pos_initial.gather(
-            1, self.target_object_id.unsqueeze(
-                1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
-        self.target_object_quat = self.object_quat.gather(
-            1, self.target_object_id.unsqueeze(
-                1).unsqueeze(2).repeat(1, 1, 4)).squeeze(1)
-        self.target_object_linvel = self.object_linvel.gather(
-            1, self.target_object_id.unsqueeze(
-                1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
-        self.target_object_angvel = self.object_angvel.gather(
-            1, self.target_object_id.unsqueeze(
-                1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+        self.target_object_pos = self.object_pos.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+        self.target_object_pos_initial = self.object_pos_initial.gather( 1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+        self.target_object_quat = self.object_quat.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 4)).squeeze(1)
+        self.target_object_linvel = self.object_linvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+        self.target_object_angvel = self.object_angvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+
+        self._refresh_pointcloud_tensors()
+
+    def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
+                                      mesh_samples_name: str = 'object_mesh_samples') -> None:
+        super()._refresh_synthetic_pointcloud(object_name='target_object',
+                                              mesh_samples_name='target_object_mesh_samples')
 
     def _object_in_bin(self, object_pos) -> torch.Tensor:
         x_lower = self.bin_info['extent'][0][0] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][0]

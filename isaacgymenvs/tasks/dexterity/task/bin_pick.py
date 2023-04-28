@@ -245,13 +245,25 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
 
         self.target_object_id[env_ids] = target_object_id
         self.target_object_actor_id_env[env_ids] = target_object_actor_id_env
+        target_object_mask = torch.nn.functional.one_hot(
+            target_object_id, num_classes=self.cfg_env.env.num_objects).to(self.device).bool()
+        self.target_object_instance = torch.masked_select(self.object_ids_in_each_bin[env_ids], target_object_mask)
+
+        # Select the mesh samples for the target object for each env.
+        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
+            self.target_object_mesh_samples_pos = self.object_mesh_samples_pos[
+                torch.arange(self.num_envs), self.target_object_instance]
+
+        # Print names of objects to pick.
+        if self.cfg_base.debug.verbose:
+            for env_id in env_ids:
+                print(f"Pick object '{self.objects[self.target_object_instance[env_id]].name}' from bin in Env {env_id}.")
 
         # Set the color of the new target object
         if self.cfg_env['env']['highlight_target_object'] and not self.headless:
             for env_id in env_ids:
                 target_object_handle = self.object_handles[env_id][
                     self.target_object_id[env_id]]
-
                 self.gym.set_rigid_body_color(
                     self.env_ptrs[env_id], target_object_handle, 0,
                     gymapi.MESH_VISUAL,

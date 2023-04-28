@@ -20,7 +20,7 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'frontview', 'synthetic_2d_bounding_box_image_frontview' ]
+    observations: ['ik_body_pos', 'ik_body_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'synthetic_pointcloud' ]
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
@@ -53,5 +53,5 @@ rl:
         success_bonus: 800  # reward received upon reaching target height
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_height: 0.3  # target height for the object in meters
-    max_episode_length: 300
+    max_episode_length: 150
 

@@ -132,6 +132,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         """
         self.keypoint_dict = self.robot.model.get_keypoints()
 
+        self.skip_keys = skip_keys
+
         num_observations = 0
         for observation in cfg['env']['observations']:
             if observation not in skip_keys:
@@ -547,7 +549,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def compute_observations(self):
         """Compute observations."""
-        self._compute_proprioceptive_observations()
+        self._compute_state_observations()
         self._compute_visual_observations()
 
     def compute_reward(self):
@@ -555,25 +557,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self._update_reset_buf()
         self._update_rew_buf()
 
-    def _compute_proprioceptive_observations(self):
+    def _compute_state_observations(self):
         """Compute observations based on base, env, or task tensors, such as joint positions or object poses."""
         obs_tensors = []
         for observation in self.cfg_task.env.observations:
             # Camera observations are computed separately.
-            if "cameras" in self.cfg_env.keys():
-                if observation in self.cfg_env.cameras.keys():
-                    continue
+            if "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
+                continue
 
+            if observation not in self.skip_keys:
                 obs = self.get_observation_tensor(observation)
-
-                if self.cfg_task.env.obs_as_dict:
-                    self.obs_dict[observation] = obs
-
-                    # Flatten observations that have more than one dimension (e.g. keypoints or bounding-boxes).
+                # Flatten observations that have more than one dimension (e.g. keypoints or bounding-boxes).
                 if len(obs.shape) == 3:
                     obs = obs.flatten(1, 2)
                 obs_tensors.append(obs)
-
         self.obs_buf = torch.cat(obs_tensors, dim=-1)  # shape = (num_envs, num_observations)
 
     def get_observation_tensor(self, observation: str) -> torch.Tensor:

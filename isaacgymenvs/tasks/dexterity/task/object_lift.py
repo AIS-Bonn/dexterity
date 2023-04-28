@@ -104,7 +104,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         pass
 
     def pre_physics_step(self, actions):
-        if self.cfg_task['calibrate']:
+        if 'calibrate' in self.cfg_task.keys() and self.cfg_task['calibrate']:
             actions = self.run_calibration_procedure(actions)
         super().pre_physics_step(actions)
 
@@ -256,8 +256,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
 
         # Initialize SAM segmentation at the start of each episode.
-        if any(obs.startswith("detected_segmented_point_cloud") for obs in
-               self.cfg["env"]["observations"]):
+        if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
             self._reset_segmentation_tracking(env_ids)
 
         self._reset_buffers(env_ids)

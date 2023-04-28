@@ -18,9 +18,13 @@ class DexterityBaseVisualizations:
                 else:
                     getattr(self, "visualize_" + visualization)(env_id)
 
-    def visualize_pos(self, name: str, env_id: int, sphere_size: float = 0.003,
+    def visualize_pos(self, data: Union[str, torch.Tensor], env_id: int, sphere_size: float = 0.003,
                       color: Tuple[float, float, float] = (1, 1, 0)) -> None:
-        pos = getattr(self, name)[env_id]
+
+        if isinstance(data, str):
+            pos = getattr(self, data)[env_id]
+        else:
+            pos = data[env_id]
 
         if len(pos.shape) == 1:
             pos = pos.unsqueeze(0)

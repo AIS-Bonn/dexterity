@@ -25,7 +25,8 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ik_body_pos', 'ik_body_quat', 'object_pos', 'object_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'fingertips_pos', 'fingertips_quat', 'palm_pos', 'palm_quat', 'detected_segmented_point_cloud_closeup', 'closeup' ]
+    observations: ['ik_body_pos', 'ik_body_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'synthetic_pointcloud' ]
+    #observations: ['ik_body_pos', 'ik_body_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'synthetic_pointcloud' ]
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -60,10 +61,8 @@ randomize:
 rl:
     reward:
         action_penalty: 0.001  # scale on action penalty
-        #palm_dist_penalty: 0.1  # scale on fingertip distance penalty
-        palm_proximity: 0.1
+        hand_bodies_proximity: 0.1
         object_lift_off_reward: 0.05  # scale on object lift-off progress reward
-        #object_target_reward: 0.0  # scale on object target progress reward
         success_bonus: 800  # reward received upon reaching target height
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_height: 0.1  # target height for the object in meters
