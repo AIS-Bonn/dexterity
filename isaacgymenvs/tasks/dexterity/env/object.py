@@ -154,6 +154,12 @@ class DexterityObject:
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(0, 0, 0.5)
         return start_pose
+    
+    @property
+    def surface_area(self) -> float:
+        if not hasattr(self, "mesh"):
+            self.acquire_mesh()
+        return self.mesh.area
 
     def sample_points_from_mesh(self, num_samples: int) -> np.array:
         if not hasattr(self, "mesh"):
@@ -175,6 +181,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                  virtual_screen_capture, force_render):
         """Initialize instance variables. Initialize environment superclass.
         Acquire tensors."""
+
+        self.synthetic_pointcloud_dimension = 64
+        self.max_num_points_padded = 70
 
         self._get_env_yaml_params()
         self.parse_camera_spec(cfg)
@@ -200,41 +209,35 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_sets_asset_root = os.path.normpath(os.path.join(
             os.path.dirname(__file__),
             self.cfg_env['env']['object_sets_asset_root']))
+        
+    def _env_observation_num(self, observation: str) -> int:
+        if observation.startswith('synthetic_pointcloud'):
+            split_observation = observation.split('_')
+            if split_observation[-1].isdigit():
+                self.synthetic_pointcloud_dimension = int(split_observation[-1])
+            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
 
-    def _update_observation_num(self, cfg) -> int:
-        self.synthetic_pointcloud_dimension = 64
+        # Detected point-clouds acquired through an instance segmentation pipeline from visual observations.
+        elif observation.startswith('detected_pointcloud'):
+            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
 
-        # Get the number of environment-specific observations.
-        skip_keys = ()
-        num_observations = 0
-        for observation in cfg['env']['observations']:
-            # Synthetic point-clouds of uniform size sampled on the object's surface.
-            if observation.startswith('synthetic_pointcloud'):
-                skip_keys += (observation,)
-                split_observation = observation.split('_')
-                if split_observation[-1].isdigit():
-                    self.synthetic_pointcloud_dimension = int(split_observation[-1])
-
-            # Detected point-clouds acquired through an instance segmentation pipeline from visual observations.
-            elif observation.startswith('detected_pointcloud'):
-                skip_keys += (observation,)
-            else:
-                continue
-
-        # Add the number of base observations.
-        num_observations += super()._update_observation_num(cfg, skip_keys=skip_keys)
+        else:
+            raise NotImplementedError
+        
         return num_observations
 
     def compute_observations(self):
         super().compute_observations()
 
         # Synthetic point-clouds of uniform size sampled on the object's surface.
-        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
-            self.obs_dict["synthetic_pointcloud"] = self.synthetic_pointcloud
+        #if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
+        #    self.padded_pointcloud[:, 0:self.synthetic_pointcloud.shape[1], :] = self.synthetic_pointcloud
+        #    self.obs_buf = torch.cat([self.obs_buf, self.padded_pointcloud.flatten(1, 2)], dim=1)
+        #    print("adding synthetic pointcloud to obs_dict")
 
         # Detected point-clouds acquired through an instance segmentation pipeline (SAM) from visual observations.
-        if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
-            self.obs_dict["detected_pointcloud"] = self.detected_pointcloud
+        #if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
+        #    self.obs_dict["detected_pointcloud"] = self.detected_pointcloud.to(self.rl_device)
 
     def _acquire_env_tensors(self):
         """Acquire and wrap tensors. Create views."""
@@ -262,19 +265,33 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         sizes/numbers of points."""
         self.detected_pointcloud[camera_name] = [None for _ in range(self.num_envs)]
 
-    def _acquire_synthetic_pointcloud(self) -> torch.Tensor:
+    def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
         """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a
         placeholder for the absolute position of the points in space (object_synthetic_pointcloud_pos) to be updated
         by _refresh_object_synthetic_pointcloud().
         """
+        self.object_mesh_samples_pos = torch.zeros((len(self.objects), self.max_num_points_padded, 4)).to(self.device)
+
+        if sample_mode == 'uniform':
+            num_samples = [num_samples, ] * len(self.objects)
+        elif sample_mode == 'area':
+            areas = [obj.surface_area for obj in self.objects]
+            mean_area = sum(areas) / len(areas)
+            print("names: ", [obj.name for obj in self.objects])
+            print("areas: ", areas)
+            num_samples = [int(num_samples * area / mean_area) for area in areas]
+            print("num_samples: ", num_samples)
+
         object_mesh_samples_pos = []
-        for obj in self.objects:
-            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=self.synthetic_pointcloud_dimension))
-        object_mesh_samples_pos = np.stack(object_mesh_samples_pos)
+        for i, obj in enumerate(self.objects):
+            object_mesh_samples_pos = torch.from_numpy(obj.sample_points_from_mesh(num_samples=num_samples[i])).to(self.device, dtype=torch.float32)
+            self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), :3] = object_mesh_samples_pos[:self.max_num_points_padded, :]
+            self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), 3] = 1
+
         num_repeats = math.ceil(self.num_envs / len(self.objects))
-        self.object_mesh_samples_pos = torch.from_numpy(object_mesh_samples_pos).to(
-            self.device, dtype=torch.float32).repeat(num_repeats, 1, 1)[:self.num_envs]
-        object_synthetic_pointcloud_pos = torch.zeros_like(self.object_mesh_samples_pos)
+        self.object_mesh_samples_pos = self.object_mesh_samples_pos.repeat(num_repeats, 1, 1)[:self.num_envs]
+        
+        object_synthetic_pointcloud_pos = self.object_mesh_samples_pos.detach().clone()
         return object_synthetic_pointcloud_pos
 
     def create_envs(self):
@@ -427,9 +444,13 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         mesh_samples_pos = getattr(self, mesh_samples_name + '_pos')
 
         num_samples = self.synthetic_pointcloud.shape[1]
-        self.synthetic_pointcloud[:] = object_pos.unsqueeze(1).repeat(
+        self.synthetic_pointcloud[..., 0:3] = object_pos.unsqueeze(1).repeat(
             1, num_samples, 1) + quat_apply(object_quat.unsqueeze(1).repeat(1, num_samples, 1),
-            mesh_samples_pos)
+            mesh_samples_pos[..., 0:3])
+        
+        #print("self.synthetic_pointcloud.shape: ", self.synthetic_pointcloud.shape)
+        #print("self.synthetic_pointcloud[0]: ", self.synthetic_pointcloud[0])
+        #print("self.synthetic_pointcloud[1]: ", self.synthetic_pointcloud[1])
 
     def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = True) -> None:
         if not hasattr(self, 'segtrackers'):
@@ -611,7 +632,13 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                            pose=gymapi.Transform())
 
     def visualize_synthetic_pointcloud(self, env_id: int) -> None:
-        self.visualize_pos('synthetic_pointcloud', env_id, color=(1, 0, 1))
+        unpadded_pointclouds = []
+        for i in range(self.num_envs):
+            synthetic_pointcloud = self.synthetic_pointcloud[i]
+            mask = synthetic_pointcloud[:, 3] > 0
+            unpadded_pointcloud = synthetic_pointcloud[mask, 0:3]
+            unpadded_pointclouds.append(unpadded_pointcloud)
+        self.visualize_pos(unpadded_pointclouds, env_id, color=(1, 0, 1))
 
     def visualize_detected_pointcloud(self, env_id: int) -> None:
         for camera_name in self.detected_pointcloud.keys():

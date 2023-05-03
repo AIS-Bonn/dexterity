@@ -380,6 +380,12 @@ class VecTask(Env):
         Returns:
             Observation dictionary
         """
+        zero_actions = self.zero_actions()
+
+        # step the simulator
+        self.step(zero_actions)
+
+
         self.obs_dict["obs"] = torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
 
         # asymmetric actor-critic

@@ -33,10 +33,10 @@ from .anymal_terrain import AnymalTerrain
 from .ball_balance import BallBalance
 from .cartpole import Cartpole
 from .dexterity.task.bin_pick import DexterityTaskBinPick
-from .dexterity.task.drill_pick_and_place import DexterityTaskDrillPickAndPlace
-from.dexterity.task.hammer_drive_nail import DexterityTaskHammerDriveNail
+#from .dexterity.task.drill_pick_and_place import DexterityTaskDrillPickAndPlace
+#from.dexterity.task.hammer_drive_nail import DexterityTaskHammerDriveNail
 from .dexterity.task.object_lift import DexterityTaskObjectLift
-from .dexterity.task.object_on_conveyor_lift import DexterityTaskObjectOnConveyorLift
+#from .dexterity.task.object_on_conveyor_lift import DexterityTaskObjectOnConveyorLift
 from .factory.factory_task_gears import FactoryTaskGears
 from .factory.factory_task_insertion import FactoryTaskInsertion
 from .factory.factory_task_nut_bolt_pick import FactoryTaskNutBoltPick
@@ -62,10 +62,10 @@ isaacgym_task_map = {
     "BallBalance": BallBalance,
     "Cartpole": Cartpole,
     "DexterityTaskBinPick": DexterityTaskBinPick,
-    "DexterityTaskDrillPickAndPlace": DexterityTaskDrillPickAndPlace,
-    "DexterityTaskHammerDriveNail": DexterityTaskHammerDriveNail,
+    #"DexterityTaskDrillPickAndPlace": DexterityTaskDrillPickAndPlace,
+    #"DexterityTaskHammerDriveNail": DexterityTaskHammerDriveNail,
     "DexterityTaskObjectLift": DexterityTaskObjectLift,
-    "DexterityTaskObjectOnConveyorLift": DexterityTaskObjectOnConveyorLift,
+    #"DexterityTaskObjectOnConveyorLift": DexterityTaskObjectOnConveyorLift,
     "FactoryTaskGears": FactoryTaskGears,
     "FactoryTaskInsertion": FactoryTaskInsertion,
     "FactoryTaskNutBoltPick": FactoryTaskNutBoltPick,

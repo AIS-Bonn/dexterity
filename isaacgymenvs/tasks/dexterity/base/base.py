@@ -134,6 +134,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         self.skip_keys = skip_keys
 
+        self.observation_start_end = {}
+
         num_observations = 0
         for observation in cfg['env']['observations']:
             if observation not in skip_keys:
@@ -150,10 +152,12 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 # then the dimension of the action-space of the robot.
                 elif observation == 'actions':
                     obs_dim = cfg['env']['numActions']
-                else:
-                    # Other observations, e.g. camera sensors or environment specific observations are 
-                    # handled separately.
+                # Visual observations are handled separately and stored under separate keys.
+                elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
                     continue
+                # Handle unknown (envionment-specific) observations.
+                else:
+                    obs_dim = self._env_observation_num(observation)
 
                 # Adjust dimensionality for keypoint group observations that can
                 # include multiple bodies
@@ -162,10 +166,17 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                         # Multiply by number of keypoints in that group
                         obs_dim *= len(
                             self.keypoint_dict[keypoint_group_name].keys())
+                        
+                self.observation_start_end[observation] = (num_observations, num_observations + obs_dim)
 
                 # Add dimensionality of this observation to the total number
                 num_observations += obs_dim
         return num_observations
+    
+    def _env_observation_num(self, observation: str)-> int:
+        """Calculates the dimensionality of environment-specific observations.
+        """
+        raise NotImplementedError
 
     def create_sim(self):
         """Set sim and PhysX params. Create sim object, ground plane, and envs."""
