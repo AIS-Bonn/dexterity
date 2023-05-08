@@ -553,8 +553,10 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
             return torch.cat([xyz, features], dim=-1)
         return xyz
 
-    def depth_to_xyz(self, env_ptrs, env_ids):
+    def depth_to_xyz(self, env_ptrs, env_ids, max_depth: float = 10.):
         depth_image = self._get_d(env_ptrs, env_ids)
+        # Clamp depth values to max_depth to avoid NaNs in xyz coordinates.
+        depth_image = torch.clamp(depth_image, min=-max_depth)
 
         # Adjusted camera projection matrix [3, 3].
         adj_proj_mat = self.get_adjusted_projection_matrix(
