@@ -42,15 +42,15 @@ params:
     mixed_precision: False
     normalize_input: True
     normalize_value: True
-    value_bootstrap: True
+    value_bootstrap: False
     num_actors: ${....task.env.numEnvs}
     reward_shaper:
       scale_value: 1.0
     normalize_advantage: True
-    gamma: 0.99
+    gamma: 0.998
     tau: 0.95
-    learning_rate: 5e-4
-    lr_schedule: adaptive
+    learning_rate: 3e-4
+    lr_schedule: linear
     schedule_type: standard
     kl_threshold: 0.016
     score_to_win: 1e6
@@ -58,13 +58,13 @@ params:
     save_best_after: 50
     save_frequency: 100
     print_stats: True
-    grad_norm: 1.5
+    grad_norm: 1.0
     entropy_coef: 0.002
     truncate_grads: True
-    e_clip: 0.15
+    e_clip: 0.2
     horizon_length: 8
     minibatch_size: 32768
-    mini_epochs: 8
+    mini_epochs: 6
     critic_coef: 4
     clip_value: True
     seq_len: 4  # only for RNN

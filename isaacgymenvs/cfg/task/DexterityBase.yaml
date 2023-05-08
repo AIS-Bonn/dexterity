@@ -68,8 +68,8 @@ ctrl:
         residual_damping: 5.0
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
-    pos_action_scale: [ 0.025, 0.025, 0.025 ]
-    rot_action_scale: [ 0.1, 0.1, 0.1 ]
+    pos_action_scale: [0.05, 0.05, 0.05]  #[ 0.025, 0.025, 0.025 ]
+    rot_action_scale: [0.2, 0.2, 0.2]  #[ 0.1, 0.1, 0.1 ]
     torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True
@@ -115,7 +115,7 @@ debug:
         [[1, -1., 1., 0., 0.], 200]
     ]
 
-    save_videos: True  # Saves all camera observations to mp4 if cameras are used in the environment
+    save_videos: False  # Saves all camera observations to mp4 if cameras are used in the environment
 
     verbose: True
     visualize: []

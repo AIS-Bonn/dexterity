@@ -8,7 +8,7 @@ env:
     env_name: 'DexterityEnvObject'
     object_sets_asset_root: '../../../../assets/dexterity/object_sets'
     object_sets:
-        ycb: [ '01*' ]
+        ycb: [ '003_cracker_box', '014_lemon' ]
         egad: []
 
     setup: 'real_robot'  # Should be in ['default', 'real_robot']
@@ -23,6 +23,13 @@ cameras:
         model: 'realsense_d405'
         pos: [ 0.5, 0.58, 0.25 ]
         quat: [ -0.383, 0, 0.924, 0 ]
+
+    close_frontview:
+        model: 'realsense_d405'
+        pos: [ 0.5, 0.58, 0.05 ]
+        quat: [ 0., 0, 1., 0 ]
+
+
 
     topview:
         model: 'realsense_d405'
