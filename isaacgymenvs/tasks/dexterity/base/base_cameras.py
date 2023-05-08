@@ -572,8 +572,8 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
         """View matrices are returned in global instead of environment
         coordinates in IsaacGym. This function projects the point-clouds into
         their environment-specific frame, which is usually desired."""
+        num_per_row = max(int(np.sqrt(self.num_envs)), 2)
         for env_id in env_ids:
-            num_per_row = int(np.sqrt(self.num_envs))
             row = int(np.floor(env_id / num_per_row))
             column = env_id % num_per_row
             xyz[env_id, :, 0] -= column * 2 * env_spacing
