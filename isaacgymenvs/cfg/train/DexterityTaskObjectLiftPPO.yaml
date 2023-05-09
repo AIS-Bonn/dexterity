@@ -50,7 +50,7 @@ params:
     gamma: 0.998
     tau: 0.95
     learning_rate: 3e-4
-    lr_schedule: linear
+    lr_schedule: None
     schedule_type: standard
     kl_threshold: 0.016
     score_to_win: 1e6
@@ -69,3 +69,9 @@ params:
     clip_value: True
     seq_len: 4  # only for RNN
     bounds_loss_coef: 0.0001
+
+    imitation:
+      mode: 'none'
+      dagger_weight: 1.0
+      actions: 'teacher'  # ['student', 'teacher']
+

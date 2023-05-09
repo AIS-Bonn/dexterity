@@ -135,6 +135,11 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
 
         self._reset_goal(env_ids)
         self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
+
+        # Initialize SAM segmentation at the start of each episode.
+        if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
+            self._reset_segmentation_tracking(env_ids)
+            
         self._reset_buffers(env_ids)
 
     def _reset_object(self, env_ids):

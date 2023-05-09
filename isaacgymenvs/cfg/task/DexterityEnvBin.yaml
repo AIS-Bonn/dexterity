@@ -14,7 +14,7 @@ env:
         ycb: [ '002_master_chef_can', '01*' ]
         egad: []
 
-    setup: 'default'  # Should be in ['default', 'real_robot']
+    setup: 'real_robot'  # Should be in ['default', 'real_robot']
 
     # pose of the bin.
     bin_pos:
@@ -29,6 +29,11 @@ env:
 
 
 cameras:
+    close_frontview:
+        model: 'realsense_d405'
+        pos: [ 0.5, 0.58, 0.55 ]
+        quat: [ -0.573, 0, 0.819, 0 ]
+    
     frontview:
         model: 'realsense_d405'
         pos: [0.75, 0, 0.5]

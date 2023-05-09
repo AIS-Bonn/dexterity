@@ -470,29 +470,36 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             1, num_samples, 1) + quat_apply(object_quat.unsqueeze(1).repeat(1, num_samples, 1),
             mesh_samples_pos[..., 0:3])
     
-    def _refresh_rendered_pointcloud(self, object_segmentation_id: int = 2, draw_debug_visualization: bool = False) -> None:
+    def _refresh_rendered_pointcloud(self, target_segmentation_id: Union[int, List[int]] = 2, draw_debug_visualization: bool = False) -> None:
+        if isinstance(target_segmentation_id, int):
+            target_segmentation_id = [target_segmentation_id] * self.num_envs
+        
         # Retrieve current camera images without debug visualizations.
         self.gym.clear_lines(self.viewer)
         image_dict = self.get_images()
+
         for camera_name in self._camera_dict.keys():
             xyz = image_dict[camera_name][..., 0:3]
             xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz
             segmentation_ids = image_dict[camera_name][..., 3]
-            mask = segmentation_ids == object_segmentation_id
-            indices = mask.nonzero(as_tuple=True)
+
+            #depth_image= self._camera_dict[camera_name]._get_d(self.env_ptrs, list(range(self.num_envs)))
+            #print("depth_image.shape", depth_image.shape)
+            #plt.imshow(depth_image[0].cpu().numpy())
+            #plt.show()
 
             rendered_pointclouds = []
             for i in range(self.num_envs):
-                idx = indices[1][indices[0] == i]
-                points_on_object = xyz_1[i, idx].clone().detach()
+                mask = segmentation_ids[i] == target_segmentation_id[i]
+                points_on_object = xyz_1[i, mask].clone().detach()
                 # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
-                if len(idx) > self.max_num_points_padded:
-                    perm = torch.randperm(len(idx))
+                if points_on_object.shape[0] > self.max_num_points_padded:
+                    perm = torch.randperm(points_on_object.shape[0])
                     sub_idx = perm[:self.max_num_points_padded]
                     points_on_object = points_on_object[sub_idx]
                 # Fewer points than the padded point-cloud tensor. Pad with zeros.
                 else:
-                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - len(idx), 4, device=self.device)], dim=0)
+                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
                 rendered_pointclouds.append(points_on_object)
             getattr(self, f'rendered_pointcloud_{camera_name}')[:] = torch.stack(rendered_pointclouds, dim=0)
                     
@@ -549,24 +556,24 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 else:
                     points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - len(pred_idx), 4, device=self.device)], dim=0)
                 detected_pointclouds.append(points_on_object)
-                getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
+            getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
 
-                if draw_debug_visualization:
-                    tracked_segmentation = draw_mask(color_image_numpy, self.pred_mask, id_countour=False)
+            if draw_debug_visualization:
+                tracked_segmentation = draw_mask(color_image_numpy, self.pred_mask, id_countour=False)
 
-                    if self.progress_buf[0] == 1:
-                        self.segm_fig[camera_name][env_id] = plt.figure()
-                        ax = self.segm_fig[camera_name][env_id].add_subplot(111)
-                        ax.cla()
-                        ax.set_title(
-                            f"Tracked target object for camera '{camera_name}' on env {env_id}.")
-                        self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
-                        plt.axis('off')
-                        plt.show(block=False)
-                    else:
-                        self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
-                        self.segm_fig[camera_name][env_id].canvas.draw()
-                        plt.pause(0.01)
+                if self.progress_buf[0] == 1:
+                    self.segm_fig[camera_name][env_id] = plt.figure()
+                    ax = self.segm_fig[camera_name][env_id].add_subplot(111)
+                    ax.cla()
+                    ax.set_title(
+                        f"Tracked target object for camera '{camera_name}' on env {env_id}.")
+                    self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
+                    plt.axis('off')
+                    plt.show(block=False)
+                else:
+                    self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
+                    self.segm_fig[camera_name][env_id].canvas.draw()
+                    plt.pause(0.01)
 
     def _reset_segmentation_tracking(self, env_ids):
         if not hasattr(self, 'segtracker'):

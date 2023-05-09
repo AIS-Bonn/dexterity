@@ -189,11 +189,11 @@ class DexterityEnvBin(DexterityEnvObject):
             actor_count += 1
 
             # Create object actors
-            for object_idx in objects_idx:
+            for id, object_idx in enumerate(objects_idx):
                 used_object = self.objects[object_idx]
                 object_handle = self.gym.create_actor(
                     env_ptr, used_object.asset, used_object.start_pose,
-                    used_object.name, i, 0, 3)
+                    used_object.name, i, 0, 3 + id)
                 self.object_actor_ids_sim[i].append(actor_count)
                 self.object_handles[i].append(object_handle)
                 self.object_names_in_each_bin[i].append(used_object.name)
@@ -246,18 +246,30 @@ class DexterityEnvBin(DexterityEnvObject):
 
         self._acquire_pointcloud_tensors()
 
-    def _acquire_synthetic_pointcloud(self) -> torch.Tensor:
-        object_mesh_samples_pos = []
-        for obj in self.objects:
-            object_mesh_samples_pos.append(obj.sample_points_from_mesh(num_samples=self.synthetic_pointcloud_dimension))
-        object_mesh_samples_pos = np.stack(object_mesh_samples_pos)
-        self.object_mesh_samples_pos = torch.from_numpy(object_mesh_samples_pos).to(
-            self.device, dtype=torch.float32).unsqueeze(0).repeat(self.num_envs, 1, 1, 1)  # shape: (num_envs, total_num_objects, syn_pc_dim, 3)
+    def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
+        self.object_mesh_samples_pos = torch.zeros((len(self.objects), self.max_num_points_padded, 4)).to(self.device)
 
-        self.target_object_mesh_samples_pos = torch.zeros((self.num_envs, self.synthetic_pointcloud_dimension, 3),
+        if sample_mode == 'uniform':
+            num_samples = [num_samples, ] * len(self.objects)
+        elif sample_mode == 'area':
+            areas = [obj.surface_area for obj in self.objects]
+            mean_area = sum(areas) / len(areas)
+            print("names: ", [obj.name for obj in self.objects])
+            print("areas: ", areas)
+            num_samples = [int(num_samples * area / mean_area) for area in areas]
+            print("num_samples: ", num_samples)
+
+        object_mesh_samples_pos = []
+        for i, obj in enumerate(self.objects):
+            object_mesh_samples_pos = torch.from_numpy(obj.sample_points_from_mesh(num_samples=num_samples[i])).to(self.device, dtype=torch.float32)
+            self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), :3] = object_mesh_samples_pos[:self.max_num_points_padded, :]
+            self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), 3] = 1
+
+        self.object_mesh_samples_pos = self.object_mesh_samples_pos.unsqueeze(0).repeat(self.num_envs, 1, 1, 1)  # shape: (num_envs, total_num_objects, max_num_point_padded, 4)
+
+        self.target_object_mesh_samples_pos = torch.zeros((self.num_envs, self.max_num_points_padded, 4),
                                                           device=self.device)
-        object_synthetic_pointcloud_pos = torch.zeros((self.num_envs, self.synthetic_pointcloud_dimension, 3),
-                                                      device=self.device)
+        object_synthetic_pointcloud_pos = self.object_mesh_samples_pos[:, 0].detach().clone()
         return object_synthetic_pointcloud_pos
 
     def refresh_env_tensors(self):
@@ -287,6 +299,12 @@ class DexterityEnvBin(DexterityEnvObject):
                                       mesh_samples_name: str = 'object_mesh_samples') -> None:
         super()._refresh_synthetic_pointcloud(object_name='target_object',
                                               mesh_samples_name='target_object_mesh_samples')
+        
+    def _refresh_rendered_pointcloud(self):
+        print("self.target_object_id:",  self.target_object_id)
+        target_segmentation_id = self.target_object_id + 3
+        super()._refresh_rendered_pointcloud(target_segmentation_id=target_segmentation_id)
+
 
     def _object_in_bin(self, object_pos) -> torch.Tensor:
         x_lower = self.bin_info['extent'][0][0] + self.cfg_env.env.bin_pos[self.cfg_env.env.setup][0]
