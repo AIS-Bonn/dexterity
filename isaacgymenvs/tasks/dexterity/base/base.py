@@ -69,8 +69,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         self._get_base_yaml_params()
         cfg = self._get_robot_model(cfg)
-        num_observations = self._update_observation_num(cfg)
-        cfg["env"]["numObservations"] = num_observations
+        self._update_observation_num(cfg)
+        
 
         if self.cfg_base.mode.export_scene:
             sim_device = 'cpu'
@@ -126,52 +126,55 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         return cfg
 
-    def _update_observation_num(self, cfg, skip_keys: Tuple = ())-> int:
-        """Calculates the basic number of observations fro positions, rotations, velocities and keypoint-groups.
-        Any other environment-specific observations are handled separately first and then included in the skip_keys.
+    def _update_observation_num(self, cfg)-> int:
+        """Calculates the basic number of observations from positions, rotations, velocities and keypoint-groups.
+        Any other environment-specific observations are handled separately in _env_observation_num().
         """
         self.keypoint_dict = self.robot.model.get_keypoints()
 
-        self.skip_keys = skip_keys
+        # Calculate dimensionality of observations.
+        num_observations, self.observations_start_end = self._compute_observation_num(cfg['env']['observations'])
+        cfg["env"]["numObservations"] = num_observations
 
-        self.observation_start_end = {}
+        # Calculate dimensionality of teacher observations.
+        if 'teacher_observations' in cfg['env'].keys():
+            num_teacher_observations, self.teacher_observations_start_end = self._compute_observation_num(cfg['env']['teacher_observations'])
+            cfg["env"]["numTeacherObservations"] = num_teacher_observations
 
+    def _compute_observation_num(self, observations: List[str]) -> Tuple[int, Dict[str, Tuple[int, int]]]:
         num_observations = 0
-        for observation in cfg['env']['observations']:
-            if observation not in skip_keys:
-                # Infer general type of observation (e.g. position, quaternion, or velocities).
-                if observation.endswith('_pos'):
-                    obs_dim = 3
-                elif observation.endswith('_quat'):
-                    obs_dim = 4
-                elif observation.endswith('_linvel'):
-                    obs_dim = 3
-                elif observation.endswith('_angvel'):
-                    obs_dim = 3
-                # Previous action can be included in the observation via the key 'actions'. obs_dim is
-                # then the dimension of the action-space of the robot.
-                elif observation == 'actions':
-                    obs_dim = cfg['env']['numActions']
-                # Visual observations are handled separately and stored under separate keys.
-                elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
-                    continue
-                # Handle unknown (envionment-specific) observations.
-                else:
-                    obs_dim = self._env_observation_num(observation)
+        observations_start_end = {}
+        for observation in observations:
+            # Infer general type of observation (e.g. position, quaternion, or velocity).
+            if observation.endswith('_pos'):
+                obs_dim = 3
+            elif observation.endswith('_quat'):
+                obs_dim = 4
+            elif observation.endswith('_linvel'):
+                obs_dim = 3
+            elif observation.endswith('_angvel'):
+                obs_dim = 3
+            # Previous action can be included in the observation via the key 'actions'. obs_dim is
+            # then the dimension of the action-space of the robot.
+            elif observation == 'actions':
+                obs_dim = cfg['env']['numActions']
+            # Visual observations are handled separately and stored under separate keys.
+            elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
+                continue
+            # Handle unknown (envionment-specific) observations.
+            else:
+                obs_dim = self._env_observation_num(observation)
 
-                # Adjust dimensionality for keypoint group observations that can
-                # include multiple bodies
-                for keypoint_group_name in self.keypoint_dict.keys():
-                    if observation.startswith(keypoint_group_name):
-                        # Multiply by number of keypoints in that group
-                        obs_dim *= len(
-                            self.keypoint_dict[keypoint_group_name].keys())
-                        
-                self.observation_start_end[observation] = (num_observations, num_observations + obs_dim)
-
-                # Add dimensionality of this observation to the total number
-                num_observations += obs_dim
-        return num_observations
+            # Adjust dimensionality for keypoint group observations that can
+            # include multiple bodies
+            for keypoint_group_name in self.keypoint_dict.keys():
+                if observation.startswith(keypoint_group_name):
+                    # Multiply by number of keypoints in that group
+                    obs_dim *= len(self.keypoint_dict[keypoint_group_name].keys())
+                    
+            observations_start_end[observation] = (num_observations, num_observations + obs_dim)
+            num_observations += obs_dim
+        return num_observations, observations_start_end
     
     def _env_observation_num(self, observation: str)-> int:
         """Calculates the dimensionality of environment-specific observations.
@@ -568,24 +571,34 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self._update_reset_buf()
         self._update_rew_buf()
 
-    def _compute_state_observations(self):
+    def _compute_state_observations(self) -> None:
         """Compute observations based on base, env, or task tensors, such as joint positions or object poses."""
         obs_tensors = []
         for observation in self.cfg_task.env.observations:
             # Camera observations are computed separately.
             if "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
                 continue
-
-            if observation not in self.skip_keys:
-                obs = self.get_observation_tensor(observation)
-                # Flatten observations that have more than one dimension (e.g. keypoints or bounding-boxes).
-                if len(obs.shape) == 3:
-                    obs = obs.flatten(1, 2)
-                obs_tensors.append(obs)
+            obs = self.get_observation_tensor(observation)
+            obs_tensors.append(obs)
         self.obs_buf = torch.cat(obs_tensors, dim=-1)  # shape = (num_envs, num_observations)
 
+        if 'teacher_observations' in self.cfg_task.env.keys():
+            teacher_obs_tensors = []
+            for teacher_observation in self.cfg_task.env.teacher_observations:
+                # Camera observations are computed separately.
+                if "cameras" in self.cfg_env.keys() and teacher_observation in self.cfg_env.cameras.keys():
+                    continue
+                teacher_obs = self.get_observation_tensor(teacher_observation)
+                teacher_obs_tensors.append(teacher_obs)
+            self.teacher_obs_buf = torch.cat(teacher_obs_tensors, dim=-1)  # shape = (num_envs, num_teacher_observations)
+
     def get_observation_tensor(self, observation: str) -> torch.Tensor:
-        return getattr(self, observation)
+        obs =  getattr(self, observation)
+    
+        # Flatten observations that have more than one dimension (e.g. keypoints, bounding-boxes or point-clouds).
+        if len(obs.shape) == 3:
+            obs = obs.flatten(1, 2)
+        return obs
 
     def _compute_visual_observations(self):
         if self._camera_dict:

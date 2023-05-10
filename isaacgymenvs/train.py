@@ -50,7 +50,7 @@ from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, get_rlgames_env_creator
     from rl_games.common import env_configurations, vecenv
-    from rl_games.torch_runner import Runner
+    from rl_games.torch_runner import Runner, TAPGRunner
     from rl_games.algos_torch import model_builder
     from isaacgymenvs.learning import amp_continuous
     from isaacgymenvs.learning import amp_players
@@ -133,7 +133,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # register new AMP network builder and agent
     def build_runner(algo_observer):
-        runner = Runner(algo_observer)
+        runner = TAPGRunner(algo_observer)
         runner.algo_factory.register_builder('amp_continuous', lambda **kwargs : amp_continuous.AMPAgent(**kwargs))
         runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
@@ -159,6 +159,7 @@ def launch_rlg_hydra(cfg: DictConfig):
         'train': not cfg.test,
         'play': cfg.test,
         'checkpoint' : cfg.checkpoint,
+        'teacher_checkpoint': cfg.teacher_checkpoint,
         'sigma' : None
     })
 
