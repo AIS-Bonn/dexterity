@@ -62,6 +62,7 @@ from scipy.ndimage import binary_dilation
 from PIL import Image
 from aot_tracker import _palette
 import gc
+import functools
 
 
 def colorize_mask(pred_mask):
@@ -184,6 +185,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
         self.synthetic_pointcloud_dimension = 64
         self.max_num_points_padded = 128
+        self.pick_detections = False
 
         self._get_env_yaml_params()
         self.parse_camera_spec(cfg)
@@ -275,8 +277,12 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 camera_name = obs[len("detected_pointcloud_"):]
                 assert camera_name in self.cfg["env"]["observations"], \
                     f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
-                assert self._camera_dict[camera_name].image_type == 'rgbd', \
-                    f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbd', but found '{self._camera_dict[camera_name].image_type}' instead."
+                if self.pick_detections:
+                    assert self._camera_dict[camera_name].image_type in ['rgbd', 'rgbdseg'], \
+                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbd', but found '{self._camera_dict[camera_name].image_type}' instead."
+                else:
+                    assert self._camera_dict[camera_name].image_type == 'rgbdseg', \
+                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbdseg', but found '{self._camera_dict[camera_name].image_type}' instead."
                 self._acquire_detected_pointcloud(camera_name)
 
     def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
@@ -575,57 +581,103 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     self.segm_fig[camera_name][env_id].canvas.draw()
                     plt.pause(0.01)
 
-    def _reset_segmentation_tracking(self, env_ids):
+    def _reset_segmentation_tracking(self, env_ids, target_segmentation_id: Union[int, List[int]] = 2, draw_debug_visualization: bool = False):
+        if isinstance(target_segmentation_id, int):
+            target_segmentation_id = [target_segmentation_id] * self.num_envs
+
         if not hasattr(self, 'segtracker'):
             self._acquire_segtracker()
+
+        plt.close('all')
 
         self.gym.clear_lines(self.viewer)
         image_dict = self.get_images()
         for camera_name in self._camera_dict.keys():
-            camera = self._camera_dict[camera_name]
-            xyz = camera.depth_to_xyz(self.env_ptrs, env_ids)
-
             for env_id in env_ids:
                 self.segtrackers[camera_name][env_id].restart_tracker()
-
-                self.input_points = []
-                self.input_labels = []
+                color_image_numpy = (image_dict[camera_name][env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(np.uint8)
                 self.pred_mask = None
 
-                color_image_numpy = (image_dict[camera_name][env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(np.uint8)
+                # Pick target object manually.
+                if self.pick_detections:
+                    self.input_points = []
+                    self.input_labels = []
 
-                def update_mask(event):
-                    ax.cla()
-                    self.input_points.append([event.xdata, event.ydata])
-                    self.input_labels.append(int(event.button == MouseButton.LEFT))
-                    for point, label in zip(self.input_points, self.input_labels):
-                        col = 'green' if label == 1 else 'red'
-                        plt.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+                    def update_mask(event):
+                        ax.cla()
+                        self.input_points.append([event.xdata, event.ydata])
+                        self.input_labels.append(int(event.button == MouseButton.LEFT))
+                        for point, label in zip(self.input_points, self.input_labels):
+                            col = 'green' if label == 1 else 'red'
+                            plt.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+
+                        self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].refine_first_frame_click(
+                            color_image_numpy.copy(), np.array(self.input_points).astype(np.int), np.array(self.input_labels), True)
+                        self.segtrackers[camera_name][env_id].sam.reset_image()
+
+                        torch.cuda.empty_cache()
+                        gc.collect()
+                        selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
+
+                        ax.imshow(selected_segmentation)
+                        ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
+                        plt.axis('off')
+                        self.segm_fig[camera_name][env_id].canvas.draw()
+
+                    self.segm_fig[camera_name][env_id] = plt.figure()
+                    ax = self.segm_fig[camera_name][env_id].add_subplot(111)
+                    ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
+                    ax.imshow(color_image_numpy)
+                    self.segm_fig[camera_name][env_id].canvas.mpl_connect('button_press_event', update_mask)
+                    plt.axis('off')
+                    plt.show()
+
+                # Target object is picked automatically based on points sampled on ground truth segmentation.
+                else:
+                    segmentation_image = image_dict[camera_name][env_id][..., 4]
+                    target_segmentation = segmentation_image == target_segmentation_id[env_id]
+                    assert torch.any(target_segmentation), f"Target object is initially fully occluded in env {env_id}."
+
+                    grid_y, grid_x = torch.meshgrid(torch.arange(segmentation_image.shape[0]), torch.arange(segmentation_image.shape[1]))
+                    mean_x = grid_x[target_segmentation].float().mean()
+                    mean_y = grid_y[target_segmentation].float().mean()
+                    std_x = (torch.max(grid_x[target_segmentation].float()) - torch.min(grid_x[target_segmentation].float())) / 1.5 #0.75
+                    std_y = (torch.max(grid_y[target_segmentation].float()) - torch.min(grid_y[target_segmentation].float())) / 1.5 #0.75
+
+                    x_samples = torch.linspace(mean_x - std_x, mean_x + std_x, 6).clamp(0, segmentation_image.shape[1] - 1).int()
+                    y_samples = torch.linspace(mean_y - std_y, mean_y + std_y, 6).clamp(0, segmentation_image.shape[0] - 1).int()
+
+                    input_points = torch.stack(torch.meshgrid(x_samples, y_samples), dim=-1).reshape(-1, 2).numpy()
+
+                    print("input_points.shape:", input_points.shape)
+
+                    #input_points = torch.stack([x_samples, y_samples], dim=1).numpy()
+                    input_labels = []
+                    for point in input_points:
+                        input_labels.append(segmentation_image[point[1], point[0]].item() == target_segmentation_id[env_id].cpu().item())
+                    input_labels = np.array(input_labels)
+
+                    #assert np.any(input_labels), f"Not a single sampled point is on the target object in env {env_id}."
 
                     self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].refine_first_frame_click(
-                        color_image_numpy.copy(), np.array(self.input_points).astype(np.int), np.array(self.input_labels), True)
+                        color_image_numpy.copy(), input_points, input_labels, True)
                     self.segtrackers[camera_name][env_id].sam.reset_image()
-
-                    torch.cuda.empty_cache()
-                    gc.collect()
-                    selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
-
-                    ax.imshow(selected_segmentation)
-                    ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
-                    plt.axis('off')
-                    self.segm_fig[camera_name][env_id].canvas.draw()
-
-                self.segm_fig[camera_name][env_id] = plt.figure()
-                ax = self.segm_fig[camera_name][env_id].add_subplot(111)
-                ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
-                ax.imshow(color_image_numpy)
-                self.segm_fig[camera_name][env_id].canvas.mpl_connect('button_press_event', update_mask)
-                plt.axis('off')
-                plt.show()
-
-                pred_idx = np.where(self.pred_mask.flatten())[0]
                 
-                #self.detected_pointcloud[camera_name][env_id] = xyz[env_id][pred_idx]
+                    if draw_debug_visualization:
+                        selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
+                        self.segm_fig[camera_name][env_id] = plt.figure()
+                        ax_segm = self.segm_fig[camera_name][env_id].add_subplot(121)
+                        ax_color = self.segm_fig[camera_name][env_id].add_subplot(122)
+                        ax_segm.set_title(f"Sampled input points for '{camera_name}' on env {env_id}.")
+                        ax_segm.imshow(segmentation_image.cpu())
+                        for point, label in zip(input_points, input_labels):
+                            col = 'green' if label == 1 else 'red'
+                            ax_segm.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+                        ax_color.set_title(f"Resulting segmentation for '{camera_name}' on env {env_id}.")
+                        ax_color.imshow(selected_segmentation)
+                        plt.show()
+
+
 
                 # Set tracker reference once the segmentation is selected.
                 self.segtrackers[camera_name][env_id].add_reference(

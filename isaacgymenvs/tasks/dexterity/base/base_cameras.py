@@ -169,7 +169,7 @@ class DexterityCameraSensorProperties:
     """Implements properties of the camera sensors, such as image-types, poses,
     and camera intrinsics."""
 
-    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
+    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'rgbdseg', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
                            'pc_seg']
     CAMERA_ASSET_ROOT = os.path.join(
         os.path.dirname(__file__), '../../../../assets/dexterity/cameras')
@@ -463,6 +463,15 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
             rgbd_image.append(
                 torch.cat([color_image[..., 0:3], depth_image], dim=-1))
         return torch.stack(rgbd_image, dim=0)
+    
+    def _get_rgbdseg(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        rgbdseg_image = []
+        for env_ptr, env_id in zip(env_ptrs, env_ids):
+            color_image = self._get_color_image(env_ptr, env_id) / 255
+            depth_image = self._get_depth_image(env_ptr, env_id).unsqueeze(-1)
+            seg_image = self._get_segmentation_image(env_ptr, env_id).unsqueeze(-1)
+            rgbdseg_image.append(torch.cat([color_image[..., 0:3], depth_image, seg_image], dim=-1))
+        return torch.stack(rgbdseg_image, dim=0)
 
     def _get_seg(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
         seg_image = []

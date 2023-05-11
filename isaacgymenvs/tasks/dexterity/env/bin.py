@@ -36,6 +36,7 @@ asset_info_object_sets.yaml.
 """
 
 import glob
+from typing import List, Union
 import hydra
 import numpy as np
 import os
@@ -301,9 +302,12 @@ class DexterityEnvBin(DexterityEnvObject):
                                               mesh_samples_name='target_object_mesh_samples')
         
     def _refresh_rendered_pointcloud(self):
-        print("self.target_object_id:",  self.target_object_id)
         target_segmentation_id = self.target_object_id + 3
         super()._refresh_rendered_pointcloud(target_segmentation_id=target_segmentation_id)
+
+    def _reset_segmentation_tracking(self, env_ids, draw_debug_visualization: bool = True):
+        target_segmentation_id = self.target_object_id + 3
+        return super()._reset_segmentation_tracking(env_ids, target_segmentation_id, draw_debug_visualization)
 
 
     def _object_in_bin(self, object_pos) -> torch.Tensor:
