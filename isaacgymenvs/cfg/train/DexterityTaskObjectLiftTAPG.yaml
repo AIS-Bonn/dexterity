@@ -1,7 +1,7 @@
 params:
   seed: ${...seed}
   algo:
-    name: a2c_pointcloud_continuous
+    name: tapg_pointcloud_continuous
 
   model:
     name: continuous_a2c_logstd
@@ -33,6 +33,8 @@ params:
   load_checkpoint: ${if:${...checkpoint},True,False}
   load_path: ${...checkpoint}
 
+  teacher_load_path: ${...teacher_checkpoint}
+
   config:
     name: ${resolve_default:DexterityTaskObjectLift,${....experiment}}
     full_experiment_name: ${.name}
@@ -49,7 +51,7 @@ params:
     normalize_advantage: True
     gamma: 0.998
     tau: 0.95
-    learning_rate: 3e-4
+    learning_rate: 3e-4 #3e-4
     lr_schedule: None
     schedule_type: standard
     kl_threshold: 0.016
@@ -63,9 +65,16 @@ params:
     truncate_grads: True
     e_clip: 0.2
     horizon_length: 8
-    minibatch_size: 32768
+    minibatch_size: 512 #32768
     mini_epochs: 6
     critic_coef: 4
     clip_value: True
     seq_len: 4  # only for RNN
     bounds_loss_coef: 0.0001
+
+    # DAgger/TAPG parameters
+    ppo_loss_coef: 0.0  # Weighting term for PPO loss
+    dagger_loss_coef: 1.0  # Weighting term for DAgger loss
+    dagger_batch_size: 256  # Batch size for (obs, teacher_actions) sampled from DAgger dataset
+    dagger_dataset_capacity: 1e7  # Maximum number of (obs, teacher_actions) that fit in DAgger dataset
+
