@@ -50,12 +50,17 @@ from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, get_rlgames_env_creator
     from rl_games.common import env_configurations, vecenv
-    from rl_games.torch_runner import Runner, TAPGRunner
+    from rl_games.torch_runner import Runner
     from rl_games.algos_torch import model_builder
     from isaacgymenvs.learning import amp_continuous
     from isaacgymenvs.learning import amp_players
     from isaacgymenvs.learning import amp_models
     from isaacgymenvs.learning import amp_network_builder
+    from isaacgymenvs.tasks.dexterity.learning import dagger_continuous
+    from isaacgymenvs.tasks.dexterity.learning import pointcloud_network_builder
+    from isaacgymenvs.tasks.dexterity.learning import pointcloud_agent
+    from isaacgymenvs.tasks.dexterity.learning import pointcloud_player
+    from isaacgymenvs.tasks.dexterity.learning import tapg_continuous
     import isaacgymenvs
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -133,11 +138,18 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # register new AMP network builder and agent
     def build_runner(algo_observer):
-        runner = TAPGRunner(algo_observer)
+        runner = Runner(algo_observer)
         runner.algo_factory.register_builder('amp_continuous', lambda **kwargs : amp_continuous.AMPAgent(**kwargs))
         runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
+
+        # Register new TAPG builders.
+        runner.algo_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_agent.A2CPointcloudAgent(**kwargs))  # passes observation indices to network builder.
+        runner.algo_factory.register_builder('tapg_pointcloud_continuous', lambda **kwargs : tapg_continuous.TAPGAgent(**kwargs))
+        runner.algo_factory.register_builder('dagger_continuous', lambda **kwargs : dagger_continuous.DAggerStudent(**kwargs))
+        model_builder.register_network('pointcloud_actor_critic', lambda **kwargs : pointcloud_network_builder.A2CPointcloudBuilder())  # builds network with PointNet like encoders.
+        runner.player_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_player.PpoPointcloudPlayerContinuous(**kwargs))
 
         return runner
 
