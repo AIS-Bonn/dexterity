@@ -20,14 +20,14 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'synthetic_pointcloud' ]
+    observations: ['ik_body_pos', 'ik_body_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'target_object_pos' ]
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
     # ik_body start pose.
     ik_body_pos_initial:  # initial position of ik_body
         default: [0.6, 0., 0.5]
-        real_robot: [0.28, 0.58, 0.3]
+        real_robot: [0.28, 0.58, 0.5]
     ik_body_euler_initial:  # initial rotation of ik_body
         default: [0., 0., 0.]
         real_robot: [0.0, 0.0, 1.571]

@@ -132,4 +132,4 @@ logging:
 
     reward_terms: ""
     success_rate_ewma:
-        alpha: 0.05
+        alpha: 0.2

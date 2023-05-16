@@ -174,9 +174,13 @@
     <key name="home" qpos="0 -1.5707 0 0 0 0"
         ctrl="0 -1.5707 0 0 0 0"/>
 
-    <!-- ik_body is centered over the left half of the table -->
-    <key name="real_robot_initial" qpos="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"
-        ctrl="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"/>
+    <!-- ik_body is centered over the left half of the table with ik_body_height=0.3 -->
+    <!--key name="real_robot_initial" qpos="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"
+        ctrl="0.6985 -1.3467 1.7360 -0.3893 0.6983 1.5708"/-->
+
+    <!-- ik_body is centered over the left half of the table with ik_body_height=0.5 -->
+    <key name="real_robot_initial" qpos="0.6985 -1.4106 1.2932 0.1174 0.6983 1.5708"
+        ctrl="0.6985 -1.4106 1.2932 0.1174 0.6983 1.5708"/>
 
     <!-- ik_body is centered 0.6m in front of the base -->
     <key name="default_initial" qpos="-0.2780 -1.5890 1.4855 0.1035 1.2927 1.5707"
