@@ -145,8 +145,16 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         num_observations = 0
         observations_start_end = {}
         for observation in observations:
+            # Previous action can be included in the observation via the key 'actions'.
+            if observation == 'actions':
+                obs_dim = cfg['env']['numActions']
+
+            # DoF pos of the actuated residual joints.
+            elif observation == 'residual_actuated_dof_pos':
+                obs_dim = self.robot.manipulator.num_actions
+
             # Infer general type of observation (e.g. position, quaternion, or velocity).
-            if observation.endswith('_pos'):
+            elif observation.endswith('_pos'):
                 obs_dim = 3
             elif observation.endswith('_quat'):
                 obs_dim = 4
@@ -154,13 +162,11 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 obs_dim = 3
             elif observation.endswith('_angvel'):
                 obs_dim = 3
-            # Previous action can be included in the observation via the key 'actions'. obs_dim is
-            # then the dimension of the action-space of the robot.
-            elif observation == 'actions':
-                obs_dim = cfg['env']['numActions']
+
             # Visual observations are handled separately and stored under separate keys.
             elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
                 continue
+
             # Handle unknown (envionment-specific) observations.
             else:
                 obs_dim = self._env_observation_num(observation)
@@ -367,7 +373,14 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, 'robot')  # shape = (num envs, num_bodies - 1, 6, num_dofs)  -1 because the base is fixed
         _mass_matrix = self.gym.acquire_mass_matrix_tensor(self.sim, 'robot')  # shape = (num_envs, num_dofs, num_dofs)
 
-        self.refresh_base_tensors()
+        # Refresh simulation tensors.
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.gym.refresh_dof_force_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_jacobian_tensors(self.sim)
+        self.gym.refresh_mass_matrix_tensors(self.sim)
 
         self.root_state = gymtorch.wrap_tensor(_root_state)
         self.body_state = gymtorch.wrap_tensor(_body_state)
@@ -485,6 +498,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.gym.refresh_mass_matrix_tensors(self.sim)
 
         self.refresh_keypoint_tensors()
+
+        if "residual_actuated_dof_pos" in self.cfg['env']['observations']:
+            self.residual_actuated_dof_pos = self.dof_pos[:, self.residual_actuated_dof_indices]
 
     def refresh_keypoint_tensors(self) -> None:
         if not hasattr(self, 'keypoint_specs'):
