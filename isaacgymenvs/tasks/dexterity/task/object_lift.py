@@ -97,7 +97,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
     def _acquire_task_tensors(self):
         """Acquire tensors."""
-        pass
+        self.object_lifted = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
 
     def _refresh_task_tensors(self):
         """Refresh tensors."""
@@ -112,22 +112,22 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         """Assign environments for reset if successful or failed."""
         self._compute_object_lifting_reset(self.object_pos, self.object_pos_initial)
 
-    def _compute_object_lifting_reset(self, object_pos, object_pos_initial):
+    def _compute_object_lifting_reset(self, object_pos, object_pos_initial, log_object_wise_success: bool = True):
         # If max episode length has been reached
         self.reset_buf[:] = torch.where(
             self.progress_buf[:] >= self.max_episode_length - 1,
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
-        # If the object has been lifted to the target height
-        '''
+        self._compute_object_lifting_success_rate(object_pos, object_pos_initial, log_object_wise_success)
+        
+    def _compute_object_lifting_success_rate(self, object_pos, object_pos_initial, log_object_wise_success: bool = True):
+        # Success is defined as lifting the object above the target height in the course of the episode.
         object_height = object_pos[:, 2]
         object_height_initial = object_pos_initial[:, 2]
         object_lifted = (object_height - object_height_initial) > \
                         self.cfg_task.rl.target_height
-        self.reset_buf[:] = torch.where(object_lifted,
-                                        torch.ones_like(self.reset_buf),
-                                        self.reset_buf)                          
+        self.object_lifted[:] = torch.logical_or(object_lifted, self.object_lifted)                      
         
 
         # Log exponentially weighted moving average (EWMA) of the success rate
@@ -137,32 +137,32 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             num_resets = torch.sum(self.reset_buf)
             # Update success rate if resets have actually occurred
             if num_resets > 0:
-                num_successes = torch.sum(object_lifted)
+                num_successes = torch.sum(self.object_lifted)
                 curr_success_rate = num_successes / num_resets
                 alpha = (num_resets / self.num_envs) * \
                     self.cfg_base.logging.success_rate_ewma.alpha
                 self.success_rate_ewma = alpha * curr_success_rate + (
                         1 - alpha) * self.success_rate_ewma
-                self.log({"success_rate_ewma": self.success_rate_ewma})
+                self.log({"success_rate_ewma/overall": self.success_rate_ewma})
 
                 # Log exponentially weighted moving average (EWMA) of the
                 # object-wise success rate
-                for i, obj in enumerate(self.objects):
-                    if not hasattr(self, obj.name + "_success_rate_ewma"):
-                        setattr(self, obj.name + "_success_rate_ewma", 0.)
-                    num_resets = torch.sum(self.reset_buf[i::len(self.objects)])
-                    if num_resets > 0:
-                        num_successes = torch.sum(object_lifted[i::len(self.objects)])
-                        curr_success_rate = num_successes / num_resets
-                        alpha = (num_resets * len(self.objects) / self.num_envs) * \
-                                self.cfg_base.logging.success_rate_ewma.alpha
-                        setattr(
-                            self, obj.name + "_success_rate_ewma",
-                            alpha * curr_success_rate + (1 - alpha) * getattr(
-                                self, obj.name + "_success_rate_ewma"))
-                        self.log({obj.name + "_success_rate_ewma": getattr(
-                            self, obj.name + "_success_rate_ewma")})
-        '''
+                if log_object_wise_success:
+                    for i, obj in enumerate(self.objects):
+                        if not hasattr(self, obj.name + "_success_rate_ewma"):
+                            setattr(self, obj.name + "_success_rate_ewma", 0.)
+                        num_resets = torch.sum(self.reset_buf[i::len(self.objects)])
+                        if num_resets > 0:
+                            num_successes = torch.sum(self.object_lifted[i::len(self.objects)])
+                            curr_success_rate = num_successes / num_resets
+                            alpha = (num_resets * len(self.objects) / self.num_envs) * \
+                                    self.cfg_base.logging.success_rate_ewma.alpha
+                            setattr(
+                                self, obj.name + "_success_rate_ewma",
+                                alpha * curr_success_rate + (1 - alpha) * getattr(
+                                    self, obj.name + "_success_rate_ewma"))
+                            self.log({"success_rate_ewma/" + obj.name: getattr(
+                                self, obj.name + "_success_rate_ewma")})
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
@@ -259,6 +259,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
             self._reset_segmentation_tracking(env_ids)
 
+        self.object_lifted[env_ids] = False
         self._reset_buffers(env_ids)
 
     def _reset_object(self, env_ids):

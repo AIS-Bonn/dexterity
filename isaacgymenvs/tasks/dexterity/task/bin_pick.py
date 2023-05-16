@@ -104,16 +104,16 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
 
     def _acquire_task_tensors(self):
         """Acquire tensors."""
-        pass
+        super()._acquire_task_tensors()
 
     def _refresh_task_tensors(self):
         """Refresh tensors."""
-        pass
+        super()._refresh_task_tensors()
 
     def _update_reset_buf(self):
         """Assign environments for reset if successful or failed."""
         self._compute_object_lifting_reset(self.target_object_pos,
-                                           self.target_object_pos_initial)
+                                           self.target_object_pos_initial, log_object_wise_success=False)
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
@@ -139,7 +139,8 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         # Initialize SAM segmentation at the start of each episode.
         if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
             self._reset_segmentation_tracking(env_ids)
-            
+        
+        self.object_lifted[env_ids] = False
         self._reset_buffers(env_ids)
 
     def _reset_object(self, env_ids):
