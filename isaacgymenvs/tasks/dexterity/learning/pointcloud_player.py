@@ -20,7 +20,7 @@ class PpoPointcloudPlayerContinuous(PpoPlayerContinuous):
         config = {
             'actions_num' : self.actions_num,
             'input_shape' : obs_shape,
-            'observation_start_end': self.env_info['observation_start_end'],
+            'observation_start_end': self.env.observations_start_end if hasattr(self.env, 'observations_start_end') else self.env_info['observation_start_end'],
             'num_seqs' : self.num_agents,
             'value_size': self.env_info.get('value_size',1),
             'normalize_value': self.normalize_value,
