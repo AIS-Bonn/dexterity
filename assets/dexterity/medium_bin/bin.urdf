@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot name="medium_bin">
+  <link name="base_link">
+    <inertial>
+      <mass value="2." />
+      <origin xyz="0 0 0" />
+      <inertia  ixx="0.0002" ixy="0.0"  ixz="0.0"  iyy="0.0002"  iyz="0.0" izz="0.0002" />
+    </inertial>
+    <visual>
+    <origin rpy="0 0 1.57075" />
+      <geometry>
+        <mesh filename="assets/medium_bin.obj"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.2425 0 0.05"/>
+      <geometry>
+	 			<box size=".015 .35 .1"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.2425 0 0.05"/>
+      <geometry>
+	 			<box size=".015 .35 .1"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 -0.175 0.05"/>
+      <geometry>
+	 			<box size=".5 .015 .1"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0.175 0.05"/>
+      <geometry>
+	 			<box size=".5 .015 .1"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
