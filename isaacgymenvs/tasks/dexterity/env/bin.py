@@ -71,9 +71,9 @@ class DexterityEnvBin(DexterityEnvObject):
         self.cfg_env = hydra.compose(config_name=config_path)
         self.cfg_env = self.cfg_env['task']  # strip superfluous nesting
 
-        bin_info_path = '../../assets/dexterity/bin/bin_info.yaml'  # relative to Gym's Hydra search path (cfg dir)
+        bin_info_path = f'../../assets/dexterity/{self.cfg_env["env"]["bin_asset"]}/bin_info.yaml'  # relative to Gym's Hydra search path (cfg dir)
         self.bin_info = hydra.compose(config_name=bin_info_path)
-        self.bin_info = self.bin_info['']['']['']['']['']['']['assets']['dexterity']['bin']  # strip superfluous nesting
+        self.bin_info = self.bin_info['']['']['']['']['']['']['assets']['dexterity'][self.cfg_env["env"]["bin_asset"]]  # strip superfluous nesting
 
         self.object_sets_asset_root = os.path.normpath(os.path.join(
             os.path.dirname(__file__),
@@ -87,7 +87,7 @@ class DexterityEnvBin(DexterityEnvObject):
         # Import bin asset
         bin_asset_root = os.path.normpath(
             os.path.join(os.path.dirname(__file__), '..', '..', '..', '..',
-                         'assets', 'dexterity', 'bin'))
+                         'assets', 'dexterity', self.cfg_env['env']['bin_asset']))
         bin_asset_file = 'bin.urdf'
         bin_options = gymapi.AssetOptions()
         bin_options.fix_base_link = True
@@ -377,17 +377,11 @@ class DexterityEnvBin(DexterityEnvObject):
         'target_object_pose' to the visualizations in DexterityBase.yaml."""
         self.visualize_body_pose("target_object", env_id, axis_length)
 
-    #def visualize_target_object(self, env_id: int) -> None:
-    #    """"Highlights the target object by setting the mesh color (called by
-    #    adding 'target_object' to the visualizations in DexterityBase.yaml."""
-    #    target_object_handle = self.object_handles[env_id][self.target_object_id[env_id]]
-
     def visualize_bin_extent(self, env_id) -> None:
         extent = torch.tensor(self.bin_info['extent'])
         bin_pose = gymapi.Transform(
-            p=gymapi.Vec3(*self.bin_pos))
+            p=gymapi.Vec3(*self.cfg_env.env.bin_pos[self.cfg_env.env.setup]))
         bbox = gymutil.WireframeBBoxGeometry(extent, pose=bin_pose,
                                              color=(0, 1, 1))
         gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
                            pose=gymapi.Transform())
-
