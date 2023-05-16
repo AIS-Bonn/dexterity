@@ -56,7 +56,6 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_players
     from isaacgymenvs.learning import amp_models
     from isaacgymenvs.learning import amp_network_builder
-    from isaacgymenvs.tasks.dexterity.learning import dagger_continuous
     from isaacgymenvs.tasks.dexterity.learning import pointcloud_network_builder
     from isaacgymenvs.tasks.dexterity.learning import pointcloud_agent
     from isaacgymenvs.tasks.dexterity.learning import pointcloud_player

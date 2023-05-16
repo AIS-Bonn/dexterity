@@ -639,6 +639,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     assert torch.any(target_segmentation), f"Target object is initially fully occluded in env {env_id}."
 
                     grid_y, grid_x = torch.meshgrid(torch.arange(segmentation_image.shape[0]), torch.arange(segmentation_image.shape[1]))
+                    grid_x = grid_x.to(self.device)
+                    grid_y = grid_y.to(self.device)
                     mean_x = grid_x[target_segmentation].float().mean()
                     mean_y = grid_y[target_segmentation].float().mean()
                     std_x = (torch.max(grid_x[target_segmentation].float()) - torch.min(grid_x[target_segmentation].float())) / 1.5 #0.75
@@ -654,7 +656,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     #input_points = torch.stack([x_samples, y_samples], dim=1).numpy()
                     input_labels = []
                     for point in input_points:
-                        input_labels.append(segmentation_image[point[1], point[0]].item() == target_segmentation_id[env_id].cpu().item())
+                        input_labels.append(segmentation_image[point[1], point[0]].item() == target_segmentation_id[env_id])
                     input_labels = np.array(input_labels)
 
                     #assert np.any(input_labels), f"Not a single sampled point is on the target object in env {env_id}."

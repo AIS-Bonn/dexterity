@@ -306,7 +306,7 @@ class DexterityEnvBin(DexterityEnvObject):
         super()._refresh_rendered_pointcloud(target_segmentation_id=target_segmentation_id)
 
     def _reset_segmentation_tracking(self, env_ids, draw_debug_visualization: bool = True):
-        target_segmentation_id = self.target_object_id + 3
+        target_segmentation_id = (self.target_object_id + 3).cpu().numpy().tolist()
         return super()._reset_segmentation_tracking(env_ids, target_segmentation_id, draw_debug_visualization)
 
 
