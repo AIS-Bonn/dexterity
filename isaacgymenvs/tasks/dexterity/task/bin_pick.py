@@ -95,13 +95,6 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
             self.cfg['randomize']['ik_body_euler_initial'][
                 self.cfg_env.env.setup]
 
-
-        print("acquire_setup_params called")
-        print('self.cfg_task.randomize.ik_body_pos_initial:', self.cfg_task.randomize.ik_body_pos_initial)
-
-        #import time
-        #time.sleep(1000)
-
     def _acquire_task_tensors(self):
         """Acquire tensors."""
         super()._acquire_task_tensors()
@@ -261,7 +254,7 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
                 torch.arange(self.num_envs), self.target_object_instance]
 
         # Print names of objects to pick.
-        if self.cfg_base.debug.verbose:
+        if self.cfg_base.debug.verbose and not self.headless:
             for env_id in env_ids:
                 print(f"Pick object '{self.objects[self.target_object_instance[env_id]].name}' from bin in Env {env_id}.")
 

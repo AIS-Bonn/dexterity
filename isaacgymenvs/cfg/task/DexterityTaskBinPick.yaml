@@ -46,12 +46,11 @@ randomize:
 
 rl:
     reward:
-        action_penalty: 0.01  # scale on action penalty
-        fingertips_dist_penalty: 0.1  # scale on fingertip distance penalty
+        #action_penalty: 0.001  # scale on action penalty
+        palm_proximity: 0.1
         object_lift_off_reward: 0.05  # scale on object lift-off progress reward
-        #object_target_reward: 0.0  # scale on object target progress reward
-        success_bonus: 800  # reward received upon reaching target height
+        success_bonus: 5.  # reward received upon reaching target height
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
-    target_height: 0.3  # target height for the object in meters
+    target_height: 0.1  # target height for the object in meters
     max_episode_length: 150
 
