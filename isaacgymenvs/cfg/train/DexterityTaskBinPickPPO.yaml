@@ -34,7 +34,7 @@ params:
   load_path: ${...checkpoint}
 
   config:
-    name: ${resolve_default:DexterityTaskBinPick${....experiment}}
+    name: ${resolve_default:DexterityTaskBinPick,${....experiment}}
     full_experiment_name: ${.name}
     env_name: rlgpu
     multi_gpu: False
