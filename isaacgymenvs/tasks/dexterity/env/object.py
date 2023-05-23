@@ -481,8 +481,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             target_segmentation_id = [target_segmentation_id] * self.num_envs
         
         # Retrieve current camera images without debug visualizations.
-        self.gym.clear_lines(self.viewer)
-        image_dict = self.get_images()
+        if (self.headless or len(self.cfg_base.debug.visualize) == 0) and 'image' in self.obs_dict.keys():
+            image_dict = self.obs_dict['image']
+        else:
+            self.gym.clear_lines(self.viewer)
+            image_dict = self.get_images()
 
         for camera_name in self._camera_dict.keys():
             xyz = image_dict[camera_name][..., 0:3]
@@ -537,9 +540,13 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         if not hasattr(self, 'segtrackers'):
             return
 
-        # Retrieve image without debug visualizations.
-        self.gym.clear_lines(self.viewer)
-        image_dict = self.get_images()
+        # Retrieve current camera images without debug visualizations.
+        if (self.headless or len(self.cfg_base.debug.visualize) == 0) and 'image' in self.obs_dict.keys():
+            image_dict = self.obs_dict['image']
+        else:
+            self.gym.clear_lines(self.viewer)
+            image_dict = self.get_images()
+
         for camera_name in self._camera_dict.keys():
             camera = self._camera_dict[camera_name]
             xyz = camera.depth_to_xyz(self.env_ptrs, list(range(self.num_envs)))

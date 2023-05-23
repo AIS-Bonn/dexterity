@@ -563,11 +563,17 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # In this policy, episode length is constant
         is_last_step = (self.progress_buf[0] == self.max_episode_length - 1)
 
+
+        # Compute visual observations first, as I may use images to compute state observations (such as 'rendered_pointcloud'), but not the other way around.
+        self._compute_visual_observations()
+
         self.refresh_base_tensors()
         self.refresh_env_tensors()
         self._refresh_task_tensors()
         self.gym.fetch_results(self.sim, True)
-        self.compute_observations()
+        
+        self._compute_state_observations()
+        
         self.compute_reward()
 
         if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
@@ -579,8 +585,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def compute_observations(self):
         """Compute observations."""
-        self._compute_state_observations()
-        self._compute_visual_observations()
+        pass
+        
 
     def compute_reward(self):
         """Detect successes and failures. Update reward and reset buffers."""
@@ -1132,6 +1138,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             actions = torch.zeros((self.num_envs, self.cfg_task.env.numActions),
                                   device=self.device)
             actions[:, :6] = delta_ik_body_pose
+
+            # Open hand.
+            actions[:, 6:8] = -1.
+            actions[:, 8:] = 1.
 
             if rand_step > 0:
                 self._apply_actions_as_ctrl_targets(
