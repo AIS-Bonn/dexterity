@@ -60,7 +60,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     from isaacgymenvs.tasks.dexterity.learning import st_continuous
     from isaacgymenvs.tasks.dexterity.learning import student_teacher_network_builder
-    
+    from isaacgymenvs.tasks.dexterity.learning import pointcloud_player
     import isaacgymenvs
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -148,6 +148,7 @@ def launch_rlg_hydra(cfg: DictConfig):
 
         runner.algo_factory.register_builder('st_continuous', lambda **kwargs : st_continuous.StudentTeacherA2CAgent(**kwargs))
         model_builder.register_network('student_teacher_actor_critic', lambda **kwargs : student_teacher_network_builder.StudentTeacherA2CBuilder())
+        runner.player_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_player.PpoPointcloudPlayerContinuous(**kwargs))
         return runner
 
     rlg_config_dict = omegaconf_to_dict(cfg.train)
