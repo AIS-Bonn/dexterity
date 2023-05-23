@@ -26,10 +26,8 @@ cameras:
 
     close_frontview:
         model: 'realsense_d405'
-        pos: [ 0.6, 0.58, 0.05 ]
-        quat: [ 0., 0, 1., 0 ]
-
-
+        pos: [ 0.75, 0.58, 0.2 ]
+        quat: [ -0.174, 0, 0.985, 0 ]
 
     topview:
         model: 'realsense_d405'

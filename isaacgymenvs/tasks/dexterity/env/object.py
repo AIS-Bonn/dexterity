@@ -536,7 +536,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.rendered_pointcloud_fig.canvas.draw()
                 plt.pause(0.01)
 
-    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = True) -> None:
+    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = False) -> None:
         if not hasattr(self, 'segtrackers'):
             return
 
@@ -657,8 +657,6 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     y_samples = torch.linspace(mean_y - std_y, mean_y + std_y, 6).clamp(0, segmentation_image.shape[0] - 1).int()
 
                     input_points = torch.stack(torch.meshgrid(x_samples, y_samples), dim=-1).reshape(-1, 2).numpy()
-
-                    print("input_points.shape:", input_points.shape)
 
                     #input_points = torch.stack([x_samples, y_samples], dim=1).numpy()
                     input_labels = []

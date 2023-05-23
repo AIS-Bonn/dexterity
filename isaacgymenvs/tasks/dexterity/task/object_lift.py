@@ -42,6 +42,7 @@ from isaacgymenvs.tasks.dexterity.task.schema_class_task import DexterityABCTask
 from isaacgymenvs.tasks.dexterity.task.schema_config_task import DexteritySchemaConfigTask
 from isaacgymenvs.tasks.dexterity.task.task_utils import *
 from isaacgymenvs.tasks.dexterity.task.sim2real_utils import CalibrationUtils
+import isaacgymenvs.tasks.dexterity.dexterity_control as ctrl
 
 
 class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationUtils):
@@ -222,6 +223,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                     hyperbole_rew(
                         scale, torch.ones_like(delta_lift_off_height) *
                                self.cfg_task.rl.lift_off_height, c=0.02, pow=1)
+                reward = torch.clamp(reward, min=0)
 
             # Reward the height progress of the object towards target height
             elif reward_term == 'object_target_reward':
@@ -333,3 +335,78 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             object_dropped_successfully = self._object_in_workspace(
                 self.object_pos_initial)
+
+
+
+    def _randomize_ik_body_pose(self, env_ids, sim_steps: int) -> None:
+        """Move ik_body to random pose."""
+
+        if self.cfg_task.randomize.move_to_pregrasp_pose:
+            self._move_to_pregrasp_pose(env_ids, sim_steps, self.object_pos)
+        else:
+            super()._randomize_ik_body_pose(env_ids, sim_steps)
+
+
+    def _move_to_pregrasp_pose(self, env_ids, sim_steps: int, object_pos: torch.Tensor) -> None:
+
+        self.gym.set_dof_position_target_tensor_indexed(
+            self.sim,
+            gymtorch.unwrap_tensor(self.ctrl_target_dof_pos),
+            gymtorch.unwrap_tensor(self.robot_actor_ids_sim),
+            len(self.robot_actor_ids_sim))
+
+        # Set target pos to desired initial pos
+        self.ctrl_target_ik_body_pos = object_pos.clone()
+        self.ctrl_target_ik_body_pos[:, 2] += 0.2
+        self.ctrl_target_ik_body_pos[:, 1] -= 0.075
+
+        ctrl_target_ik_body_euler = torch.tensor(
+            self.cfg_task.randomize.ik_body_euler_initial, device=self.device
+        ).unsqueeze(0).repeat(self.num_envs, 1)
+
+        self.ctrl_target_ik_body_quat = torch_utils.quat_from_euler_xyz(
+            ctrl_target_ik_body_euler[:, 0],
+            ctrl_target_ik_body_euler[:, 1],
+            ctrl_target_ik_body_euler[:, 2])
+
+        self.initial_ik_body_quat = self.ctrl_target_ik_body_quat.clone()
+
+        # Step sim and render
+        for rand_step in range(sim_steps):
+            self.refresh_base_tensors()
+            if self.device == "cpu":
+                self.gym.fetch_results(self.sim, True)
+
+            # On the initial step after resetting, the ik_body is still in the
+            # wrong pose. Hence, we do not assume a pos or quat error.
+            pos_error, axis_angle_error = ctrl.get_pose_error(
+                ik_body_pos=self.ik_body_pos,
+                ik_body_quat=self.ik_body_quat,
+                ctrl_target_ik_body_pos=self.ctrl_target_ik_body_pos,
+                ctrl_target_ik_body_quat=self.ctrl_target_ik_body_quat,
+                jacobian_type=self.cfg_ctrl['jacobian_type'],
+                rot_error_type='axis_angle')
+
+            delta_ik_body_pose = torch.cat(
+                (pos_error, axis_angle_error), dim=-1)
+            actions = torch.zeros((self.num_envs, self.cfg_task.env.numActions),
+                                  device=self.device)
+            actions[:, :6] = delta_ik_body_pose
+
+            # Open hand.
+            actions[:, 6] = -1.
+            actions[:, 7] = -1.
+            actions[:, 8:] = 1.
+
+            if rand_step > 0:
+                self._apply_actions_as_ctrl_targets(
+                    ik_body_pose_actions=actions[:, :6],
+                    residual_dof_actions=actions[:, 6:],
+                    do_scale=False)
+
+            self.gym.simulate(self.sim)
+            self.render()
+            if len(self.cfg_base.debug.visualize) > 0 and not self.cfg[
+                'headless']:
+                self.gym.clear_lines(self.viewer)
+                self.draw_visualizations(self.cfg_base.debug.visualize)
