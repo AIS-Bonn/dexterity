@@ -166,6 +166,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             # Visual observations are handled separately and stored under separate keys.
             elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
                 continue
+            
+            # ROS camera observations are handled separately and stored under separate keys.
+            elif "ros_cameras" in self.cfg_env.keys() and observation in self.cfg_env.ros_cameras.keys():
+                continue
 
             # Handle unknown (envionment-specific) observations.
             else:
@@ -599,6 +603,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         for observation in self.cfg_task.env.observations:
             # Camera observations are computed separately.
             if "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
+                continue
+            elif "ros_cameras" in self.cfg_env.keys() and observation in self.cfg_env.ros_cameras.keys():
                 continue
             obs = self.get_observation_tensor(observation)
             obs_tensors.append(obs)
