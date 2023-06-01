@@ -1,3 +1,4 @@
+from abc import ABC
 import cv2
 import hydra
 from isaacgym import gymapi, gymtorch
@@ -7,6 +8,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 import os
+import ros_numpy
+import rospy
+from sensor_msgs.msg import CompressedImage, PointCloud2
 from typing import *
 
 
@@ -169,7 +173,7 @@ class DexterityCameraSensorProperties:
     """Implements properties of the camera sensors, such as image-types, poses,
     and camera intrinsics."""
 
-    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'rgbdseg', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
+    ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'rgbxyz', 'rgbxyzseg', 'rgbdseg', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
                            'pc_seg']
     CAMERA_ASSET_ROOT = os.path.join(
         os.path.dirname(__file__), '../../../../assets/dexterity/cameras')
@@ -423,7 +427,7 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
                 camera_tensor_color)
             self._camera_tensors_color.append(torch_camera_tensor_color)
 
-        if any(t in self._image_type for t in ["d", "pc"]):
+        if any(t in self._image_type for t in ["d", "pc", "xyz"]):
             camera_tensor_depth = self.gym.get_camera_image_gpu_tensor(
                 self.sim, env_ptr, camera_handle, gymapi.IMAGE_DEPTH)
             torch_camera_tensor_depth = gymtorch.wrap_tensor(
@@ -446,14 +450,14 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
         for env_ptr, env_id in zip(env_ptrs, env_ids):
             color_image = self._get_color_image(env_ptr, env_id)
             rgb_image.append(color_image[..., 0:3])
-        return torch.stack(rgb_image, dim=0)
+        return torch.stack(rgb_image, dim=0).to(self.device)
 
     def _get_d(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
         d_image = []
         for env_ptr, env_id in zip(env_ptrs, env_ids):
             depth_image = self._get_depth_image(env_ptr, env_id)
             d_image.append(depth_image)
-        return torch.stack(d_image, dim=0)
+        return torch.stack(d_image, dim=0).to(self.device)
 
     def _get_rgbd(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
         rgbd_image = []
@@ -463,6 +467,16 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
             rgbd_image.append(
                 torch.cat([color_image[..., 0:3], depth_image], dim=-1))
         return torch.stack(rgbd_image, dim=0)
+    
+    def _get_rgbxyz(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        rgb_image = self._get_rgb(env_ptrs, env_ids) / 255
+        xyz_image = self._get_point_cloud(env_ptrs, env_ids).view(rgb_image.shape)
+        return torch.cat([rgb_image, xyz_image], dim=-1)
+    
+    def _get_rgbxyzseg(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        rgb_image = self._get_rgb(env_ptrs, env_ids) / 255
+        xyzseg_image = self._get_point_cloud(env_ptrs, env_ids, features='seg').view(rgb_image.shape[0], rgb_image.shape[1], rgb_image.shape[2], 4)
+        return torch.cat([rgb_image, xyzseg_image], dim=-1)
     
     def _get_rgbdseg(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
         rgbdseg_image = []
@@ -802,6 +816,125 @@ class DexterityCamera(DexterityCameraSensor, DexterityCameraActor,
         self.device = device
 
 
+class DexterityROSCameraSensorProperties:
+    """Implements properties of the ROS (real-world) camera sensors."""
+
+    ALLOWED_IMAGE_TYPES = ['rgbxyz']
+
+    def __init__(
+            self,
+            camera_name: str,
+            image_type: Optional[str] = None
+    ) -> None:
+        self.camera_name = camera_name
+        self.image_type = image_type
+
+        self.add_camera_actor = False
+        self._camera_handles = [None]
+        
+    @property
+    def image_type(self) -> str:
+        return self._image_type
+
+    @image_type.setter
+    def image_type(self, value: str) -> None:
+        assert value in self.ALLOWED_IMAGE_TYPES, \
+            f"Image type should be one of {self.ALLOWED_IMAGE_TYPES}, but " \
+            f"unknown type '{value}' was found."
+        self._image_type = value
+
+
+
+class DexerityROSImageSubscriber(ABC):
+    def __init__(
+            self, 
+            image_topic: str,
+            message_type: Any
+    ) -> None:
+        self.image_topic = image_topic
+        self.image = None
+        self.image_sub = rospy.Subscriber(image_topic, message_type, self._update_image)
+
+    def _update_image(self, data) -> None:
+        self.image = data
+    
+    def get_np_image(self) -> np.array:
+        """Get NumPy array from the ROS image message.
+        
+        As multiple image_types can be stacked to create the final observation (e.g. RGB and Depth or RGB and XYZ), 
+        the numpy array should be of type float32 and the color range should be normalized to [0, 1]. 
+        The shape of the array should be (height, width, channels).
+        """
+        raise NotImplementedError
+
+
+class DexterityROSRGBSubscriber(DexerityROSImageSubscriber):
+    def __init__(
+            self,
+            camera_name: str,
+    ) -> None:
+        super().__init__(f"/{camera_name}/camera/color/image_rect_color/compressed", CompressedImage)
+        
+    def get_np_image(self) -> np.array:
+        if self.image is None:
+            assert False, f"No image received yet for topic '{self.image_topic}'."
+        else:
+            np_arr = np.fromstring(self.image.data, np.uint8)
+            image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR).astype(np.float32)[..., ::-1] / 255.0
+            return image_np
+    
+class DexterityROSXYZSubscriber(DexerityROSImageSubscriber):
+    def __init__(
+            self,
+            camera_name: str,
+    ) -> None:
+        super().__init__(f"/{camera_name}/camera/depth_registered/points", PointCloud2)
+
+    def get_np_image(self) -> np.array:
+        if self.image is None:
+            assert False, f"No image received yet for topic '{self.image_topic}'."
+        else:
+            #self.image = self.transform_pointcloud(self.image, "base_link")
+            structured_array = ros_numpy.numpify(self.image)
+            xyz = np.stack([structured_array['x'], structured_array['y'], structured_array['z']], axis=-1)
+            xyz = np.nan_to_num(xyz)  # TODO: Check if I cannot do something better here to separate the NaNs
+            return xyz
+
+class DexterityROSCameraSensor(DexterityROSCameraSensorProperties):
+    def __init__(
+            self, 
+            camera_name: str,
+            image_type: Optional[str] = None
+    ) -> None:
+        super().__init__(camera_name, image_type)
+        self._create_subscribers()
+
+    def _create_subscribers(self) -> None:
+        if 'rgb' in self.image_type:
+            self.rgb_sub = DexterityROSRGBSubscriber(self.camera_name)
+        if 'xyz' in self.image_type:
+            self.xyz_sub = DexterityROSXYZSubscriber(self.camera_name)
+
+    def get_image(self, env_ptrs: List, env_ids: List[int]) -> torch.Tensor:
+        assert len(env_ptrs) == len(env_ids) == 1, "Can only get ROS-Camera images for a single environment."
+        return getattr(self, f"_get_{self.image_type}")()
+    
+    def _get_rgbxyz(self) -> torch.Tensor:
+        rgb_image = self._get_rgb()
+        xyz_image = self._get_xyz()
+        return torch.cat([rgb_image, xyz_image], dim=-1)
+
+    def _get_rgb(self) -> torch.Tensor:
+        np_image = self.rgb_sub.get_np_image()
+        return torch.from_numpy(np_image).to(torch.float32).unsqueeze(0)
+
+    def _get_xyz(self) -> torch.Tensor:
+        np_image = self.xyz_sub.get_np_image()
+        return torch.from_numpy(np_image).to(torch.float32).unsqueeze(0)
+
+
+
+    
 class DexterityBaseCameras:
     def parse_camera_spec(self, cfg) -> None:
         self.camera_tensors_enabled = False
@@ -816,6 +949,12 @@ class DexterityBaseCameras:
                     # Enable camera tensors if any of the cameras uses them.
                     if self._camera_dict[camera_name].use_camera_tensors:
                         self.camera_tensors_enabled = True
+
+        if 'ros_cameras' in self.cfg_env.keys():
+            for camera_name, camera_cfg in self.cfg_env.ros_cameras.items():
+                if camera_name in cfg['env']['observations']:
+                    self._camera_dict[camera_name] = DexterityROSCameraSensor(
+                        camera_name, **camera_cfg)
 
     def get_images(self) -> Dict[str, torch.Tensor]:
         """Retrieve images from all camera sensors and in all environments."""
@@ -872,7 +1011,7 @@ class DexterityBaseCameras:
             if dexterity_camera.add_camera_actor:
                 if not hasattr(dexterity_camera, "_camera_asset"):
                     dexterity_camera.create_asset(self.gym, self.sim)
-            rigid_body_count += dexterity_camera.get_rigid_body_count(self.gym)
+                rigid_body_count += dexterity_camera.get_rigid_body_count(self.gym)
         return rigid_body_count
 
     @property
@@ -882,8 +1021,7 @@ class DexterityBaseCameras:
             if dexterity_camera.add_camera_actor:
                 if not hasattr(dexterity_camera, "_camera_asset"):
                     dexterity_camera.create_asset(self.gym, self.sim)
-            rigid_shape_count += dexterity_camera.get_rigid_shape_count(
-                self.gym)
+                rigid_shape_count += dexterity_camera.get_rigid_shape_count(self.gym)
         return rigid_shape_count
 
     def create_camera_actors(self, env_prt: int, i: int, actor_count: int

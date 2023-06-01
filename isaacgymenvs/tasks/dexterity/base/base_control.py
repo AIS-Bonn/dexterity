@@ -13,7 +13,7 @@ from isaacgymenvs.tasks.dexterity import dexterity_control as ctrl
 import math
 import numpy as np
 import rospy
-from sensor_msgs.msg import CompressedImage, Image, JointState
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from trajectory_msgs.msg import JointTrajectoryPoint
 import tf
@@ -21,9 +21,6 @@ import time
 import torch
 from typing import *
 import contextlib
-
-from cv_bridge import CvBridge
-import cv2
 
 
 class FPSTimer:
@@ -47,66 +44,7 @@ class FPSTimer:
 timer = FPSTimer()
 
 
-class ROSImageSubscriber:
-    def __init__(
-            self,
-            image_topic: str,
-    ) -> None:
-        self.image_topic = image_topic
-        self.image_sub = rospy.Subscriber(image_topic, Image,
-                                          self._update_image)
-        self.ocv_bridge = CvBridge()
-        self.image = None
-
-    def _update_image(self, data: Image) -> None:
-        self.image = data
-
-    def get_image(self) -> Image:
-        return self.image
-
-    def get_ocv_image(self):
-        if self.image is not None:
-            return self.ocv_bridge.imgmsg_to_cv2(self.image, "rgb8")
-        else:
-            return None
-
-class ROSCompressedImageSubscriber:
-    def __init__(
-            self,
-            image_topic: str,
-    ) -> None:
-        self.image_topic = image_topic
-        self.image_sub = rospy.Subscriber(image_topic, CompressedImage, self._update_image)
-        self.image = None
-
-    def _update_image(self, data: CompressedImage) -> None:
-        self.image = data
-
-    def get_np_image(self) -> np.array:
-        np_arr = np.fromstring(self.image.data, np.uint8)
-        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-        #print("image_np.shape:", image_np.shape)
-        #import matplotlib.pyplot as plt
-
-        #plt.imshow(image_np)
-        #plt.show()
-        return image_np
-
-
-class ROSTransformSubscriber:
-    def __init__(
-            self
-    ) -> None:
-        self.tf_sub = tf.TransformListener()
-
-    def get_transform(self, target_frame: str, source_frame: str):
-        trans, rot = self.tf_sub.lookupTransform(
-            target_frame, source_frame, rospy.Time(0))
-        return trans, rot
-
-
-class ROSJointStateSubscriber(ROSTransformSubscriber):
+class ROSJointStateSubscriber:
     def __init__(
             self,
             joint_state_topic: str,
@@ -184,7 +122,6 @@ class ROSJointTrajectoryInterface(ROSJointStateSubscriber):
             execution_time: float = 0.25,
             max_joint_deviation: float = 0.15,
             verbose: bool = False,
-
     ) -> None:
         super().__init__(joint_state_topic, joint_mapping, verbose)
         self.joint_trajectory_client = actionlib.SimpleActionClient(
@@ -254,7 +191,11 @@ class DexterityBaseControl:
             joint_state_topic=self.robot.manipulator.ros_state_topic,
             joint_target_topic=self.robot.manipulator.ros_target_topic,
             joint_mapping=self.robot.manipulator.ros_joint_mapping
-        )
+        )  
+
+        self.tf_sub = tf.TransformListener()
+        import time
+        time.sleep(1)
 
         if self.cfg["calibrate"]:
             #self.ros_image_subscriber = ROSImageSubscriber(

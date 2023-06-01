@@ -43,6 +43,7 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import os
+import rospy
 from scipy.spatial.transform import Rotation as R
 import trimesh
 from typing import *
@@ -184,8 +185,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         Acquire tensors."""
 
         self.synthetic_pointcloud_dimension = 64
-        self.max_num_points_padded = 128
-        self.pick_detections = False
+        self.max_num_points_padded = 256
+        self.pick_detections = True
 
         self._get_env_yaml_params()
         self.parse_camera_spec(cfg)
@@ -263,7 +264,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
             self.synthetic_pointcloud = self._acquire_synthetic_pointcloud()
 
+        self.rendered_pointcloud_camera_names = []
+        self.detected_pointcloud_camera_names = []
         for obs in self.cfg["env"]["observations"]:
+            print("obs:", obs)
             # Rendered point-clouds.
             if obs.startswith("rendered_pointcloud"):
                 camera_name = obs[len("rendered_pointcloud_"):]
@@ -272,18 +276,20 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 assert self._camera_dict[camera_name].image_type == 'pc_seg', \
                     f"The image type of the camera '{camera_name}' used in '{obs}' must be 'pc_seg', but found '{self._camera_dict[camera_name].image_type}' instead."
                 self._acquire_rendered_pointcloud(camera_name)
+                self.rendered_pointcloud_camera_names.append(camera_name)
             # Detected point-clouds.
             if obs.startswith("detected_pointcloud"):
                 camera_name = obs[len("detected_pointcloud_"):]
                 assert camera_name in self.cfg["env"]["observations"], \
                     f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
                 if self.pick_detections:
-                    assert self._camera_dict[camera_name].image_type in ['rgbd', 'rgbdseg'], \
-                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbd', but found '{self._camera_dict[camera_name].image_type}' instead."
+                    assert self._camera_dict[camera_name].image_type.startswith('rgbxyz'), \
+                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyz', but found '{self._camera_dict[camera_name].image_type}' instead."
                 else:
-                    assert self._camera_dict[camera_name].image_type == 'rgbdseg', \
-                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbdseg', but found '{self._camera_dict[camera_name].image_type}' instead."
+                    assert self._camera_dict[camera_name].image_type == 'rgbxyzseg', \
+                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyzseg', but found '{self._camera_dict[camera_name].image_type}' instead."
                 self._acquire_detected_pointcloud(camera_name)
+                self.detected_pointcloud_camera_names.append(camera_name)
 
     def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
         """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a
@@ -487,15 +493,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.gym.clear_lines(self.viewer)
             image_dict = self.get_images()
 
-        for camera_name in self._camera_dict.keys():
+        for camera_name in self.rendered_pointcloud_camera_names:
             xyz = image_dict[camera_name][..., 0:3]
             xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz
             segmentation_ids = image_dict[camera_name][..., 3]
 
-            #depth_image= self._camera_dict[camera_name]._get_d(self.env_ptrs, list(range(self.num_envs)))
-            #print("depth_image.shape", depth_image.shape)
-            #plt.imshow(depth_image[0].cpu().numpy())
-            #plt.show()
 
             rendered_pointclouds = []
             for i in range(self.num_envs):
@@ -536,7 +538,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.rendered_pointcloud_fig.canvas.draw()
                 plt.pause(0.01)
 
-    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = False) -> None:
+    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = True) -> None:
         if not hasattr(self, 'segtrackers'):
             return
 
@@ -547,9 +549,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.gym.clear_lines(self.viewer)
             image_dict = self.get_images()
 
-        for camera_name in self._camera_dict.keys():
-            camera = self._camera_dict[camera_name]
-            xyz = camera.depth_to_xyz(self.env_ptrs, list(range(self.num_envs)))
+        for camera_name in self.detected_pointcloud_camera_names:
+            xyz = image_dict[camera_name][..., 3:6].flatten(1, 2)
             xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz
 
             detected_pointclouds = []
@@ -558,16 +559,25 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     np.uint8)
                 self.pred_mask = self.segtrackers[camera_name][env_id].track(color_image_numpy, update_memory=True)
                 pred_idx = np.where(self.pred_mask.flatten())[0]
-
                 points_on_object = xyz_1[env_id][pred_idx]
+
+                # Transform points to base_link frame for ROS-Cameras and remove invalid points.
+                if camera_name  in self.cfg_env.ros_cameras.keys():
+                    # Remove invalid points that now lie at [0, 0, 0].
+                    points_on_object = points_on_object[torch.norm(points_on_object[:, 0:3], dim=1) > 0.001]
+                    trans, rot = self.tf_sub.lookupTransform('base_link', self._camera_dict[camera_name].xyz_sub.image.header.frame_id, rospy.Time(0))
+                    tm = torch.from_numpy(self.tf_sub.fromTranslationRotation(trans, rot)).float().to(self.device)
+                    points_on_object = torch.matmul(tm, points_on_object.t()).t()
+                    
+
                 # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
-                if len(pred_idx) > self.max_num_points_padded:
-                    perm = torch.randperm(len(pred_idx))
+                if points_on_object.shape[0] > self.max_num_points_padded:
+                    perm = torch.randperm(points_on_object.shape[0])
                     sub_idx = perm[:self.max_num_points_padded]
                     points_on_object = points_on_object[sub_idx]
                 # Fewer points than the padded point-cloud tensor. Pad with zeros.
                 else:
-                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - len(pred_idx), 4, device=self.device)], dim=0)
+                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
                 detected_pointclouds.append(points_on_object)
             getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
 
@@ -597,9 +607,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
         plt.close('all')
 
-        self.gym.clear_lines(self.viewer)
         image_dict = self.get_images()
-        for camera_name in self._camera_dict.keys():
+        for camera_name in self.detected_pointcloud_camera_names:
             for env_id in env_ids:
                 self.segtrackers[camera_name][env_id].restart_tracker()
                 color_image_numpy = (image_dict[camera_name][env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(np.uint8)
@@ -641,7 +650,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
                 # Target object is picked automatically based on points sampled on ground truth segmentation.
                 else:
-                    segmentation_image = image_dict[camera_name][env_id][..., 4]
+                    segmentation_image = image_dict[camera_name][env_id][..., 6]
                     target_segmentation = segmentation_image == target_segmentation_id[env_id]
                     assert torch.any(target_segmentation), f"Target object is initially fully occluded in env {env_id}."
 
@@ -707,7 +716,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
         # Create a tracker per camera and environment.
         self.segtrackers, self.segm_fig, self.tracked_image_debug = {}, {}, {}
-        for camera_name in self._camera_dict.keys():
+        for camera_name in self.detected_pointcloud_camera_names:
             self.segtrackers[camera_name] = [SegTracker(segtracker_args, sam_args, aot_args) for _ in range(self.num_envs)]
             self.segm_fig[camera_name] = [None for _ in range(self.num_envs)]
             self.tracked_image_debug[camera_name] = [None for _ in range(self.num_envs)]
