@@ -747,6 +747,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 # Overwrite max efforts if they are specified.
                 if hasattr(self.cfg_base.ctrl.gym_default, "ik_max_effort"):
                     robot_dof_props['effort'][:self.cfg_ctrl['ik_body_dof_count']] = self.cfg_base.ctrl.gym_default.ik_max_effort
+                if hasattr(self.cfg_base.ctrl.gym_default, "ik_max_velocity"):
+                    robot_dof_props['velocity'][:self.cfg_ctrl['ik_body_dof_count']] = self.cfg_base.ctrl.gym_default.ik_max_velocity
                 if hasattr(self.cfg_base.ctrl.gym_default, "residual_max_effort"):
                     robot_dof_props['effort'][self.cfg_ctrl['ik_body_dof_count']:] = self.cfg_base.ctrl.gym_default.residual_max_effort
 
