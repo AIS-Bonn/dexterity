@@ -25,9 +25,8 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'detected_pointcloud_close_frontview', 'close_frontview' ]
-
-    teacher_observations: ['ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'object_pos' ]
+    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'synthetic_pointcloud']
+    teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'object_pos']
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -48,7 +47,7 @@ randomize:
 
     move_to_pregrasp_pose: True
 
-    num_ik_body_initial_move_steps: 30  # number of steps to reach initial pose
+    num_ik_body_initial_move_steps: 150  # number of steps to reach initial pose
 
     # object drop position.
     object_pos_drop:  # position from which object is dropped
@@ -61,7 +60,7 @@ randomize:
     # workspace extent, outside which objects will be dropped again.
     workspace_extent_xy:
         default: [[-0.2, -0.2], [0.2, 0.2]]
-        real_robot: [[-0.2, -0.2], [0.2, 0.2]]
+        real_robot: [[-0.1, -0.125], [0.1, 0.125]]
 
 rl:
     reward:

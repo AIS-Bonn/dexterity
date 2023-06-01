@@ -227,7 +227,8 @@ def get_pose_error(ik_body_pos,
                    ctrl_target_ik_body_pos,
                    ctrl_target_ik_body_quat,
                    jacobian_type,
-                   rot_error_type):
+                   rot_error_type,
+                   use_tait_bryan_angles=True):
     """Compute task-space error between target robot arm end effector pose and
     current pose."""
     # Reference: https://ethz.ch/content/dam/ethz/special-interest/mavt/robotics-n-intelligent-systems/rsl-dam/documents/RobotDynamics2018/RD_HS2018script.pdf
@@ -240,15 +241,6 @@ def get_pose_error(ik_body_pos,
         # Compute quat error (i.e., difference quat)
         # Reference: https://personal.utdallas.edu/~sxb027100/dock/quat.html
 
-        #print("ctrl_target_ik_body_quat:", ctrl_target_ik_body_quat)
-        #ctrl_target_inverted = (ctrl_target_ik_body_quat[:, 3] < 0.).unsqueeze(
-        #    1).repeat(1, 4)
-        #ctrl_target_ik_body_quat = torch.where(ctrl_target_inverted,
-        #                                       -ctrl_target_ik_body_quat,
-        #                                       ctrl_target_ik_body_quat)
-
-        #print("ctrl_target_ik_body_quat (adjusted):", ctrl_target_ik_body_quat)
-
         ik_body_quat_norm = torch_utils.quat_mul(
             ik_body_quat,
             torch_utils.quat_conjugate(ik_body_quat))[:, 3]  # scalar component
@@ -256,14 +248,11 @@ def get_pose_error(ik_body_pos,
             ik_body_quat) / ik_body_quat_norm.unsqueeze(-1)
         quat_error = torch_utils.quat_mul(
             ctrl_target_ik_body_quat, ik_body_quat_inv)
-
-        #print("ik_body_quat_inv:", ik_body_quat_inv)
-        #print("ctrl_target_ik_body_quat:", ctrl_target_ik_body_quat)
-
-        # Convert to axis-angle error
-        axis_angle_error = axis_angle_from_quat(quat_error)
-
-        #print("axis_angle_error:", axis_angle_error)
+        
+        if use_tait_bryan_angles:
+            axis_angle_error = tait_bryan_angles_from_quat(quat_error)
+        else:
+            axis_angle_error = axis_angle_from_quat(quat_error)
 
         # Always return the rotation difference the "short way" around.
         #axis_angle_error = torch.where(axis_angle_error > torch.pi,
@@ -272,10 +261,6 @@ def get_pose_error(ik_body_pos,
         #axis_angle_error = torch.where(axis_angle_error < -torch.pi,
         #                               axis_angle_error + 2 * torch.pi,
         #                               axis_angle_error)
-
-        #print("quat_dot(ik_body_quat_inv, ctrl_target_ik_body_quat):", quat_dot(ik_body_quat_inv, ctrl_target_ik_body_quat))
-
-        #print("axis_angle_error (clamped):", axis_angle_error)
 
     elif jacobian_type == 'analytic':  # See example 2.9.7; note use of J_a and difference of rotation vectors
         # Compute axis-angle error
@@ -455,6 +440,24 @@ def axis_angle_from_quat(quat, eps=1.0e-6):
     axis_angle = quat[:, 0:3] / sin_half_angle_over_angle.unsqueeze(-1)
 
     return axis_angle
+
+
+def tait_bryan_angles_from_quat(q_diff):
+    ysqr = q_diff[:, 1] * q_diff[:, 1]
+    t0 = 2.0 * (q_diff[:, 3] * q_diff[:, 0] + q_diff[:, 1] * q_diff[:, 2])
+    t1 = 1.0 - 2.0 * (ysqr + q_diff[:, 2] * q_diff[:, 2])
+    roll = torch.atan2(t0, t1)
+
+    t2 = 2.0 * (q_diff[:, 3] * q_diff[:, 1] - q_diff[:, 2] * q_diff[:, 0])
+    t2 = torch.where(t2 > 1.0, torch.ones_like(t2), t2)
+    t2 = torch.where(t2 < -1.0, -torch.ones_like(t2), t2)
+    pitch = torch.asin(t2)
+
+    t3 = 2.0 * (q_diff[:, 3] * q_diff[:, 2] + q_diff[:, 0] * q_diff[:, 1])
+    t4 = 1.0 - 2.0 * (ysqr + q_diff[:, 1] * q_diff[:, 1])
+    yaw = torch.atan2(t3, t4)
+
+    return torch.stack((roll, pitch, yaw), dim=1)
 
 
 def axis_angle_from_quat_naive(quat):

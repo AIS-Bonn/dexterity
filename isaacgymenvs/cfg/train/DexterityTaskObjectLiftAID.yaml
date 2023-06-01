@@ -1,13 +1,13 @@
 params:
   seed: ${...seed}
   algo:
-    name: st_continuous
+    name: aid_continuous
 
   model:
     name: continuous_a2c_logstd
 
   network:
-    name: student_teacher_actor_critic
+    name: aid_actor_critic #pointcloud_actor_critic
     separate: False
 
     space:
@@ -32,7 +32,6 @@ params:
 
   load_checkpoint: ${if:${...checkpoint},True,False}
   load_path: ${...checkpoint}
-
   teacher_load_path: ${...teacher_checkpoint}
 
   config:
@@ -57,15 +56,15 @@ params:
     kl_threshold: 0.016
     score_to_win: 1e6
     max_epochs: ${resolve_default:8192,${....max_iterations}}
-    save_best_after: 10
-    save_frequency: 10
+    save_best_after: 50
+    save_frequency: 100
     print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.002
     truncate_grads: True
     e_clip: 0.15
-    horizon_length: 64 #8
-    minibatch_size: 32 # 32768
+    horizon_length: 8
+    minibatch_size: 32768
     mini_epochs: 6
     critic_coef: 4
     clip_value: True
@@ -73,12 +72,11 @@ params:
     bounds_loss_coef: 0.0001
 
 
-  student_teacher:
-    method: 'dagger'  # ['none', 'dagger', 'guided_observations']
-    #feature_type: 'actions'  # ['actions', 'activations']
-    #feature_fusion: 'input'  # ['input', 'residual', 'gating']
 
-    imitation_head_units: [64, 64]
+  student_teacher:
+    method: 'dagger'  # ['none', 'dagger', 'aid']
+
+    imitation_head_units: [128, 128, 128]
     imitation_lr: 0.001
 
     imitation_miniepochs: 10

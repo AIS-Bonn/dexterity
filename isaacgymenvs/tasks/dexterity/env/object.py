@@ -267,7 +267,6 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.rendered_pointcloud_camera_names = []
         self.detected_pointcloud_camera_names = []
         for obs in self.cfg["env"]["observations"]:
-            print("obs:", obs)
             # Rendered point-clouds.
             if obs.startswith("rendered_pointcloud"):
                 camera_name = obs[len("rendered_pointcloud_"):]

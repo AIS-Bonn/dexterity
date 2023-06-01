@@ -26,7 +26,7 @@ ros_master_uri: http://robo15:11311/  # Set URI of the ROS master.
     
 env:
     env_spacing: 1.0
-    robot: [ 'ur5/ur5_optoforce.xml', 'schunk_sih/right_hand_default_mount.xml', 'vive_tracker/tracker.xml']
+    robot: [ 'ur5/ur5_optoforce_limited.xml', 'schunk_sih/right_hand_default_mount.xml', 'vive_tracker/tracker.xml']
     robot_depth: 0.0
     robot_friction: 1.0
     has_table: False
@@ -36,13 +36,13 @@ env:
 ctrl:
     ctrl_type: gym_default  # {gym_default, joint_space_id}
     ik_body: tracker
-    add_pose_actions_to: pose  # {target, pose}
+    add_pose_actions_to: target  # {target, pose}
     neglect_attached_weights: True  # Whether to ignore the weights of rigid bodies attached to the robot arm, such as fingers of a robotic hand. This drastically improves the inverse kinematics.
 
     workspace:
-        limit_ik_body_pose: False
+        limit_ik_body_pose: True
         pos: [[0.18, 0.455, 0.1], [0.38, 0.705, 0.525]]  # Absolute
-        angle: [[-0.2, -0.785398, -0.785398], [0.2, 0.785398, 0.785398]]  # Relative to initial hand-orientation
+        #angle: [[-0.174533, -1.5708, -0.785398], [0.174533, 1.5708, 0.785398]]  # Relative to initial hand-orientation
 
     all:
         jacobian_type: geometric
@@ -68,9 +68,9 @@ ctrl:
         residual_damping: 5.0
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
-    pos_action_scale: [0.05, 0.05, 0.05]  #[ 0.025, 0.025, 0.025 ]
-    rot_action_scale: [0.2, 0.2, 0.2]  #[ 0.1, 0.1, 0.1 ]
-    torque_action_scale: [ 1.0, 1.0, 1.0 ]
+    pos_action_scale: [0.125, 0.125, 0.125]  #[ 0.025, 0.025, 0.025 ]
+    rot_action_scale: [0.025, 0.025, 0.025]  #[ 0.1, 0.1, 0.1 ]
+    #torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True
     clamp_rot_thresh: 1.0e-6
@@ -118,7 +118,7 @@ debug:
     save_videos: False  # Saves all camera observations to mp4 if cameras are used in the environment
 
     verbose: True
-    visualize: []
+    visualize: ['ik_body_workspace', 'ctrl_target_ik_body_pose']
 
 # Specifies data to be logged in addition the data logged by default through
 # rl-games. dexterity environments check for the keys in logging (e.g.

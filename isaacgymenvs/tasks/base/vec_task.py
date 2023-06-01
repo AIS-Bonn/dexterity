@@ -344,6 +344,10 @@ class VecTask(Env):
         for i in range(self.control_freq_inv):
             if self.force_render:
                 self.render()
+
+            if hasattr(self, "cfg_base") and self.cfg_base.ros_activate and self.viewer is None:
+                self.gym.sync_frame_time(self.sim)
+                
             self.gym.simulate(self.sim)
 
         # to fix!

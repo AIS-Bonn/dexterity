@@ -138,7 +138,12 @@ class ROSJointTrajectoryInterface(ROSJointStateSubscriber):
         assert joint_deviation.max() < self.max_joint_deviation, \
             f"Found a deviation between the current joint position and " \
             f"target to be published of {joint_deviation.max()}, which " \
-            f"violates the deviation limit of {self.max_joint_deviation}."
+            f"violates the deviation limit of {self.max_joint_deviation}." \
+            f"Command target is {command_target} and current joint position " \
+            f"is {self.get_joint_position()}."
+        
+        print("command_target:", command_target)
+        print("current joint position:", self.get_joint_position())
 
         # Cancel previous goal
         self.joint_trajectory_client.cancel_goal()
@@ -197,11 +202,6 @@ class DexterityBaseControl:
         import time
         time.sleep(1)
 
-        if self.cfg["calibrate"]:
-            #self.ros_image_subscriber = ROSImageSubscriber(
-            #    'l515/camera/color/image_rect_color')
-            self.ros_image_subscriber = ROSCompressedImageSubscriber('l515/camera/color/image_rect_color/compressed')
-
     def generate_ctrl_signals(self):
         """Get Jacobian. Set robot DOF position targets or DOF torques."""
 
@@ -239,10 +239,6 @@ class DexterityBaseControl:
 
     @timer.fps('publish_targets')
     def _publish_targets(self, arm_targets, manipulator_targets) -> None:
-
-        if self.viewer is None:
-            self.gym.sync_frame_time(self.sim)
-
         if rospy.is_shutdown():
             import sys
             sys.exit('ROSPy has been stopped.')

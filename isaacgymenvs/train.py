@@ -58,8 +58,8 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
 
 
-    from isaacgymenvs.tasks.dexterity.learning import st_continuous
-    from isaacgymenvs.tasks.dexterity.learning import student_teacher_network_builder
+    from isaacgymenvs.tasks.dexterity.learning import aid_continuous
+    from isaacgymenvs.tasks.dexterity.learning import aid_network_builder
     from isaacgymenvs.tasks.dexterity.learning import pointcloud_player
     import isaacgymenvs
 
@@ -144,11 +144,9 @@ def launch_rlg_hydra(cfg: DictConfig):
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
 
-
-
-        runner.algo_factory.register_builder('st_continuous', lambda **kwargs : st_continuous.StudentTeacherA2CAgent(**kwargs))
-        model_builder.register_network('student_teacher_actor_critic', lambda **kwargs : student_teacher_network_builder.StudentTeacherA2CBuilder())
-        runner.player_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_player.PpoPointcloudPlayerContinuous(**kwargs))
+        runner.algo_factory.register_builder('aid_continuous', lambda **kwargs : aid_continuous.AIDAgent(**kwargs))
+        model_builder.register_network('aid_actor_critic', lambda **kwargs : aid_network_builder.AIDBuilder())
+        #runner.player_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_player.PpoPointcloudPlayerContinuous(**kwargs))
         return runner
 
     rlg_config_dict = omegaconf_to_dict(cfg.train)

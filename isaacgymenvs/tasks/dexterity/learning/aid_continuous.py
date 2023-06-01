@@ -67,7 +67,7 @@ class TeacherDataset:
         return obses, teacher_actions
     
 
-class StudentTeacherA2CAgent(A2CAgent):
+class AIDAgent(A2CAgent):
     def __init__(self, base_name, params) -> None:
         self.st_cfg = params['student_teacher']
         self._acquire_student(base_name, params)
@@ -76,7 +76,7 @@ class StudentTeacherA2CAgent(A2CAgent):
         self.train_result = (torch.tensor([0.]), torch.tensor([0.]), torch.tensor([0.]), torch.tensor([0.]), self.last_lr, torch.tensor([0.]), torch.tensor([0.]), torch.tensor([0.]), torch.tensor([0.]))
         self.imitate_results = defaultdict(list)
 
-        if self.st_cfg['method'] == 'guided_observations':
+        if self.st_cfg['method'] == 'aid':
             self.imitation_optimizer = optim.Adam(self.model.a2c_network.imitation_head.parameters(), float(self.st_cfg['imitation_lr']))
         elif self.st_cfg['method'] == 'dagger':
             self.imitation_optimizer = optim.Adam(self.model.parameters(), float(self.st_cfg['imitation_lr']))
@@ -152,7 +152,7 @@ class StudentTeacherA2CAgent(A2CAgent):
         teacher_params['config']['vec_env'] = self.vec_env
 
         # Student-teacher learning only makes sense when checkpoint for the teacher is specified.
-        assert params['teacher_load_path'], "teacher_load_path must be specified to run TAPG."
+        assert params['teacher_load_path'], "teacher_load_path must be specified to run AID."
 
         # Create and restore teacher.
         teacher = PpoPointcloudPlayerContinuous(teacher_params)
@@ -294,7 +294,7 @@ class StudentTeacherA2CAgent(A2CAgent):
         dagger_loss = torch.nn.functional.mse_loss(student_actions, teacher_actions.detach())
         return dagger_loss
 
-    def calc_guided_observations_gradients(self, input_dict) -> None:
+    def calc_aid_gradients(self, input_dict) -> None:
         # Calculated imitation head gradients.
         self.calc_imitation_head_gradients()
         # Calculate regular policy gradients.
@@ -371,7 +371,7 @@ class StudentTeacherA2CAgent(A2CAgent):
 
                 for k, v in self.imitate_results.items():
                     self.writer.add_scalar(k, sum(v) / len(v), frame)
-                self.imitate_results = defaultdict(list)  # Reset kd_results
+                self.imitate_results = defaultdict(list)  # Reset imitate_results
                 self.writer.add_scalar('info/last_teacher_action_prob', self.teacher_action_prob, frame)
                 teacher_replay_size = self.teacher_dataset.capacity if self.teacher_dataset.full else self.teacher_dataset.idx
                 self.writer.add_scalar('info/teacher_replay_size', teacher_replay_size, frame)

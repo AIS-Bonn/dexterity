@@ -356,20 +356,20 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             len(self.robot_actor_ids_sim))
 
         # Set target pos to desired initial pos
-        self.ctrl_target_ik_body_pos = object_pos.clone()
-        self.ctrl_target_ik_body_pos[:, 2] += 0.2
-        self.ctrl_target_ik_body_pos[:, 1] -= 0.075
+        target_ik_body_pos = object_pos.clone()
+        target_ik_body_pos[:, 2] += 0.2
+        target_ik_body_pos[:, 1] -= 0.075
 
-        ctrl_target_ik_body_euler = torch.tensor(
+        target_ik_body_euler = torch.tensor(
             self.cfg_task.randomize.ik_body_euler_initial, device=self.device
         ).unsqueeze(0).repeat(self.num_envs, 1)
 
-        self.ctrl_target_ik_body_quat = torch_utils.quat_from_euler_xyz(
-            ctrl_target_ik_body_euler[:, 0],
-            ctrl_target_ik_body_euler[:, 1],
-            ctrl_target_ik_body_euler[:, 2])
+        target_ik_body_quat = torch_utils.quat_from_euler_xyz(
+            target_ik_body_euler[:, 0],
+            target_ik_body_euler[:, 1],
+            target_ik_body_euler[:, 2])
 
-        self.initial_ik_body_quat = self.ctrl_target_ik_body_quat.clone()
+        self.initial_ik_body_quat = target_ik_body_quat.clone()
 
         # Step sim and render
         for rand_step in range(sim_steps):
@@ -379,11 +379,20 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             # On the initial step after resetting, the ik_body is still in the
             # wrong pose. Hence, we do not assume a pos or quat error.
+            if self.cfg_base.ctrl.add_pose_actions_to == 'pose':
+                current_pos = self.ik_body_pos
+                current_quat = self.ik_body_quat
+            elif self.cfg_base.ctrl.add_pose_actions_to == 'target':
+                current_pos = self.ctrl_target_ik_body_pos
+                current_quat = self.ctrl_target_ik_body_quat
+            else:
+                assert False
+
             pos_error, axis_angle_error = ctrl.get_pose_error(
-                ik_body_pos=self.ik_body_pos,
-                ik_body_quat=self.ik_body_quat,
-                ctrl_target_ik_body_pos=self.ctrl_target_ik_body_pos,
-                ctrl_target_ik_body_quat=self.ctrl_target_ik_body_quat,
+                ik_body_pos=current_pos,
+                ik_body_quat=current_quat,
+                ctrl_target_ik_body_pos=target_ik_body_pos,
+                ctrl_target_ik_body_quat=target_ik_body_quat,
                 jacobian_type=self.cfg_ctrl['jacobian_type'],
                 rot_error_type='axis_angle')
 

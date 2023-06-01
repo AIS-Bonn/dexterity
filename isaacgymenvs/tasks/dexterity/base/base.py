@@ -150,7 +150,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 obs_dim = cfg['env']['numActions']
 
             # DoF pos of the actuated residual joints.
-            elif observation == 'residual_actuated_dof_pos':
+            elif observation in ['ctrl_target_residual_actuated_dof_pos', 'residual_actuated_dof_pos']:
                 obs_dim = self.robot.manipulator.num_actions
 
             # Infer general type of observation (e.g. position, quaternion, or velocity).
@@ -455,10 +455,16 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.flange_angvel = self.body_angvel[:, self.flange_body_id_env, 0:3]
 
         # Initialize pose targets for inverse kinematics
+        #self.base_ctrl_target_ik_body_pos = torch.tensor(
+        #    [[0.6, 0., 0.5]], device=self.device).repeat(self.num_envs, 1)
+        #self.base_ctrl_target_ik_body_quat = torch.tensor(
+        #    [[0., 0., 0., 1.]], device=self.device).repeat(self.num_envs, 1)
+        
         self.base_ctrl_target_ik_body_pos = torch.tensor(
-            [[0.6, 0., 0.5]], device=self.device).repeat(self.num_envs, 1)
+            [[0.28, 0.58, 0.5]], device=self.device).repeat(self.num_envs, 1)
         self.base_ctrl_target_ik_body_quat = torch.tensor(
-            [[0., 0., 0., 1.]], device=self.device).repeat(self.num_envs, 1)
+            [[0., 0., 0.707, 0.707]], device=self.device).repeat(self.num_envs, 1)
+        
         self.ctrl_target_ik_body_pos = self.base_ctrl_target_ik_body_pos.clone()
         self.ctrl_target_ik_body_quat = self.base_ctrl_target_ik_body_quat.clone()
 
@@ -615,6 +621,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             for teacher_observation in self.cfg_task.env.teacher_observations:
                 # Camera observations are computed separately.
                 if "cameras" in self.cfg_env.keys() and teacher_observation in self.cfg_env.cameras.keys():
+                    continue
+                elif "ros_cameras" in self.cfg_env.keys() and observation in self.cfg_env.ros_cameras.keys():
                     continue
                 teacher_obs = self.get_observation_tensor(teacher_observation)
                 teacher_obs_tensors.append(teacher_obs)
@@ -932,7 +940,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # Interpret actions as target pos displacements and set pos target
         pos_actions = ik_body_pose_actions[:, 0:3]
         if do_scale:
-            pos_actions = pos_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.pos_action_scale, device=self.device))
+            pos_actions = pos_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.pos_action_scale, device=self.device)) * self.cfg_base.sim.dt * self.control_freq_inv
 
         if self.cfg_base.ctrl.add_pose_actions_to == "pose":
             self.ctrl_target_ik_body_pos = self.ik_body_pos + pos_actions
@@ -941,7 +949,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         else:
             assert False
 
-        if self.cfg_base.ctrl.workspace.limit_ik_body_pose:
+        if self.cfg_base.ctrl.workspace.limit_ik_body_pose and "pos" in self.cfg_base.ctrl.workspace.keys():
             self.ctrl_target_ik_body_pos[:, 0] = torch.clamp(
                 self.ctrl_target_ik_body_pos[:, 0],
                 self.cfg_base.ctrl.workspace.pos[0][0],
@@ -954,11 +962,13 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 self.ctrl_target_ik_body_pos[:, 2],
                 self.cfg_base.ctrl.workspace.pos[0][2],
                 self.cfg_base.ctrl.workspace.pos[1][2])
+            
+        #print("ctrl_target_ik_body_pos (after clamp):", self.ctrl_target_ik_body_pos)
 
         # Interpret actions as target rot (axis-angle) displacements
         rot_actions = ik_body_pose_actions[:, 3:6]
         if do_scale:
-            rot_actions = rot_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.rot_action_scale, device=self.device))
+            rot_actions = rot_actions @ torch.diag(torch.tensor(self.cfg_base.ctrl.rot_action_scale, device=self.device)) * self.cfg_base.sim.dt * self.control_freq_inv
 
         # Convert to quat and set rot target
         angle = torch.norm(rot_actions, p=2, dim=-1)
@@ -977,14 +987,12 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         else:
             assert False
 
-        if self.cfg_base.ctrl.workspace.limit_ik_body_pose:
+        if self.cfg_base.ctrl.workspace.limit_ik_body_pose and "angle" in self.cfg_base.ctrl.workspace.keys():
             quat_diff = quat_mul(self.ctrl_target_ik_body_quat, quat_conjugate(self.initial_ik_body_quat))
             roll, pitch, yaw = get_euler_xyz(quat_diff)
             euler_diff = torch.stack([roll, pitch, yaw], dim=1)
 
-            euler_diff = torch.where(euler_diff > np.pi,
-                                     euler_diff - 2 * np.pi,
-                                     euler_diff)
+            euler_diff = torch.where(euler_diff > np.pi, euler_diff - 2 * np.pi, euler_diff)
 
             euler_diff[:, 0] = torch.clamp(
                 euler_diff[:, 0],
@@ -998,9 +1006,11 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 euler_diff[:, 2],
                 self.cfg_base.ctrl.workspace.angle[0][2],
                 self.cfg_base.ctrl.workspace.angle[1][2])
+            
 
             new_quat_diff = quat_from_euler_xyz(
                 euler_diff[:, 0], euler_diff[:, 1], euler_diff[:, 2])
+            
 
             self.ctrl_target_ik_body_quat = quat_mul(
                 new_quat_diff, self.initial_ik_body_quat)
@@ -1090,7 +1100,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             len(self.robot_actor_ids_sim))
 
         # Set target pos to desired initial pos
-        self.ctrl_target_ik_body_pos = torch.tensor(
+        target_ik_body_pos = torch.tensor(
             self.cfg_task.randomize.ik_body_pos_initial, device=self.device
         ).unsqueeze(0).repeat(self.num_envs, 1)
 
@@ -1100,10 +1110,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                             device=self.device) - 0.5)  # [-1, 1]
         ik_body_pos_noise = ik_body_pos_noise @ torch.diag(torch.tensor(
                 self.cfg_task.randomize.ik_body_pos_noise, device=self.device))
-        self.ctrl_target_ik_body_pos += ik_body_pos_noise
+        target_ik_body_pos += ik_body_pos_noise
 
         # Set target rot to desired initial rot
-        ctrl_target_ik_body_euler = torch.tensor(
+        target_ik_body_euler = torch.tensor(
             self.cfg_task.randomize.ik_body_euler_initial, device=self.device
         ).unsqueeze(0).repeat(self.num_envs, 1)
 
@@ -1113,15 +1123,15 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         ik_body_euler_noise = ik_body_euler_noise @ torch.diag(
             torch.tensor(self.cfg_task.randomize.ik_body_euler_noise,
                          device=self.device))
+        target_ik_body_euler += ik_body_euler_noise
 
-        ctrl_target_ik_body_euler += ik_body_euler_noise
+        target_ik_body_quat = torch_utils.quat_from_euler_xyz(
+            target_ik_body_euler[:, 0],
+            target_ik_body_euler[:, 1],
+            target_ik_body_euler[:, 2])
 
-        self.ctrl_target_ik_body_quat = torch_utils.quat_from_euler_xyz(
-            ctrl_target_ik_body_euler[:, 0],
-            ctrl_target_ik_body_euler[:, 1],
-            ctrl_target_ik_body_euler[:, 2])
-
-        self.initial_ik_body_quat = self.ctrl_target_ik_body_quat.clone()
+        self.initial_ik_body_quat = target_ik_body_quat.clone()
+        self.ctrl_target_ik_body_quat[:] = self.initial_ik_body_quat.clone()
 
         # Step sim and render
         for rand_step in range(sim_steps):
@@ -1131,11 +1141,20 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
             # On the initial step after resetting, the ik_body is still in the
             # wrong pose. Hence, we do not assume a pos or quat error.
+            if self.cfg_base.ctrl.add_pose_actions_to == 'pose':
+                current_pos = self.ik_body_pos
+                current_quat = self.ik_body_quat
+            elif self.cfg_base.ctrl.add_pose_actions_to == 'target':
+                current_pos = self.ctrl_target_ik_body_pos
+                current_quat = self.ctrl_target_ik_body_quat
+            else:
+                assert False
+
             pos_error, axis_angle_error = ctrl.get_pose_error(
-                ik_body_pos=self.ik_body_pos,
-                ik_body_quat=self.ik_body_quat,
-                ctrl_target_ik_body_pos=self.ctrl_target_ik_body_pos,
-                ctrl_target_ik_body_quat=self.ctrl_target_ik_body_quat,
+                ik_body_pos=current_pos,
+                ik_body_quat=current_quat,
+                ctrl_target_ik_body_pos=target_ik_body_pos,
+                ctrl_target_ik_body_quat=target_ik_body_quat,
                 jacobian_type=self.cfg_ctrl['jacobian_type'],
                 rot_error_type='axis_angle')
 
