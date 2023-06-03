@@ -423,10 +423,6 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             self.env_ptrs[0], self.robot_handles[0], self.cfg_base.ctrl.ik_body,
             gymapi.DOMAIN_ENV)
 
-        self.flange_body_id_env = self.gym.find_actor_rigid_body_index(
-            self.env_ptrs[0], self.robot_handles[0], 'flange',
-            gymapi.DOMAIN_ENV)
-
         actuated_dof_names = [
             self.robot.model.get_asset_actuator_joint_name(i) for i
             in range(self.robot.model.get_asset_actuator_count())]
@@ -448,11 +444,6 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                                 0:self.ik_body_dof_count]  # minus 1 because base is fixed
         self.ik_body_mass_matrix = self.mass_matrix[:, 0:self.ik_body_dof_count,
                                    0:self.ik_body_dof_count]
-
-        self.flange_pos = self.body_pos[:, self.flange_body_id_env, 0:3]
-        self.flange_quat = self.body_quat[:, self.flange_body_id_env, 0:4]
-        self.flange_linvel = self.body_linvel[:, self.flange_body_id_env, 0:3]
-        self.flange_angvel = self.body_angvel[:, self.flange_body_id_env, 0:3]
 
         # Initialize pose targets for inverse kinematics
         #self.base_ctrl_target_ik_body_pos = torch.tensor(
