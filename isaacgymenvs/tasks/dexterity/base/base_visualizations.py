@@ -1,4 +1,5 @@
 from isaacgym import gymapi, gymutil
+import matplotlib.cm as cm
 import torch
 from typing import *
 
@@ -74,3 +75,25 @@ class DexterityBaseVisualizations:
                                              color=(0, 1, 1))
         gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
                            pose=gymapi.Transform())
+        
+
+    def visualize_robot_contact_forces(self, env_id: int, colormap: str = 'viridis', vmax: float = 10., arm_only: bool = False) -> None:
+        """Visualize contact forces on the robot arm.
+        
+        Args:
+            env_id (int): Environment ID.
+            colormap (str, optional): Matplotlib colormap to use. Defaults to 'viridis'.
+            vmax (float, optional): Maximum force to normalize by in Newton. Defaults to 10.
+            arm_only (bool, optional): Whether to only visualize the arm. Defaults to False.
+        """
+        
+        cmap = cm.get_cmap(colormap)
+        contact_force = self.contact_force[env_id]
+        contact_force_mag = torch.clamp(torch.norm(contact_force, dim=1) / vmax, max=1.0)
+        rgb = cmap(contact_force_mag.cpu().numpy())[:, :3]
+        num_rigid_bodies = self.robot_arm_rigid_body_count if arm_only else contact_force.shape[0]
+        for rb_idx in range(num_rigid_bodies):
+            self.gym.set_rigid_body_color(
+                self.env_ptrs[env_id], self.robot_handles[env_id], rb_idx,
+                gymapi.MESH_VISUAL,
+                gymapi.Vec3(rgb[rb_idx, 0], rgb[rb_idx, 1], rgb[rb_idx, 2]))
