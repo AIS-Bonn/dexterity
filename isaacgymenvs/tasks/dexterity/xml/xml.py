@@ -119,6 +119,14 @@ class DexterityXML(DexterityABCXML):
     @property
     def actuated_joint_names(self) -> List[str]:
         return [actuator.attrib['joint'] for actuator in self.actuator]
+    
+    @property
+    def num_bodies(self) -> int:
+        bodies = self._findall_rec(
+            node=self.worldbody, tags="body", return_first=False)
+        if bodies is None:
+            return 0
+        return len(bodies)
 
     @property
     def body_names(self) -> List[str]:

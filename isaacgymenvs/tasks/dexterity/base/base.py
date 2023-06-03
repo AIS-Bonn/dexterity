@@ -409,6 +409,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         self.robot_dof_count = self.robot.model.get_asset_dof_count()
         self.robot_actuator_count = self.robot.model.get_asset_actuator_count()
+        self.robot_arm_rigid_body_count = self.robot.arm.num_bodies
+        self.robot_manipulator_rigid_body_count = self.robot.manipulator.num_bodies
 
         # Initialize torque or position targets for all DoFs
         self.dof_torque = torch.zeros(
