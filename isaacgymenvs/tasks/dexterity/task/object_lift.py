@@ -195,8 +195,11 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                     object_pos_expanded = object_pos.unsqueeze(1).repeat(
                         1, keypoint_pos.shape[1], 1)
                     keypoint_dist = torch.norm(
-                        keypoint_pos - object_pos_expanded, dim=-1).mean(dim=-1)
-                    reward = -scale * keypoint_dist
+                        keypoint_pos - object_pos_expanded, dim=-1).sum(dim=-1)
+                    #reward = -scale * keypoint_dist
+                    reward = 1.0 / (0.025 + 5 * keypoint_dist.pow(2))
+                    #reward = hyperbole_rew(
+                    #    scale, keypoint_dist, c=0.025, pow=1)
                 elif reward_term.endswith('_proximity'):
                     keypoint_group_name = reward_term[:-len('_proximity')]
                     keypoint_pos = getattr(self, keypoint_group_name + '_pos')

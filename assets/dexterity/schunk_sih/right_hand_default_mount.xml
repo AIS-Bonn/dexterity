@@ -208,6 +208,8 @@
                         <body name="th_distal" pos="-0.0391 0 0">
                             <site name="keypoint-hand_bodies-th_distal" pos="-0.023 0 0.015"/>
                             <site name="keypoint-fingertips-th" pos="-0.023 0 0.015"/>
+                            <site name="keypoint-fingertips-th2" pos="-0.023 0 0.015"/>
+                            <site name="keypoint-tripod-th" pos="-0.023 0 0.015"/>
                             <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
                             <joint name="th_inter_to_th_distal" class="thumb_bending"/>
                             <geom class="plastic_visual" pos="0.0971 -0.024 -0.081" type="mesh" mesh="th_distal_top" />
@@ -234,6 +236,7 @@
                     <body name="if_distal" pos="0 0 0.048">
                         <site name="keypoint-hand_bodies-if_distal" pos="-0.087 0.0175 0.041"/>
                         <site name="keypoint-fingertips-if" pos="-0.087 0.0175 0.041"/>
+                        <site name="keypoint-tripod-if" pos="-0.087 0.0175 0.041"/>
                         <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001" /-->
                         <joint name="if_proximal_to_if_distal" class="finger_bending"/>
                         <geom class="plastic_visual" pos="-0.0435 0 -0.189" type="mesh" mesh="if_distal_top" />
@@ -260,6 +263,7 @@
                     <body name="mf_distal" pos="0 0 0.0525">
                         <site name="keypoint-hand_bodies-mf_distal" pos="-0.0375 0.0175 0.049"/>
                         <site name="keypoint-fingertips-mf" pos="-0.0375 0.0175 0.049"/>
+                        <site name="keypoint-tripod-mf" pos="-0.0375 0.0175 0.049"/>
                         <!--inertial pos="0 0 0" quat="0.820473 0.339851 -0.17592 0.424708" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/-->
                         <joint name="mf_proximal_to_mf_distal" class="finger_bending"/>
                         <geom class="plastic_visual" pos="-0.0187 0 -0.1935" type="mesh" mesh="mf_distal_top" />
