@@ -184,6 +184,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             (object_height - object_height_initial), min=0)
         object_lifted = (object_height - object_height_initial) > \
                         self.cfg_task.rl.target_height
+        
 
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
@@ -212,12 +213,25 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 else:
                     assert False
 
-            # Penalize large actions
+            # Penalize large actions.
             elif reward_term == 'action_penalty':
                 squared_action_norm = torch.linalg.norm(
                     self.actions, dim=-1)
                 reward = - squared_action_norm * scale
 
+            # Penalize large contact forces.
+            elif reward_term.endswith('contact_penalty'):
+                contact_force_mag = torch.linalg.norm(self.contact_force, dim=-1)
+                if reward_term.startswith('arm'):
+                    contact_force_mag = contact_force_mag[:, :self.robot_arm_rigid_body_count].sum(dim=-1)
+                elif reward_term.startswith('manipulator'):
+                    contact_force_mag = contact_force_mag[:, self.robot_arm_rigid_body_count:].sum(dim=-1)
+                elif reward_term.startswith('robot'):
+                    contact_force_mag = contact_force_mag.sum(dim=-1)
+                else:
+                    assert False
+                reward = - contact_force_mag * scale
+            
             # Reward the height progress of the object towards lift-off
             elif reward_term == 'object_lift_off_reward':
                 reward = \
@@ -243,7 +257,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             reward_terms["reward_terms/" + reward_term] = reward.mean()
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
-            #print(reward_terms)
+            print(reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
