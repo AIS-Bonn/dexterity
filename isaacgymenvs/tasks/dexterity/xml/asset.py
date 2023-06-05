@@ -60,8 +60,16 @@ class DexterityXMLAsset(DexterityXML):
             self._init_joint_equality(ctrl_target_dof_pos.device)
             self._joint_equality_initialized = True
 
+
         x = ctrl_target_dof_pos[:, self.parent_joint_ids]
-        ctrl_target_dof_pos[:, self.child_joint_ids] = self.c0 + self.c1 * x
+        c = self.joint_equality_polycoef
+        ctrl_target_dof_pos[:, self.child_joint_ids] = c[:, 0] + c[:, 1] * x + c[:, 2] * x**2 + c[:, 3] * x**3 + c[:, 4] * x**4
+    
+        # Enforce self-equalities, i.e., how the joint command is mapped to the actual joint position.
+        x = ctrl_target_dof_pos[:, self.self_equality_joint_ids]
+        c = self.self_equality_joint_polycoef
+        ctrl_target_dof_pos[:, self.self_equality_joint_ids] = c[:, 0] + c[:, 1] * x + c[:, 2] * x**2 + c[:, 3] * x**3 + c[:, 4] * x**4
+
         return ctrl_target_dof_pos
 
     def _init_joint_equality(self, device: torch.device) -> None:
@@ -71,19 +79,33 @@ class DexterityXMLAsset(DexterityXML):
 
         parent_joint_names, child_joint_names, \
             joint_equality_polycoef = [], [], []
+        
+        self_equality_joint_names, self_equality_joint_polycoef = [], []
         for joint_equality in self.equality:
             assert joint_equality.tag == 'joint'
 
-            parent_joint_names.append(joint_equality.attrib['joint1'])
-            child_joint_names.append(joint_equality.attrib['joint2'])
-            joint_equality_polycoef.append(
-                list(map(float, joint_equality.attrib['polycoef'].split(" "))))
+            # Regular joint equality.
+            if 'joint2' in joint_equality.attrib.keys():
+                parent_joint_names.append(joint_equality.attrib['joint1'])
+                child_joint_names.append(joint_equality.attrib['joint2'])
+                joint_equality_polycoef.append(
+                    list(map(float, joint_equality.attrib['polycoef'].split(" "))))
+            
+            # "Self-equality" to imitate difference between command and actual joint movement.
+            else:
+                self_equality_joint_names.append(joint_equality.attrib['joint1'])
+                self_equality_joint_polycoef.append(
+                    list(map(float, joint_equality.attrib['polycoef'].split(" "))))
+                
 
         parent_joint_ids, child_joint_ids = [], []
-        for parent_name, child_name in \
-                zip(parent_joint_names, child_joint_names):
+        for parent_name, child_name in zip(parent_joint_names, child_joint_names):
             parent_joint_ids.append(self.find_asset_dof_index(parent_name))
             child_joint_ids.append(self.find_asset_dof_index(child_name))
+
+        self_equality_joint_ids = []
+        for self_equality_joint_name in self_equality_joint_names:
+            self_equality_joint_ids.append(self.find_asset_dof_index(self_equality_joint_name))
 
         self.parent_joint_ids = to_torch(parent_joint_ids, dtype=torch.long,
                                          device=device)
@@ -91,6 +113,9 @@ class DexterityXMLAsset(DexterityXML):
                                         device=device)
         self.joint_equality_polycoef = to_torch(joint_equality_polycoef,
                                                 device=device)
+        
+        self.self_equality_joint_ids = to_torch(self_equality_joint_ids, dtype=torch.long, device=device)
+        self.self_equality_joint_polycoef = to_torch(self_equality_joint_polycoef, device=device)
 
         self.c0 = self.joint_equality_polycoef[:, 0]
         self.c1 = self.joint_equality_polycoef[:, 1]

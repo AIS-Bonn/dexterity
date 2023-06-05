@@ -353,12 +353,17 @@
 
     <!-- define equalities to position joints that cannot be actuated directly -->
     <equality>
-        <joint name="th_bend_equality" joint1="th_proximal_to_th_inter" joint2="th_inter_to_th_distal" polycoef="0 1 0 0 0"/>
-        <joint name="if_bend_equality" joint1="palm_to_if_proximal" joint2="if_proximal_to_if_distal" polycoef="0 1 0 0 0"/>
-        <joint name="mf_bend_equality" joint1="palm_to_mf_proximal" joint2="mf_proximal_to_mf_distal" polycoef="0 1 0 0 0"/>
-        <joint name="rf_bend_equality" joint1="palm_to_rf_proximal" joint2="rf_proximal_to_rf_distal" polycoef="0 1 0 0 0"/>
-        <joint name="rf_lf_equality1" joint1="palm_to_rf_proximal" joint2="palm_to_lf_proximal" polycoef="0 1 0 0 0"/>
-        <joint name="rf_lf_equality2" joint1="palm_to_rf_proximal" joint2="lf_proximal_to_lf_distal" polycoef="0 1 0 0 0"/>
+        <joint name="th_command_mapping" joint1="th_proximal_to_th_inter" polycoef="0.07598 -0.12908 5.02439 -4.98155 1.40271"/>
+        <joint name="if_command_mapping" joint1="palm_to_if_proximal" polycoef="-0.07021 2.70951 2.18205 0.79028 0.10012"/>
+        <joint name="mf_command_mapping" joint1="palm_to_mf_proximal" polycoef="-0.07021 2.70951 2.18205 0.79028 0.10012"/>
+        <joint name="rf_command_mapping" joint1="palm_to_rf_proximal" polycoef="-0.07021 2.70951 2.18205 0.79028 0.10012"/>
+
+        <joint name="th_bend_equality" joint1="th_proximal_to_th_inter" joint2="th_inter_to_th_distal" polycoef="0.02341 0.05085 -0.51205 1.19094 -0.37817"/>
+        <joint name="if_bend_equality" joint1="palm_to_if_proximal" joint2="if_proximal_to_if_distal" polycoef="-0.04943 -0.66783 -2.98017 -2.17345 -0.56311"/>
+        <joint name="mf_bend_equality" joint1="palm_to_mf_proximal" joint2="mf_proximal_to_mf_distal" polycoef="-0.04943 -0.66783 -2.98017 -2.17345 -0.56311"/>
+        <joint name="rf_bend_equality" joint1="palm_to_rf_proximal" joint2="rf_proximal_to_rf_distal" polycoef="-0.04943 -0.66783 -2.98017 -2.17345 -0.56311"/>
+        <joint name="rf_lf_equality1" joint1="palm_to_rf_proximal" joint2="palm_to_lf_proximal" polycoef="-0.07021 2.70951 2.18205 0.79028 0.10012"/>
+        <joint name="rf_lf_equality2" joint1="palm_to_rf_proximal" joint2="lf_proximal_to_lf_distal" polycoef="-0.04943 -0.66783 -2.98017 -2.17345 -0.56311"/>
     </equality>
 
     <keyframe>

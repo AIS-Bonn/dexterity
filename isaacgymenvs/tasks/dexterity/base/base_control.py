@@ -213,6 +213,9 @@ class DexterityBaseControl:
         self.ctrl_target_dof_pos = scale(
             self.ctrl_target_dof_pos, self.robot_dof_lower_limits,
             self.robot_dof_upper_limits)
+        
+        # Store targets of actuated residual DoFs.
+        self.uncoupled_ctrl_target_dof_pos = self.ctrl_target_dof_pos.clone().detach()
 
         # Enforce equalities specified in XML model
         ctrl_target_dof_pos = self.robot.model.joint_equality(
@@ -292,8 +295,9 @@ class DexterityBaseControl:
             arm_targets = self.ctrl_target_dof_pos[
                 0, :self.robot.arm.num_joints].cpu().numpy()
 
-            manipulator_targets = self.ctrl_target_dof_pos[
-                0, self.residual_actuated_dof_indices].cpu().numpy()
+            # Publish the unscaled targets before coupling and tranformation.
+            manipulator_targets = self.uncoupled_ctrl_target_dof_pos[0, self.residual_actuated_dof_indices].cpu().numpy()
+            
             self._publish_targets(arm_targets, manipulator_targets)
 
         # This includes non-robot DoFs, such as from a door or drill
