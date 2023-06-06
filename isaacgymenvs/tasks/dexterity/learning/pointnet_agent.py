@@ -5,6 +5,7 @@ import torch
 from torch import optim
 import time
 from rl_games.algos_torch import torch_ext
+import os
 
 
 class A2CPointNetAgent(A2CAgent):
@@ -162,7 +163,8 @@ class A2CPointNetAgent(A2CAgent):
                         if attrib.endswith('pointcloud_encoder'):
                             # Add graph structure of encoder models to tensorboard.
                             if not self.pointnet_graphs_added:
-                                self.writer.add_graph(getattr(self.model.a2c_network, attrib), torch.zeros((1, 4, 128)).to(self.device))
+                                num_points_padded = (self.env_info['observation_start_end'][attrib[:-8]][1] - self.env_info['observation_start_end'][attrib[:-8]][0]) // 4
+                                self.writer.add_graph(getattr(self.model.a2c_network, attrib), torch.zeros((1, 4, num_points_padded)).to(self.device))
 
                             # Add all weights of this encoder model to tensorboard as histograms.
                             for name, param in getattr(self.model.a2c_network, attrib).named_parameters(): 

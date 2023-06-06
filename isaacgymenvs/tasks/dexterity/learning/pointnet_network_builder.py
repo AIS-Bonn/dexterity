@@ -26,14 +26,15 @@ class A2CPointNetBuilder(A2CBuilder):
             self.observation_start_end = kwargs['observation_start_end']
             for obs, start_end in kwargs['observation_start_end'].items():
                 if 'pointcloud' in obs:
-                    self._build_pointnet(obs, max_num_points_padded=128)
+                    num_points_padded = (start_end[1] - start_end[0]) // 4
+                    self._build_pointnet(obs, max_num_points_padded=num_points_padded)
 
         def embed_pointcloud(self, name, pointcloud):
             # point_cloud.shape == [batch_size, max_num_points_padded, 4], where the last dim is (x, y, z, mask)
             embedding = getattr(self, name + '_encoder').to(pointcloud.device)(pointcloud.transpose(1, 2)).squeeze(2)
             return embedding
 
-        def _build_pointnet(self, name: str, units=(64, 64), max_num_points_padded=128):
+        def _build_pointnet(self, name: str, max_num_points_padded: int, units=(64, 64)):
             """Builds a simple PointNet encoder that processes pointclouds of shape 
             [batch_size, max_num_points_padded, 4]. Permutation invariance is created by 
             MaxPood1d at the end."""
