@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 
 
-class A2CPointcloudBuilder(A2CBuilder):
+class A2CPointNetBuilder(A2CBuilder):
     def build(self, name, **kwargs):
-        self.pointcloud_emb_shape = 32
+        self.pointcloud_emb_shape = 64
         mlp_input_dim = 0
         for obs, start_end in kwargs['observation_start_end'].items():
             if 'pointcloud' in obs:
@@ -15,7 +15,7 @@ class A2CPointcloudBuilder(A2CBuilder):
                 mlp_input_dim += start_end[1] - start_end[0]
 
         kwargs['input_shape'] = (mlp_input_dim,)
-        net = A2CPointcloudBuilder.Network(self.params, **kwargs)
+        net = A2CPointNetBuilder.Network(self.params, **kwargs)
         return net
 
     class Network(A2CBuilder.Network):
@@ -24,19 +24,16 @@ class A2CPointcloudBuilder(A2CBuilder):
             super().__init__(params, **kwargs)
 
             self.observation_start_end = kwargs['observation_start_end']
-
-            self.pointcloud_split_idx = None
             for obs, start_end in kwargs['observation_start_end'].items():
                 if 'pointcloud' in obs:
                     self._build_pointnet(obs, max_num_points_padded=128)
-                    self.pointcloud_split_idx = start_end
 
         def embed_pointcloud(self, name, pointcloud):
             # point_cloud.shape == [batch_size, max_num_points_padded, 4], where the last dim is (x, y, z, mask)
             embedding = getattr(self, name + '_encoder').to(pointcloud.device)(pointcloud.transpose(1, 2)).squeeze(2)
             return embedding
 
-        def _build_pointnet(self, name: str, units=(16, 32), max_num_points_padded=128):
+        def _build_pointnet(self, name: str, units=(64, 64), max_num_points_padded=128):
             """Builds a simple PointNet encoder that processes pointclouds of shape 
             [batch_size, max_num_points_padded, 4]. Permutation invariance is created by 
             MaxPood1d at the end."""

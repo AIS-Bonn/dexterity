@@ -185,7 +185,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         Acquire tensors."""
 
         self.synthetic_pointcloud_dimension = 64
-        self.max_num_points_padded = 256
+        self.max_num_points_padded = 128
         self.pick_detections = True
 
         self._get_env_yaml_params()

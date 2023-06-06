@@ -3,7 +3,7 @@ from rl_games.algos_torch.players import PpoPlayerContinuous
 import torch
 
 
-class PpoPointcloudPlayerContinuous(PpoPlayerContinuous):
+class PpoPointNetPlayerContinuous(PpoPlayerContinuous):
     """PPO player for continuous action space, modified to pass observation_start_end to the network builder."""
     def __init__(self, params):
         BasePlayer.__init__(self, params)

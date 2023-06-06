@@ -184,7 +184,6 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             (object_height - object_height_initial), min=0)
         object_lifted = (object_height - object_height_initial) > \
                         self.cfg_task.rl.target_height
-        
 
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
@@ -257,7 +256,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             reward_terms["reward_terms/" + reward_term] = reward.mean()
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
-            print(reward_terms)
+            #print(reward_terms)
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""

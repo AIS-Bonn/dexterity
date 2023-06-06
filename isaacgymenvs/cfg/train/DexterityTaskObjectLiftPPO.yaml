@@ -1,13 +1,13 @@
 params:
   seed: ${...seed}
   algo:
-    name: a2c_continuous
+    name: a2c_continuous_pointnet
 
   model:
     name: continuous_a2c_logstd
 
   network:
-    name: actor_critic #pointcloud_actor_critic
+    name: pointnet_actor_critic
     separate: False
 
     space:

@@ -60,7 +60,9 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     from isaacgymenvs.tasks.dexterity.learning import aid_continuous
     from isaacgymenvs.tasks.dexterity.learning import aid_network_builder
-    from isaacgymenvs.tasks.dexterity.learning import pointcloud_player
+    from isaacgymenvs.tasks.dexterity.learning import pointnet_agent
+    from isaacgymenvs.tasks.dexterity.learning import pointnet_network_builder
+    from isaacgymenvs.tasks.dexterity.learning import pointnet_player
     import isaacgymenvs
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -145,8 +147,12 @@ def launch_rlg_hydra(cfg: DictConfig):
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
 
         runner.algo_factory.register_builder('aid_continuous', lambda **kwargs : aid_continuous.AIDAgent(**kwargs))
+        runner.player_factory.register_builder('aid_continuous', lambda **kwargs : aid_continuous.AIDPlayerContinuous(**kwargs))
         model_builder.register_network('aid_actor_critic', lambda **kwargs : aid_network_builder.AIDBuilder())
-        #runner.player_factory.register_builder('a2c_pointcloud_continuous', lambda **kwargs : pointcloud_player.PpoPointcloudPlayerContinuous(**kwargs))
+
+        runner.algo_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : pointnet_agent.A2CPointNetAgent(**kwargs))
+        runner.player_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : pointnet_player.PpoPointNetPlayerContinuous(**kwargs))
+        model_builder.register_network('pointnet_actor_critic', lambda **kwargs : pointnet_network_builder.A2CPointNetBuilder())
         return runner
 
     rlg_config_dict = omegaconf_to_dict(cfg.train)
