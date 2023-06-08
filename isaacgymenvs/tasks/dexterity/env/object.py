@@ -537,7 +537,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.rendered_pointcloud_fig.canvas.draw()
                 plt.pause(0.01)
 
-    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = True) -> None:
+    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = False) -> None:
         if not hasattr(self, 'segtrackers'):
             return
 
@@ -580,26 +580,42 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 detected_pointclouds.append(points_on_object)
             getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
 
-            if draw_debug_visualization:
+            if draw_debug_visualization or self.cfg_base.debug.save_videos:
                 tracked_segmentation = draw_mask(color_image_numpy, self.pred_mask, id_countour=False)
 
-                if self.progress_buf[0] == 1:
-                    self.segm_fig[camera_name][env_id] = plt.figure()
-                    ax = self.segm_fig[camera_name][env_id].add_subplot(111)
-                    ax.cla()
-                    ax.set_title(
-                        f"Tracked target object for camera '{camera_name}' on env {env_id}.")
-                    self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
-                    plt.axis('off')
-                    plt.show(block=False)
-                else:
-                    self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
-                    self.segm_fig[camera_name][env_id].canvas.draw()
-                    plt.pause(0.01)
+                if self.cfg_base.debug.save_videos:
+                    self._segmented_frames[camera_name][env_id].append(tracked_segmentation)
+
+                if draw_debug_visualization:
+                    if self.progress_buf[0] == 1:
+                        self.segm_fig[camera_name][env_id] = plt.figure()
+                        ax = self.segm_fig[camera_name][env_id].add_subplot(111)
+                        ax.cla()
+                        ax.set_title(
+                            f"Tracked target object for camera '{camera_name}' on env {env_id}.")
+                        self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
+                        plt.axis('off')
+                        plt.show(block=False)
+                    else:
+                        self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
+                        self.segm_fig[camera_name][env_id].canvas.draw()
+                        plt.pause(0.01)
 
     def _reset_segmentation_tracking(self, env_ids, target_segmentation_id: Union[int, List[int]] = 2, draw_debug_visualization: bool = False):
         if isinstance(target_segmentation_id, int):
             target_segmentation_id = [target_segmentation_id] * self.num_envs
+
+
+        # Write videos of segmentation tracking.
+        if hasattr(self, '_segmented_frames'):
+            for camera_name in self.detected_pointcloud_camera_names:
+                for env_id in env_ids:
+                    if len(self._segmented_frames[camera_name][env_id]) > 0:
+                        video_writer = cv2.VideoWriter(f'tracked_segmentation_{camera_name}_env_{env_id}_episode_{self._episodes[env_id]}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
+                        for frame in self._segmented_frames[camera_name][env_id]:
+                            video_writer.write(frame[..., ::-1])
+                        video_writer.release()          
+        self._segmented_frames = {camera_name: [[] for _ in range(self.num_envs)] for camera_name in self.detected_pointcloud_camera_names}
 
         if not hasattr(self, 'segtracker'):
             self._acquire_segtracker()
