@@ -10,7 +10,7 @@ import matplotlib.cm as cmx
 import os
 import ros_numpy
 import rospy
-from sensor_msgs.msg import CompressedImage, PointCloud2
+from sensor_msgs.msg import CompressedImage, PointCloud2, CameraInfo
 from typing import *
 
 
@@ -829,8 +829,14 @@ class DexterityROSCameraSensorProperties:
         self.camera_name = camera_name
         self.image_type = image_type
 
+        self.camera_info_sub = rospy.Subscriber(f'{camera_name}/camera/color/camera_info', CameraInfo, self._update_camera_info)
+
         self.add_camera_actor = False
         self._camera_handles = [None]
+
+    def _update_camera_info(self, data) -> None:
+        if not hasattr(self, '_camera_info'):
+            self._camera_info = data
         
     @property
     def image_type(self) -> str:
@@ -842,6 +848,14 @@ class DexterityROSCameraSensorProperties:
             f"Image type should be one of {self.ALLOWED_IMAGE_TYPES}, but " \
             f"unknown type '{value}' was found."
         self._image_type = value
+
+    @property
+    def width(self) -> int:
+        return self._camera_info.width
+    
+    @property
+    def height(self) -> int:
+        return self._camera_info.height
 
 
 
@@ -1115,9 +1129,9 @@ class DexterityBaseCameras:
                     ).cpu().numpy()).astype(np.uint8)[0, ..., ::-1]
 
                 else:
-                    assert False, \
-                        f"Cannot write videos to file for image type " \
-                        f"{self._camera_dict[camera_name].image_type} yet."
+                    continue
+                    #f"Cannot write videos to file for image type " \
+                    #f"{self._camera_dict[camera_name].image_type} yet."
                 self._videos[camera_name][env_id].write(np_image)
 
         done_env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
