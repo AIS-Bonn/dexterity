@@ -611,7 +611,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             for camera_name in self.detected_pointcloud_camera_names:
                 for env_id in env_ids:
                     if len(self._segmented_frames[camera_name][env_id]) > 0:
-                        video_writer = cv2.VideoWriter(f'tracked_segmentation_{camera_name}_env_{env_id}_episode_{self._episodes[env_id]}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
+                        video_writer = cv2.VideoWriter(f'{self.videos_dir}/tracked_segmentation_{camera_name}_env_{env_id}_episode_{self._episodes[env_id] - 1}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
                         for frame in self._segmented_frames[camera_name][env_id]:
                             video_writer.write(frame[..., ::-1])
                         video_writer.release()          
