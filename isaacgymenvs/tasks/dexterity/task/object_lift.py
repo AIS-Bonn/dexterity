@@ -229,7 +229,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                     contact_force_mag = contact_force_mag.sum(dim=-1)
                 else:
                     assert False
-                reward = - contact_force_mag * scale
+                reward = - torch.clamp(contact_force_mag, max=10.) * scale
             
             # Reward the height progress of the object towards lift-off
             elif reward_term == 'object_lift_off_reward':
@@ -431,6 +431,10 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             self.gym.simulate(self.sim)
             self.render()
+
+            if hasattr(self, "cfg_base") and self.cfg_base.ros_activate and self.viewer is None and rand_step % self.control_freq_inv == 0:
+                self.gym.sync_frame_time(self.sim)
+                
             if len(self.cfg_base.debug.visualize) > 0 and not self.cfg[
                 'headless']:
                 self.gym.clear_lines(self.viewer)

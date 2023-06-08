@@ -25,8 +25,8 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'synthetic_pointcloud']
-    #teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'residual_actuated_dof_pos', 'object_pos']
+    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'd455', 'detected_pointcloud_d455']
+    teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos']
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -35,6 +35,11 @@ env:
 
 
 randomize:
+    observations:
+        pointcloud:
+            noise_prob: 0.25
+            noise_std: 0.002
+
     # ik_body start pose.
     ik_body_pos_initial:  # initial position of ik_body
         default: [0.6, 0., 0.3]
@@ -60,7 +65,7 @@ randomize:
     # workspace extent, outside which objects will be dropped again.
     workspace_extent_xy:
         default: [[-0.2, -0.2], [0.2, 0.2]]
-        real_robot: [[-0.1, -0.125], [0.1, 0.125]]
+        real_robot: [[-0.1, -0.1], [0.1, 0.1]]
 
 rl:
     reward:
@@ -72,4 +77,3 @@ rl:
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_height: 0.2  # target height for the object in meters
     max_episode_length: 150
-

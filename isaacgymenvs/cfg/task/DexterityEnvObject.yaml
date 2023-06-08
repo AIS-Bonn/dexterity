@@ -19,10 +19,21 @@ cameras:
         pos: [ 0.75, 0.58, 0.2 ]
         quat: [ -0.174, 0, 0.985, 0 ]
 
+    sideview:
+        model: 'realsense_d455'
+        pos: [ -0.334, 0.634, 0.356 ]
+        quat: [ 0., 0.131, 0.0, 0.991 ]
+
     palmview:
         model: 'realsense_d405'
         pos: [ 0.0125, 0.038, 0.081 ]
         quat: [ -0.271, -0.653, 0.271, 0.653 ]  # 45 deg inclined downwards with the connector facing the wrist
+        attach_to_body: 'palm'
+
+    wristview:
+        model: 'realsense_d405'
+        pos: [ 0., 0.075, -0.06 ]
+        quat: [ -0.092, -0.701, 0.092, 0.701 ]
         attach_to_body: 'palm'
 
     topview:
@@ -32,4 +43,7 @@ cameras:
 
 ros_cameras:
     l515:
+        image_type: 'rgbxyz'
+
+    d455:
         image_type: 'rgbxyz'

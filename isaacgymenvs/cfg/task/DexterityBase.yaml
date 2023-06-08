@@ -41,8 +41,9 @@ ctrl:
 
     workspace:
         limit_ik_body_pose: True
-        #pos: [[0.18, 0.455, 0.15], [0.38, 0.705, 0.525]]  # Absolute
-        pos: [[0.08, 0.38, 0.0], [0.48, 0.78, 0.6]]  # Large limits
+        pos: [[0.18, 0.48, 0.15], [0.38, 0.68, 0.525]]  # Small limits
+        #pos: [[0.13, 0.43, 0.15], [0.43, 0.73, 0.525]]  # Medium limits
+        #pos: [[0.08, 0.38, 0.0], [0.48, 0.78, 0.6]]  # Large limits
         #angle: [[-0.174533, -1.5708, -0.785398], [0.174533, 1.5708, 0.785398]]  # Relative to initial hand-orientation
 
     all:
@@ -70,7 +71,7 @@ ctrl:
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
     pos_action_scale: [0.25, 0.25, 0.25]  #[ 0.025, 0.025, 0.025 ]
-    rot_action_scale: [0.04, 0.04, 0.04]  #[ 0.1, 0.1, 0.1 ]
+    rot_action_scale: [0.1, 0.1, 0.1]  #[ 0.1, 0.1, 0.1 ]
     #torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True
@@ -116,10 +117,10 @@ debug:
         [[1, -1., 1., 0., 0.], 200]
     ]
 
-    save_videos: False  # Saves all camera observations to mp4 if cameras are used in the environment
+    save_videos: True  # Saves all camera observations to mp4 if cameras are used in the environment
 
     verbose: True
-    visualize: ['ik_body_pose'] #['ik_body_workspace', 'ctrl_target_ik_body_pose']
+    visualize: [] #['synthetic_pointcloud', 'robot_contact_forces'] #['ik_body_workspace', 'ctrl_target_ik_body_pose']
 
 # Specifies data to be logged in addition the data logged by default through
 # rl-games. dexterity environments check for the keys in logging (e.g.

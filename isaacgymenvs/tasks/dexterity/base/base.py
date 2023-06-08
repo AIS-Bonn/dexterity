@@ -40,6 +40,7 @@ from omegaconf import ListConfig
 import os
 import sys
 from typing import *
+import time
 
 from isaacgym import gymapi, gymtorch, torch_utils
 from isaacgym.torch_utils import *
@@ -121,7 +122,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # manipulator)
         cfg["env"]["numActions"] = 6 + self.residual_actuator_count
 
-        if self.cfg_base.ros_activate:
+        if self.cfg_base.ros_activate or any([ros_camera in self.cfg['env']['observations'] for ros_camera in self.cfg_env.ros_cameras]):
             self._get_ros_interface()
 
         return cfg
@@ -623,6 +624,12 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def get_observation_tensor(self, observation: str) -> torch.Tensor:
         obs =  getattr(self, observation)
+
+        if 'observations' in self.cfg_task.randomize.keys() and any([rand_key in observation for rand_key in self.cfg_task.randomize.observations.keys()]):
+            if 'pointcloud' in observation:
+                obs = self._randomize_pointcloud(obs, **self.cfg_task.randomize.observations.pointcloud)
+            else:
+                assert False, f"Randomization of observation {observation} not implemented."
     
         # Flatten observations that have more than one dimension (e.g. keypoints, bounding-boxes or point-clouds).
         if len(obs.shape) == 3:
@@ -854,6 +861,10 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         reset_dof_pos = getattr(self.robot.model, reset_to + "_dof_pos")
 
         if self.cfg_base.ros_activate and reset_to == "real_robot_initial":
+            print("resetting arm in the real setup")
+            self.ros_arm_interface.set_joint_target(reset_dof_pos[0:self.ik_body_dof_count], execution_time_secs=10, limit_max_deviation=False)
+            time.sleep(10)
+
             print("Real robot:")
             print("Arm joint_pos:", self.ros_arm_interface.get_joint_position())
             print("Hand joint_pos:",
@@ -1171,7 +1182,17 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
             self.gym.simulate(self.sim)
             self.render()
+
+            if hasattr(self, "cfg_base") and self.cfg_base.ros_activate and self.viewer is None and rand_step % self.control_freq_inv == 0:
+                self.gym.sync_frame_time(self.sim)
+
             if len(self.cfg_base.debug.visualize) > 0 and not self.cfg[
                 'headless']:
                 self.gym.clear_lines(self.viewer)
                 self.draw_visualizations(self.cfg_base.debug.visualize)
+
+    def _randomize_pointcloud(self, pointcloud: torch.Tensor, noise_prob: float, noise_std: float) -> torch.Tensor:
+        add_noise = (torch.rand(pointcloud.shape[0:2]) < noise_prob).unsqueeze(-1).repeat(1, 1, 3)
+        noise = (torch.normal(mean=0, std=noise_std, size=(pointcloud.shape[0], pointcloud.shape[1], 3)) * add_noise).to(pointcloud.device)
+        pointcloud[..., 0:3] += noise
+        return pointcloud

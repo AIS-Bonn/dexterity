@@ -5,7 +5,7 @@ import torch.nn as nn
 
 class AIDBuilder(A2CBuilder):
     def build(self, name, **kwargs):
-        self.aid_architecture = 'concatenation'
+        self.aid_architecture = 'skip_connection'
 
         self.method = kwargs['agent_params']['student_teacher']['method'] if 'agent_params' in kwargs.keys() else 'none'
 
@@ -13,10 +13,12 @@ class AIDBuilder(A2CBuilder):
         actions_num = kwargs['actions_num']
 
         if self.method == 'aid':
-            if self.go_architecture == 'skip_connection':
+            if self.aid_architecture == 'skip_connection':
                 kwargs['input_shape'] = (observations_num,)
-            elif self.go_architecture == 'concatenation':
+            elif self.aid_architecture == 'concatenation':
                 kwargs['input_shape'] = (observations_num + actions_num,)  # Input to the MLP will be observations & estimated teacher actions. 
+            elif self.aid_architecture == 'late_fusion':
+                kwargs['input_shape'] = (32 + actions_num,)
             else:
                 assert False, 'Unknown go_architecture: {}'.format(self.go_architecture)
 
@@ -43,6 +45,11 @@ class AIDBuilder(A2CBuilder):
                     return mu, sigma, value, states
                 elif self.aid_architecture == 'concatenation':
                     obs_dict['obs'] = torch.cat((obs_dict['obs'], est_teacher_actions), dim=1)
+
+                elif self.aid_architecture == 'late_fusion':
+                    emb_student_obs = self.student_obs_encoder(obs_dict['obs'])
+                    obs_dict['obs'] = torch.cat((emb_student_obs, est_teacher_actions), dim=1)
+
             return super().forward(obs_dict)
 
         def _build_imitation_head(self):
@@ -61,4 +68,14 @@ class AIDBuilder(A2CBuilder):
                 )
                 self.skip_connection[0].weight.data.copy_(torch.eye(self.actions_num))
                 self.skip_connection[0].bias.data.copy_(torch.zeros(self.actions_num))
+
+            if self.aid_architecture == 'late_fusion':
+                self.student_obs_encoder = nn.Sequential(
+                    nn.Linear(self.observations_num, 128),
+                    nn.ReLU(),
+                    nn.Linear(128, 64),
+                    nn.ReLU(),
+                    nn.Linear(64, 32),
+                    nn.Tanh(),
+                )
         

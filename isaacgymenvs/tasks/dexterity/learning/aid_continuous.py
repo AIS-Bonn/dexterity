@@ -1,4 +1,3 @@
-from isaacgymenvs.tasks.dexterity.learning.pointcloud_player import PpoPointcloudPlayerContinuous
 import numpy as np
 import os
 from rl_games.algos_torch import torch_ext
@@ -14,6 +13,9 @@ from rl_games.algos_torch import central_value
 from rl_games.algos_torch.a2c_continuous import A2CAgent
 from rl_games.common import a2c_common, datasets
 from torch import optim
+
+from rl_games.common.player import BasePlayer
+from rl_games.algos_torch.players import PpoPlayerContinuous
 
 
 
@@ -33,8 +35,9 @@ class TeacherDataset:
 
         self.obses = torch.empty((capacity, obs_shape)).to(device)
         self.teacher_actions = torch.empty((capacity, action_shape)).to(device)
+        self.teacher_values = torch.empty((capacity, 1)).to(device)
 
-    def add(self, obs: torch.Tensor, teacher_action: torch.Tensor) -> None:
+    def add(self, obs: torch.Tensor, teacher_action: torch.Tensor, teacher_values: torch.Tensor) -> None:
         """Add new observations and teacher-actions to the dataset.
 
         Observations and actions are added in a batch-wise fashion. If the dataset is full,
@@ -56,6 +59,7 @@ class TeacherDataset:
 
         self.obses[self.idx:self.idx+remaining_capacity] = obs[:remaining_capacity]
         self.teacher_actions[self.idx:self.idx+remaining_capacity] = teacher_action[:remaining_capacity]
+        self.teacher_values[self.idx:self.idx+remaining_capacity] = teacher_values[:remaining_capacity]
         self.idx = (self.idx + remaining_capacity) % self.capacity
         
     def sample(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -64,7 +68,8 @@ class TeacherDataset:
             device=self.device)
         obses = self.obses[idxs]
         teacher_actions = self.teacher_actions[idxs]
-        return obses, teacher_actions
+        teacher_values = self.teacher_values[idxs]
+        return obses, teacher_actions, teacher_values
     
 
 class AIDAgent(A2CAgent):
@@ -78,7 +83,7 @@ class AIDAgent(A2CAgent):
 
         if self.st_cfg['method'] == 'aid':
             self.imitation_optimizer = optim.Adam(self.model.a2c_network.imitation_head.parameters(), float(self.st_cfg['imitation_lr']))
-        elif self.st_cfg['method'] == 'dagger':
+        elif self.st_cfg['method'] in ['dagger', 'cri']:
             self.imitation_optimizer = optim.Adam(self.model.parameters(), float(self.st_cfg['imitation_lr']))
 
         else:
@@ -136,7 +141,7 @@ class AIDAgent(A2CAgent):
         self.has_value_loss = self.use_experimental_cv or not self.has_central_value
         self.algo_observer.after_init(self)
         
-    def _acquire_teacher(self, params) -> PpoPointcloudPlayerContinuous:
+    def _acquire_teacher(self, params) -> PpoPlayerContinuous:
         """Create and restore teacher from checkpoint."""
         self.teacher_cfg = params['teacher']
         
@@ -155,7 +160,7 @@ class AIDAgent(A2CAgent):
         assert params['teacher_load_path'], "teacher_load_path must be specified to run AID."
 
         # Create and restore teacher.
-        teacher = PpoPointcloudPlayerContinuous(teacher_params)
+        teacher = PpoPlayerContinuous(teacher_params)
         teacher.restore(params['teacher_load_path'])
         teacher.has_batch_dimension = True
 
@@ -184,7 +189,15 @@ class AIDAgent(A2CAgent):
                 res_dict = self.get_action_values(self.obs)
 
             teacher_actions = self.teacher.get_action(self.obs['teacher_obs'], is_determenistic=True)
-            self.teacher_dataset.add(self.obs['obs'], teacher_actions)
+            teacher_input_dict = {
+            'is_train': False,
+            'prev_actions': None, 
+            'obs' : self.obs['teacher_obs'],
+            'rnn_states' : self.states
+            }
+            teacher_res_dict = self.teacher.model(teacher_input_dict)
+            teacher_values = teacher_res_dict['values']
+            self.teacher_dataset.add(self.obs['obs'], teacher_actions, teacher_values)
 
             # Log distance between student and teacher actions.
             self.imitate_results['info/student_teacher_action_l2_distance'].append(torch.nn.functional.mse_loss(res_dict['mus'], teacher_actions).item())
@@ -245,7 +258,7 @@ class AIDAgent(A2CAgent):
 
         return batch_dict
 
-    def _get_differentiable_actions(self, obs_batch, is_deterministic=True):
+    def _get_differentiable_actions(self, obs_batch, is_deterministic=True, return_values=False):
         """Queries student policy actions in a differentiable manner."""
         # Get actions from the student policy.
         input_dict = {
@@ -263,9 +276,13 @@ class AIDAgent(A2CAgent):
         else:
             assert False
         if is_deterministic:
+            if return_values:
+                return mu, value
             return mu
         else:
             distr = torch.distributions.Normal(mu, sigma, validate_args=False)
+            if return_values:
+                return distr.rsample(), value
             return distr.rsample()
     
     def calc_gradients(self, input_dict) -> None:
@@ -289,7 +306,7 @@ class AIDAgent(A2CAgent):
 
     def calc_dagger_loss(self) -> torch.Tensor:
         """Calculates DAgger loss as MSE between student and teacher actions."""
-        obses, teacher_actions = self.teacher_dataset.sample(self.teacher_cfg['batch_size'])
+        obses, teacher_actions, teacher_values = self.teacher_dataset.sample(self.teacher_cfg['batch_size'])
         student_actions = self._get_differentiable_actions(obses)
         dagger_loss = torch.nn.functional.mse_loss(student_actions, teacher_actions.detach())
         return dagger_loss
@@ -299,6 +316,42 @@ class AIDAgent(A2CAgent):
         self.calc_imitation_head_gradients()
         # Calculate regular policy gradients.
         super().calc_gradients(input_dict)
+
+    def calc_cri_gradients(self, input_dict) -> None:
+        # Calculate regular policy gradients.
+        super().calc_gradients(input_dict)
+
+        imitation_losses = []
+        mean_teacher_values = []
+        mean_student_values = []
+        for _ in range(5):
+            obses, teacher_actions, teacher_values = self.teacher_dataset.sample(self.teacher_cfg['batch_size'])
+
+            student_actions, student_values = self._get_differentiable_actions(obses, return_values=True)
+
+            teacher_knows_better = (teacher_values.detach() > student_values.detach()).float().repeat(1, 11)
+
+            #print("teacher_knows_better:", teacher_knows_better)
+            #print("teacher_knows_better.shape:", teacher_knows_better.shape)
+
+            action_diff = teacher_knows_better * (teacher_actions - student_actions)
+
+            imitation_loss = torch.norm(action_diff, p=2, dim=1).mean()
+
+            #print("imitation_loss:", imitation_loss)
+
+            self.imitation_optimizer.zero_grad()
+            imitation_loss.backward()
+            self.imitation_optimizer.step()
+
+            imitation_losses.append(imitation_loss.item())
+            mean_student_values.append(student_values.mean().item())
+            mean_teacher_values.append(teacher_values.mean().item())
+
+        self.imitate_results['losses/imitation_l2'].append(sum(imitation_losses) / len(imitation_losses))
+        self.imitate_results['values/student'].append(sum(mean_student_values) / len(mean_student_values))
+        self.imitate_results['values/teacher'].append(sum(mean_teacher_values) / len(mean_teacher_values))
+        self.imitate_results['values/frac_teacher_knows_better'].append(teacher_knows_better[0].mean().item() / teacher_knows_better.shape[0])
 
     def calc_imitation_head_gradients(self) -> None:
         imitation_losses = []
@@ -311,9 +364,9 @@ class AIDAgent(A2CAgent):
         self.imitate_results['losses/imitation_l2'].append(sum(imitation_losses) / len(imitation_losses))
 
     def calc_imitation_loss(self) -> torch.Tensor:
-        obses, teacher_actions = self.teacher_dataset.sample(self.teacher_cfg['batch_size'])
+        obses, teacher_actions, teacher_values = self.teacher_dataset.sample(self.teacher_cfg['batch_size'])
         
-        # Normailze observations because I will also get normalized student observations when queried in the policies forward call.
+        # Normalize observations because I will also get normalized student observations when queried in the policies forward call.
         obses = self.model.norm_obs(obses)
 
         imitation_head_actions = self.model.a2c_network.imitation_head(obses)
@@ -431,6 +484,117 @@ class AIDAgent(A2CAgent):
             if should_exit:
                 return self.last_mean_rewards, epoch_num
 
+
+    def train_epoch(self):
+        from rl_games.common.a2c_common import A2CBase
+        A2CBase.train_epoch(self)
+
+        self.set_eval()
+        play_time_start = time.time()
+        with torch.no_grad():
+            if self.is_rnn:
+                batch_dict = self.play_steps_rnn()
+            else:
+                batch_dict = self.play_steps()
+
+        play_time_end = time.time()
+        update_time_start = time.time()
+        rnn_masks = batch_dict.get('rnn_masks', None)
+
+        self.set_train()
+        self.curr_frames = batch_dict.pop('played_frames')
+        self.prepare_dataset(batch_dict)
+        self.algo_observer.after_steps()
+        if self.has_central_value:
+            self.train_central_value()
+
+        a_losses = []
+        c_losses = []
+        b_losses = []
+        entropies = []
+        kls = []
+
+        for mini_ep in range(0, self.mini_epochs_num):
+            ep_kls = []
+            for i in range(len(self.dataset)):
+                a_loss, c_loss, entropy, kl, last_lr, lr_mul, cmu, csigma, b_loss = self.train_actor_critic(self.dataset[i])
+                a_losses.append(a_loss)
+                c_losses.append(c_loss)
+                ep_kls.append(kl)
+                entropies.append(entropy)
+                if self.bounds_loss_coef is not None:
+                    b_losses.append(b_loss)
+
+                self.dataset.update_mu_sigma(cmu, csigma)
+                if self.schedule_type == 'legacy':
+                    av_kls = kl
+                    if self.multi_gpu:
+                        dist.all_reduce(kl, op=dist.ReduceOp.SUM)
+                        av_kls /= self.rank_size
+                    self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+                    self.update_lr(self.last_lr)
+
+            av_kls = torch_ext.mean_list(ep_kls)
+            if self.multi_gpu:
+                dist.all_reduce(av_kls, op=dist.ReduceOp.SUM)
+                av_kls /= self.rank_size
+            if self.schedule_type == 'standard':
+                self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
+                self.update_lr(self.last_lr)
+
+            kls.append(av_kls)
+            self.diagnostics.mini_epoch(self, mini_ep)
+            if self.normalize_input:
+                self.model.running_mean_std.eval() # don't need to update statstics more than one miniepoch
+
+        update_time_end = time.time()
+        play_time = play_time_end - play_time_start
+        update_time = update_time_end - update_time_start
+        total_time = update_time_end - play_time_start
+
+        return batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, last_lr, lr_mul
+
+
+
+class AIDPlayerContinuous(PpoPlayerContinuous):
+    def __init__(self, params):
+        BasePlayer.__init__(self, params)
+        self.network = self.config['network']
+        self.actions_num = self.action_space.shape[0] 
+        self.actions_low = torch.from_numpy(self.action_space.low.copy()).float().to(self.device)
+        self.actions_high = torch.from_numpy(self.action_space.high.copy()).float().to(self.device)
+        self.mask = [False]
+
+        self.normalize_input = self.config['normalize_input']
+        self.normalize_value = self.config.get('normalize_value', False)
+
+        obs_shape = self.obs_shape
+        build_config = {
+            'actions_num' : self.actions_num,
+            'input_shape' : obs_shape,
+            #'observation_start_end': self.env_info['observation_start_end'],
+            'num_seqs' : self.num_agents,
+            'value_size': self.env_info.get('value_size',1),
+            'normalize_value' : self.normalize_value,
+            'normalize_input': self.normalize_input,
+            'agent_params': params,
+        }
+
+        self.model_type = params['model']['name']
+        self.model = self.network.build(build_config)
+        self.model.to(self.device)
+        self.model.eval()
+        self.is_rnn = self.model.is_rnn()
+
+    def restore(self, fn):
+        checkpoint = torch_ext.load_checkpoint(fn)
+        self.model.load_state_dict(checkpoint['model'])
+        if self.normalize_input and 'running_mean_std' in checkpoint:
+            self.model.running_mean_std.load_state_dict(checkpoint['running_mean_std'])
+
+        env_state = checkpoint.get('env_state', None)
+        if self.env is not None and env_state is not None:
+            self.env.set_env_state(env_state)
 
 # class FeatureMimicking:
 #     def calc_feature_mimicking_gradients(self) -> None:

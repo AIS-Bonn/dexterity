@@ -120,7 +120,7 @@ class ROSJointTrajectoryInterface(ROSJointStateSubscriber):
             joint_target_topic: str,
             joint_mapping: Dict[str, List[float]],
             execution_time: float = 0.25,
-            max_joint_deviation: float = 0.15,
+            max_joint_deviation: float = 0.2,
             verbose: bool = False,
     ) -> None:
         super().__init__(joint_state_topic, joint_mapping, verbose)
@@ -129,21 +129,21 @@ class ROSJointTrajectoryInterface(ROSJointStateSubscriber):
         self.nsecs = int(1e9 * execution_time)
         self.max_joint_deviation = max_joint_deviation
 
-    def set_joint_target(self, position_target: np.array) -> None:
+    def set_joint_target(self, position_target: np.array, execution_time_secs: int = 0, limit_max_deviation: bool = True) -> None:
         #command_target = self.map_position_to_command_target(position_target)
         command_target = position_target
-
-        joint_deviation = command_target - self.get_joint_position()
-
-        assert joint_deviation.max() < self.max_joint_deviation, \
-            f"Found a deviation between the current joint position and " \
-            f"target to be published of {joint_deviation.max()}, which " \
-            f"violates the deviation limit of {self.max_joint_deviation}." \
-            f"Command target is {command_target} and current joint position " \
-            f"is {self.get_joint_position()}."
         
-        print("command_target:", command_target)
-        print("current joint position:", self.get_joint_position())
+        if limit_max_deviation:
+            joint_deviation = command_target - self.get_joint_position()
+            assert joint_deviation.max() < self.max_joint_deviation, \
+                f"Found a deviation between the current joint position and " \
+                f"target to be published of {joint_deviation.max()}, which " \
+                f"violates the deviation limit of {self.max_joint_deviation}. " \
+                f"Command target is {command_target} and current joint position " \
+                f"is {self.get_joint_position()}."
+        
+        #print("command_target:", command_target)
+        #print("current joint position:", self.get_joint_position())
 
         # Cancel previous goal
         self.joint_trajectory_client.cancel_goal()
@@ -152,6 +152,7 @@ class ROSJointTrajectoryInterface(ROSJointStateSubscriber):
         position_target_point = JointTrajectoryPoint()
         position_target_point.positions = command_target
         position_target_point.time_from_start.nsecs = self.nsecs
+        position_target_point.time_from_start.secs = execution_time_secs
 
         # Create and publish trajectory goal
         joint_trajectory_msg = FollowJointTrajectoryGoal()
