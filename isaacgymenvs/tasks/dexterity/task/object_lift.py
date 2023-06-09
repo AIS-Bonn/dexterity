@@ -271,6 +271,10 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 sim_steps=self.cfg_task.randomize.num_object_drop_steps)
             self.objects_dropped = True
 
+            # Disable collisions with simulated objects if the policy is executed on the real robot.
+            if self.cfg_base.ros_activate:
+                self._disable_object_collisions()
+
         self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
 
         # Initialize SAM segmentation at the start of each episode.

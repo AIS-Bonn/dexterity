@@ -325,26 +325,6 @@ class DexterityEnvBin(DexterityEnvObject):
         in_bin = torch.logical_and(in_bin, object_pos[..., 2] <= z_upper)
         return in_bin
 
-    def _disable_object_collisions(self, object_ids):
-        self._set_object_collisions(object_ids, collision_filter=-1)
-
-    def _enable_object_collisions(self, object_ids):
-        self._set_object_collisions(object_ids, collision_filter=0)
-
-    def _set_object_collisions(self, object_ids: List[int],
-                               collision_filter: int) -> None:
-        # No tensor API to set actor rigid shape props, so a loop is required
-        for env_id in range(self.num_envs):
-            for object_id in object_ids:
-                object_shape_props = self.gym.get_actor_rigid_shape_properties(
-                    self.env_ptrs[env_id],
-                    self.object_handles[env_id][object_id])
-                for shape_id in range(len(object_shape_props)):
-                    object_shape_props[shape_id].filter = collision_filter
-                self.gym.set_actor_rigid_shape_properties(
-                    self.env_ptrs[env_id],
-                    self.object_handles[env_id][object_id], object_shape_props)
-
     def _place_objects_before_bin(self):
         # Place the objects in front of the bin
         self.root_pos[:, self.object_actor_id_env, 0] = 1.1

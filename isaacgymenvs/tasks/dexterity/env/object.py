@@ -793,6 +793,29 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         object_in_workspace = torch.logical_and(
             object_in_workspace, object_pos[:, 1] <= y_upper)
         return object_in_workspace
+    
+    def _disable_object_collisions(self, object_ids: List[int] = None):
+        self._set_object_collisions(object_ids, collision_filter=-1)
+
+    def _enable_object_collisions(self, object_ids: List[int] = None):
+        self._set_object_collisions(object_ids, collision_filter=0)
+
+    def _set_object_collisions(self, object_ids: List[int], collision_filter: int) -> None:
+        def set_collision_filter(env_id: int, actor_handle, collision_filter: int) -> None:
+            actor_shape_props = self.gym.get_actor_rigid_shape_properties(
+                self.env_ptrs[env_id], actor_handle)
+            for shape_id in range(len(actor_shape_props)):
+                actor_shape_props[shape_id].filter = collision_filter
+                self.gym.set_actor_rigid_shape_properties(
+                    self.env_ptrs[env_id], actor_handle, actor_shape_props)
+
+        # No tensor API to set actor rigid shape props, so a loop is required
+        for env_id in range(self.num_envs):
+            if object_ids is not None:
+                for object_id in object_ids:
+                    set_collision_filter(env_id, self.object_handles[env_id][object_id], collision_filter)
+            else:
+                set_collision_filter(env_id, self.object_handles[env_id], collision_filter)
 
     def visualize_workspace_xy(self, env_id: int) -> None:
         # Set extent in z-direction to 0

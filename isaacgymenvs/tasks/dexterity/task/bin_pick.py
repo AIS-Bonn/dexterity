@@ -175,8 +175,8 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         while not torch.all(objects_dropped_successfully):
             # loop through object actors per bin
             for i in range(self.cfg_env.env.num_objects):
-                # Enable collisions for this object
-                if initial_dropping_sequence:
+                # Enable collisions for this object if the policy is not being executed on the real robot.
+                if initial_dropping_sequence and not self.cfg_base.ros_activate:
                     self._enable_object_collisions(object_ids=[i])
                 # Check for which env_ids this object must still be dropped
                 env_ids = torch.masked_select(
