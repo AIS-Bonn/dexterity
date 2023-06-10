@@ -224,7 +224,8 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 if reward_term.startswith('arm'):
                     contact_force_mag = contact_force_mag[:, :self.robot_arm_rigid_body_count].sum(dim=-1)
                 elif reward_term.startswith('manipulator'):
-                    contact_force_mag = contact_force_mag[:, self.robot_arm_rigid_body_count:].sum(dim=-1)
+                    allowed_manipulator_force = 5.0
+                    contact_force_mag = torch.clamp(contact_force_mag[:, self.robot_arm_rigid_body_count:].sum(dim=-1) - allowed_manipulator_force, min=0.0)
                 elif reward_term.startswith('robot'):
                     contact_force_mag = contact_force_mag.sum(dim=-1)
                 else:

@@ -8,7 +8,7 @@ env:
     env_name: 'DexterityEnvObject'
     object_sets_asset_root: '../../../../assets/dexterity/object_sets'
     object_sets:
-        ycb: ['005_tomato_soup_can', '007_tuna_fish_can', '011_banana', '012_strawberry', '014_lemon', '015_peach', '017_orange', '040_large_marker', '061_foam_brick', '077_rubiks_cube' ]
+        ycb: ['*'] #['005_tomato_soup_can', '007_tuna_fish_can', '011_banana', '012_strawberry', '014_lemon', '015_peach', '017_orange', '040_large_marker', '061_foam_brick', '077_rubiks_cube' ]
         egad: []
 
     setup: 'real_robot'  # Should be in ['default', 'real_robot']

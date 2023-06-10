@@ -25,8 +25,8 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'd455', 'detected_pointcloud_d455']
-    teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos']
+    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos', 'object_quat', 'object_linvel', 'object_angvel']
+    #teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos']
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -70,6 +70,7 @@ randomize:
 rl:
     reward:
         #action_penalty: 0.001  # scale on action penalty
+        manipulator_contact_penalty: 1.0
         arm_contact_penalty: 1.0
         fingertips_dist_penalty: 1.0
         object_lift_off_reward: 0.5  # scale on object lift-off progress reward
