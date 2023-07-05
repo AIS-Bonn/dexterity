@@ -53,7 +53,7 @@ randomize:
 
     move_to_pregrasp_pose: False
 
-    num_ik_body_initial_move_steps: 150  # number of steps to reach initial pose
+    num_ik_body_initial_move_steps: 2  # number of steps to reach initial pose
 
     # object drop position.
     object_pos_drop:  # position from which object is dropped

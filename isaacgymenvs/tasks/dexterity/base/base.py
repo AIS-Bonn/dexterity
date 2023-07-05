@@ -887,7 +887,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # Reset robot control targets.
         self.ctrl_target_dof_pos[env_ids] = \
             self.dof_pos[env_ids, :self.robot_dof_count]
-        self.ctrl_target_residual_actuated_dof_pos[env_ids, :] = 0.
+        self.ctrl_target_residual_actuated_dof_pos[env_ids, :] = torch.Tensor([[-1., -1., 1., 1., 1.]]).repeat(len(env_ids), 1)  # Reset to open hand.
 
         # Apply resets.
         multi_env_ids_int32 = self.robot_actor_ids_sim[env_ids].flatten()

@@ -367,8 +367,8 @@
     </equality>
 
     <keyframe>
-        <key name="home" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
-        <key name="default_initial" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
-        <key name="real_robot_initial" qpos="0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0"/>
+        <key name="home" qpos="-1.571 0 0 0 0 0 0 0 0 0 0" ctrl="-1.571 0 0 0 0"/>
+        <key name="default_initial" qpos="-1.571 0 0 0 0 0 0 0 0 0 0" ctrl="-1.571 0 0 0 0"/>
+        <key name="real_robot_initial" qpos="-1.571 0 0 0 0 0 0 0 0 0 0" ctrl="-1.571 0 0 0 0"/>
     </keyframe>
 </mujoco>
