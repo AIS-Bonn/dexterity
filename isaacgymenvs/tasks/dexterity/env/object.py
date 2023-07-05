@@ -42,6 +42,7 @@ import hydra
 import math
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
+from matplotlib.widgets import TextBox
 import os
 import rospy
 from scipy.spatial.transform import Rotation as R
@@ -55,15 +56,10 @@ from isaacgymenvs.tasks.dexterity.base.base import DexterityBase
 from isaacgymenvs.tasks.dexterity.env.schema_class_env import DexterityABCEnv
 from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
     DexteritySchemaConfigEnv
-from isaacgymenvs.tasks.dexterity.base.base_cameras import DexterityCameraSensorProperties
-from isaacgymenvs.tasks.dexterity.base.base_cameras import xyz_to_image, image_plane_to_bounding_box, draw_square, draw_bounding_box, xyz_world_to_camera, xyz_camera_to_world
-
-
 from scipy.ndimage import binary_dilation
 from PIL import Image
 from aot_tracker import _palette
 import gc
-import functools
 
 
 def colorize_mask(pred_mask):
@@ -409,6 +405,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.env_ptrs = []
         self.object_handles = []  # Isaac Gym actors
         self.object_actor_ids_sim = []  # within-sim indices
+        self.object_id = []  # identifier of each object in the used_objects list
 
         actor_count = 0
         for i in range(self.num_envs):
@@ -418,6 +415,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             # Loop through all used objects
             object_idx = i % self.object_count
             used_object = self.objects[object_idx]
+            self.object_id.append(object_idx)
 
             # Aggregate all actors
             if self.cfg_base.sim.aggregate_mode > 1:
@@ -467,6 +465,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # For extracting root pos/quat
         self.object_actor_id_env = self.gym.find_actor_index(
             env_ptr, used_object.name, gymapi.DOMAIN_ENV)
+        
+        # For identifying with object is present.
+        self.object_id = torch.tensor(self.object_id, dtype=torch.float, device=self.device).unsqueeze(1)
 
     def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
                                       mesh_samples_name: str = 'object_mesh_samples') -> None:
@@ -581,10 +582,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
 
             if draw_debug_visualization or self.cfg_base.debug.save_videos:
-                tracked_segmentation = draw_mask(color_image_numpy, self.pred_mask, id_countour=False)
+                tracked_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=False)
 
                 if self.cfg_base.debug.save_videos:
                     self._segmented_frames[camera_name][env_id].append(tracked_segmentation)
+                    self._original_frames[camera_name][env_id].append(color_image_numpy)
 
                 if draw_debug_visualization:
                     if self.progress_buf[0] == 1:
@@ -611,11 +613,15 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             for camera_name in self.detected_pointcloud_camera_names:
                 for env_id in env_ids:
                     if len(self._segmented_frames[camera_name][env_id]) > 0:
-                        video_writer = cv2.VideoWriter(f'{self.videos_dir}/tracked_segmentation_{camera_name}_env_{env_id}_episode_{self._episodes[env_id] - 1}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
-                        for frame in self._segmented_frames[camera_name][env_id]:
-                            video_writer.write(frame[..., ::-1])
-                        video_writer.release()          
+                        segmented_video_writer = cv2.VideoWriter(f'{self.videos_dir}/tracked_segmentation_{camera_name}_env_{env_id}_episode_{self._episodes[env_id] - 1}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
+                        original_video_writer = cv2.VideoWriter(f'{self.videos_dir}/original_{camera_name}_env_{env_id}_episode_{self._episodes[env_id] - 1}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 15, (self._segmented_frames[camera_name][env_id][0].shape[1], self._segmented_frames[camera_name][env_id][0].shape[0]))
+                        for i in range(len(self._segmented_frames[camera_name][env_id])):
+                            segmented_video_writer.write(self._segmented_frames[camera_name][env_id][i][..., ::-1])
+                            original_video_writer.write(self._original_frames[camera_name][env_id][i][..., ::-1])
+                        segmented_video_writer.release()          
+                        original_video_writer.release()
         self._segmented_frames = {camera_name: [[] for _ in range(self.num_envs)] for camera_name in self.detected_pointcloud_camera_names}
+        self._original_frames = {camera_name: [[] for _ in range(self.num_envs)] for camera_name in self.detected_pointcloud_camera_names}
 
         if not hasattr(self, 'segtracker'):
             self._acquire_segtracker()
@@ -634,33 +640,61 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     self.input_points = []
                     self.input_labels = []
 
-                    def update_mask(event):
-                        ax.cla()
-                        self.input_points.append([event.xdata, event.ydata])
-                        self.input_labels.append(int(event.button == MouseButton.LEFT))
-                        for point, label in zip(self.input_points, self.input_labels):
-                            col = 'green' if label == 1 else 'red'
-                            plt.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+                    def update_mask_on_click(event):
+                        if event.inaxes == ax_image:    
+                            self.input_points.append([event.xdata, event.ydata])
+                            self.input_labels.append(int(event.button == MouseButton.LEFT))
+                            
 
-                        self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].refine_first_frame_click(
-                            color_image_numpy.copy(), np.array(self.input_points).astype(np.int), np.array(self.input_labels), True)
-                        self.segtrackers[camera_name][env_id].sam.reset_image()
+                            self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].seg_acc_click(
+                                color_image_numpy.copy(), np.array(self.input_points).astype(np.int), np.array(self.input_labels), True)
 
-                        torch.cuda.empty_cache()
-                        gc.collect()
-                        selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
+                            torch.cuda.empty_cache()
+                            gc.collect()
+                            selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
 
-                        ax.imshow(selected_segmentation)
-                        ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
-                        plt.axis('off')
+                            ax_image.imshow(selected_segmentation)
+
+                            for point, label in zip(self.input_points, self.input_labels):
+                                col = 'green' if label == 1 else 'red'
+                                ax_image.scatter(point[0], point[1], color=col, edgecolors='white', s=50)
+                                
+                            self.segm_fig[camera_name][env_id].canvas.draw()
+
+                    def update_mask_on_text(text):
+                        if text not in ['', 'Left-click to add positive marker, right-click to add negative marker.']:
+                            if len(self.input_points) > 0:
+                                print("Cannot use text input when markers have already been added.")
+                            else:
+                                self.pred_mask, masked_frame = self.segtrackers[camera_name][env_id].detect_and_seg(color_image_numpy.copy(), text, 0.25, 0.25)
+                                selected_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=True)
+                                ax_image.imshow(selected_segmentation)
+                                #ax_image.axis('off')
+                                self.segm_fig[camera_name][env_id].canvas.draw()
+
+                    def on_hover_over_image(event):
+                        if event.inaxes == ax_image and event.xdata is not None and event.ydata is not None:
+                            if text_box.text == "":
+                                text_box.set_val('Left-click to add positive marker, right-click to add negative marker.')
+                        else:
+                            if text_box.text == 'Left-click to add positive marker, right-click to add negative marker.':
+                                text_box.set_val('')
                         self.segm_fig[camera_name][env_id].canvas.draw()
 
-                    self.segm_fig[camera_name][env_id] = plt.figure()
-                    ax = self.segm_fig[camera_name][env_id].add_subplot(111)
-                    ax.set_title(f"Select target object for camera '{camera_name}' on env {env_id}.")
-                    ax.imshow(color_image_numpy)
-                    self.segm_fig[camera_name][env_id].canvas.mpl_connect('button_press_event', update_mask)
-                    plt.axis('off')
+                    self.segm_fig[camera_name][env_id] = plt.figure(num=f"Select target object for camera '{camera_name}' on env {env_id}.")
+                    ax_image = self.segm_fig[camera_name][env_id].add_subplot(111)
+                    ax_image.axis('off')
+
+                    self.segm_fig[camera_name][env_id].subplots_adjust(bottom=0.2)
+
+                    ax_prompt = plt.axes([0.1, 0.05, 0.8, 0.075])
+
+                    text_box = TextBox(ax_prompt, "Text prompt:", initial="")
+                    text_box.on_submit(update_mask_on_text)
+
+                    ax_image.imshow(color_image_numpy)
+                    self.segm_fig[camera_name][env_id].canvas.mpl_connect('button_press_event', update_mask_on_click)
+                    self.segm_fig[camera_name][env_id].canvas.mpl_connect('motion_notify_event', on_hover_over_image)
                     plt.show()
 
                 # Target object is picked automatically based on points sampled on ground truth segmentation.
@@ -711,6 +745,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
 
                 # Set tracker reference once the segmentation is selected.
+                assert self.pred_mask is not None, f"Segmentation for '{camera_name}' on env {env_id} is not selected."
                 self.segtrackers[camera_name][env_id].add_reference(
                     color_image_numpy, self.pred_mask)
 
@@ -728,6 +763,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         }
         sam_args['sam_checkpoint'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/sam_vit_b_01ec64.pth'
         aot_args['model_path'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/R50_DeAOTL_PRE_YTB_DAV.pth'
+
+        segtracker_args['sam_gap'] = 9999   # We don't need SAM to detect newly-appearing objects.
 
         # Create a tracker per camera and environment.
         self.segtrackers, self.segm_fig, self.tracked_image_debug = {}, {}, {}

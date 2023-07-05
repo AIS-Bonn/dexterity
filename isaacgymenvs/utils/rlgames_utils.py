@@ -38,6 +38,7 @@ from typing import Callable
 import wandb
 
 from isaacgymenvs.tasks import isaacgym_task_map
+from isaacgymenvs.tasks.dexterity.base.base_logger import DexterityBaseLogger
 
 
 def get_rlgames_env_creator(
@@ -165,7 +166,7 @@ class RLGPUAlgoObserver(AlgoObserver):
                 self.log(k + '/time', v, total_time)
 
             # clear dict of values to log
-            self.algo.vec_env.env.log_data = {}
+            DexterityBaseLogger.log_data = {}
 
         # Log model checkpoints to Weights & Biases run.
         if hasattr(self.algo.vec_env.env, "cfg_base"):

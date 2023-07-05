@@ -163,6 +163,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                 obs_dim = 3
             elif observation.endswith('_angvel'):
                 obs_dim = 3
+            elif observation.endswith('_id'):
+                obs_dim = 1
 
             # Visual observations are handled separately and stored under separate keys.
             elif "cameras" in self.cfg_env.keys() and observation in self.cfg_env.cameras.keys():
@@ -1180,11 +1182,13 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                     residual_dof_actions=actions[:, 6:],
                     do_scale=False)
 
-            self.gym.simulate(self.sim)
-            self.render()
+            for i in range(self.control_freq_inv):
+                self.gym.simulate(self.sim)
+                self.render()
 
-            if hasattr(self, "cfg_base") and self.cfg_base.ros_activate and self.viewer is None and rand_step % self.control_freq_inv == 0:
-                self.gym.sync_frame_time(self.sim)
+                if self.cfg_base.ros_activate and self.viewer is None:
+                    self.gym.sync_frame_time(self.sim)
+
 
             if len(self.cfg_base.debug.visualize) > 0 and not self.cfg[
                 'headless']:

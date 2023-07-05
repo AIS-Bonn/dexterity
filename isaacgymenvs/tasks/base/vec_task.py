@@ -44,6 +44,7 @@ import sys
 
 import abc
 from abc import ABC
+import time
 
 EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
@@ -108,6 +109,7 @@ class Env(ABC):
 
         self.clip_obs = config["env"].get("clipObservations", np.Inf)
         self.clip_actions = config["env"].get("clipActions", np.Inf)
+        self.last_frame_time: float = 0.0
 
     @abc.abstractmethod 
     def allocate_buffers(self):
@@ -344,11 +346,17 @@ class VecTask(Env):
         for i in range(self.control_freq_inv):
             if self.force_render:
                 self.render()
-
-            if hasattr(self, "cfg_base") and self.cfg_base.ros_activate and self.viewer is None:
-                self.gym.sync_frame_time(self.sim)
-                
             self.gym.simulate(self.sim)
+
+        if hasattr(self, "cfg_base") and (self.cfg_base.ros_activate or self.cfg_task['test']) and self.viewer is None:
+            now = time.time()
+            delta = now - self.last_frame_time
+            render_dt = self.cfg_base.sim.dt * self.control_freq_inv
+            if delta < render_dt:
+                time.sleep(render_dt - delta)
+
+            #print("FPS:", 1 / (time.time() - self.last_frame_time))
+            self.last_frame_time = time.time()
 
         # to fix!
         if self.device == 'cpu':
