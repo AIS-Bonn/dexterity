@@ -8,8 +8,9 @@ env:
     env_name: 'DexterityEnvObject'
     object_sets_asset_root: '../../../../assets/dexterity/object_sets'
     object_sets:
-        ycb: ['*'] #['005_tomato_soup_can', '007_tuna_fish_can', '011_banana', '012_strawberry', '014_lemon', '015_peach', '017_orange', '040_large_marker', '061_foam_brick', '077_rubiks_cube' ]
+        ycb: ['002_master_chef_can', '004_sugar_box', '005_tomato_soup_can', '006_mustard_bottle', '007_tuna_fish_can', '008_pudding_box', '009_gelatin_box', '010_potted_meat_can', '011_banana', '012_strawberry', '013_apple', '014_lemon', '015_peach', '016_pear', '017_orange', '018_plum', '025_mug', '036_wood_block'] #['*'] #['005_tomato_soup_can', '007_tuna_fish_can', '011_banana', '012_strawberry', '014_lemon', '015_peach', '017_orange', '040_large_marker', '061_foam_brick', '077_rubiks_cube' ]
         egad: []
+        # ycb_easy: ['002_master_chef_can', '004_sugar_box', '005_tomato_soup_can', '006_mustard_bottle', '007_tuna_fish_can', '008_pudding_box', '009_gelatin_box', '010_potted_meat_can', '011_banana', '012_strawberry', '013_apple', '014_lemon', '015_peach', '016_pear', '017_orange', '018_plum', '025_mug', '036_wood_block']
 
     setup: 'real_robot'  # Should be in ['default', 'real_robot']
 

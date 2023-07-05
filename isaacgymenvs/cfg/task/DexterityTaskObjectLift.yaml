@@ -7,6 +7,7 @@ defaults:
 name: DexterityTaskObjectLift
 physics_engine: ${..physics_engine}
 full_experiment_name: ${..experiment}
+test: ${..test}
 
 enableCameraSensors: True  # Set to true to test visual observations
 
@@ -31,14 +32,14 @@ env:
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
 
-    controlFrequencyInv: 4
+    controlFrequencyInv: 8
 
 
 randomize:
     observations:
         pointcloud:
             noise_prob: 0.25
-            noise_std: 0.002
+            noise_std: 0.001
 
     # ik_body start pose.
     ik_body_pos_initial:  # initial position of ik_body
@@ -77,4 +78,4 @@ rl:
         success_bonus: 100.  # reward received upon reaching target height
     lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
     target_height: 0.2  # target height for the object in meters
-    max_episode_length: 150
+    max_episode_length: 75
