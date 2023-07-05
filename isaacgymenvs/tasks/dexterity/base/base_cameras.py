@@ -1178,7 +1178,7 @@ class DexterityBaseCameras:
                 f"{camera_name}_env_{env_id}_episode_"
                 f"{self._episodes[env_id]}.mp4"),
             self.fourcc,
-            1 / self.cfg['sim']['dt'],
+            1 / (self.cfg['sim']['dt'] * self.cfg['env']['controlFrequencyInv']),
             (width, height)) for env_id in env_ids_list]
         if not isinstance(env_ids, List):
             return video_writers[0]
