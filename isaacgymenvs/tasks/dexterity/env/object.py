@@ -180,7 +180,6 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         """Initialize instance variables. Initialize environment superclass.
         Acquire tensors."""
 
-        self.synthetic_pointcloud_dimension = 64
         self.max_num_points_padded = 128
         self.pick_detections = True
 
@@ -227,6 +226,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
         elif observation.startswith('detected_pointcloud'):
             num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+        
+        elif observation == 'object_bounding_box':
+            num_observations = 10
 
         else:
             raise NotImplementedError
@@ -254,11 +256,40 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
         self._acquire_pointcloud_tensors()
+        if "object_bounding_box" in self.cfg["env"]["observations"]:
+            self._acquire_object_bounding_box()
+
+    def _acquire_object_bounding_box(self) -> None:
+        self.object_bounding_box_from_origin_pos = torch.zeros((len(self.objects), 3)).to(self.device)
+        self.object_bounding_box_from_origin_quat = torch.zeros((len(self.objects), 4)).to(self.device)
+        self.object_bounding_box_extents = torch.zeros((len(self.objects), 3)).to(self.device)
+        self.object_bounding_box = torch.zeros((self.num_envs, 10)).to(self.device)  # [pos, quat, extents]
+
+        for i, obj in enumerate(self.objects):
+            to_origin, extents = obj.find_bounding_box_from_mesh()
+            from_origin = np.linalg.inv(to_origin)
+            from_origin_pos = from_origin[0:3, 3]
+            from_origin_quat = R.from_matrix(from_origin[0:3, 0:3]).as_quat()
+            self.object_bounding_box_from_origin_pos[i] = torch.from_numpy(from_origin_pos)
+            self.object_bounding_box_from_origin_quat[i] = torch.from_numpy(from_origin_quat)
+            self.object_bounding_box_extents[i] = torch.from_numpy(extents)
+
+        num_repeats = math.ceil(self.num_envs / len(self.objects))
+        self.object_bounding_box_from_origin_pos = self.object_bounding_box_from_origin_pos.repeat(num_repeats, 1)[:self.num_envs]
+        self.object_bounding_box_from_origin_quat = self.object_bounding_box_from_origin_quat.repeat(num_repeats, 1)[:self.num_envs]
+        self.object_bounding_box[:, 7:10] = self.object_bounding_box_extents.repeat(num_repeats, 1)[:self.num_envs]
+
+    def _refresh_object_bounding_box(self) -> None:
+        # Update bounding box position.
+        self.object_bounding_box[:, 0:3] = self.object_pos + quat_apply(
+            self.object_quat, self.object_bounding_box_from_origin_pos)
+        # Update bounding box quaternion.
+        self.object_bounding_box[:, 3:7] = quat_mul(self.object_quat, self.object_bounding_box_from_origin_quat)
 
     def _acquire_pointcloud_tensors(self) -> None:
         # Synthetic point-clouds.
         if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
-            self.synthetic_pointcloud = self._acquire_synthetic_pointcloud()
+            self.synthetic_pointcloud_ordered = self._acquire_synthetic_pointcloud()
 
         self.rendered_pointcloud_camera_names = []
         self.detected_pointcloud_camera_names = []
@@ -303,7 +334,6 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             num_samples = [int(num_samples * area / mean_area) for area in areas]
             print("num_samples: ", num_samples)
 
-        object_mesh_samples_pos = []
         for i, obj in enumerate(self.objects):
             object_mesh_samples_pos = torch.from_numpy(obj.sample_points_from_mesh(num_samples=num_samples[i])).to(self.device, dtype=torch.float32)
             self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), :3] = object_mesh_samples_pos[:self.max_num_points_padded, :]
@@ -470,17 +500,26 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_id = torch.tensor(self.object_id, dtype=torch.float, device=self.device).unsqueeze(1)
 
     def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
-                                      mesh_samples_name: str = 'object_mesh_samples') -> None:
+                                      mesh_samples_name: str = 'object_mesh_samples',
+                                      random_permutation: bool  = True) -> None:
         """Update the relative position of the sampled points (object_mesh_samples_pos) by the current 
         object pose."""
         object_pos = getattr(self, object_name + '_pos')
         object_quat = getattr(self, object_name + '_quat')
         mesh_samples_pos = getattr(self, mesh_samples_name + '_pos')
 
-        num_samples = self.synthetic_pointcloud.shape[1]
-        self.synthetic_pointcloud[..., 0:3] = object_pos.unsqueeze(1).repeat(
+        num_samples = self.synthetic_pointcloud_ordered.shape[1]
+        self.synthetic_pointcloud_ordered[..., 0:3] = object_pos.unsqueeze(1).repeat(
             1, num_samples, 1) + quat_apply(object_quat.unsqueeze(1).repeat(1, num_samples, 1),
             mesh_samples_pos[..., 0:3])
+        
+        # Set points that are only padding to zero.
+        self.synthetic_pointcloud_ordered[..., 0:3] *= self.synthetic_pointcloud_ordered[..., 3:].repeat(1, 1, 3)
+
+        if random_permutation:
+            self.synthetic_pointcloud = self.synthetic_pointcloud_ordered[:, torch.randperm(num_samples), :]
+        else:
+            self.synthetic_pointcloud = self.synthetic_pointcloud_ordered
     
     def _refresh_rendered_pointcloud(self, target_segmentation_id: Union[int, List[int]] = 2, draw_debug_visualization: bool = False) -> None:
         if isinstance(target_segmentation_id, int):
@@ -781,6 +820,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
         self._refresh_pointcloud_tensors()
+        if "object_bounding_box" in self.cfg["env"]["observations"]:
+            self._refresh_object_bounding_box()
 
     def _refresh_pointcloud_tensors(self):
         if "synthetic_pointcloud" in self.cfg["env"]["observations"]:
@@ -900,6 +941,15 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                         unpadded_pointcloud = detected_pointcloud[mask, 0:3]
                         self.visualization_detected_unpadded_pointclouds.append(unpadded_pointcloud)
                 self.visualize_pos(self.visualization_detected_unpadded_pointclouds, env_id, color=(1, 0, 1))
+
+    def visualize_object_bounding_box(self, env_id: int) -> None:
+        bbox_pos = self.object_bounding_box[env_id, 0:3]
+        bbox_quat = self.object_bounding_box[env_id, 3:7]
+        bbox_extent = self.object_bounding_box[env_id, 7:10]
+        bbox_range = torch.stack([-0.5 * bbox_extent, 0.5 * bbox_extent], dim=0)
+
+        bbox_geom = gymutil.WireframeBBoxGeometry(bbox_range, pose=gymapi.Transform(gymapi.Vec3(*bbox_pos), gymapi.Quat(*bbox_quat)))
+        gymutil.draw_lines(bbox_geom, self.gym, self.viewer, self.env_ptrs[env_id], gymapi.Transform())
 
     def visualize_real_robot_table(self, env_id: int) -> None:
         extent = torch.tensor([[-0.07, -0.17, 0.], [0.63, 0.83, 0.]])
