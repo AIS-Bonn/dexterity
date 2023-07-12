@@ -1144,6 +1144,8 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         # Step sim and render
         for rand_step in range(sim_steps):
             self.refresh_base_tensors()
+            self.refresh_env_tensors()
+            
             if self.device == "cpu":
                 self.gym.fetch_results(self.sim, True)
 
