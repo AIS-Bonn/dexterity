@@ -1,0 +1,3 @@
+This directory contains 3D models used in ContactDB. The models have been scaled/rotated/translated to match the 3D printed objects used our CVPR 2019 paper. The scaling/rotation/translation information is also provided in https://docs.google.com/spreadsheets/d/1v1BqZJOKQ0chPYkBFVJvfToLU7KWs-2RRb2tsJ5IDP8/edit?usp=sharing.
+
+The 3D models are provided without any warranty, for non-commercial use, and subject to their individual licenses which are mentioned in licenses.json. licenses.json also mentions the original creator, and whether the 3D model was modified. Modifications may include scaling, translation, rotation, and increasing poly count by subsampling the surface. We do not claim ownership of the models.

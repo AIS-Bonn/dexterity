@@ -1,0 +1,302 @@
+{
+    "airplane": {
+        "url": "https://sketchfab.com/models/ccaad3f84f65493083a12b77d6f90b5e#", 
+        "creator": "Gravity Sketch", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY-4.0", 
+        "changes_made": true
+    }, 
+    "alarm_clock": {
+        "url": "https://www.tinkercad.com/things/7DbC5IA3jGg-alarm-clock", 
+        "creator": "Javier Ruiz", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "apple": {
+        "url": "https://sketchfab.com/models/4e05c41fd5c14f84bea8af99c10a9d9f", 
+        "creator": "kimirra", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 4.0", 
+        "changes_made": true
+    }, 
+    "banana": {
+        "url": "https://www.myminifactory.com/object/3d-print-banana-for-scale-5721", 
+        "creator": "Lloyd Bolts", 
+        "license": "https://www.myminifactory.com/object-licensing (credit, remix, non-commercial)", 
+        "changes_made": true
+    }, 
+    "binoculars": {
+        "url": "https://sketchfab.com/models/78a49e51166040148e18ef563dff78c2", 
+        "creator": "Microsoft", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY 4.0", 
+        "changes_made": true
+    }, 
+    "bowl": {
+        "url": "https://www.youmagine.com/designs/morphi-bowl", 
+        "creator": "Morphi app", 
+        "license": "https://creativecommons.org/licenses/by-nc-sa/2.0/ CC BY-NC-SA", 
+        "changes_made": true
+    }, 
+    "camera": {
+        "url": "http://impression3d.laposte.fr/en/3d-model/game/appareil-photo-_-camera", 
+        "creator": "LAWOUATTEBETE", 
+        "license": "https://creativecommons.org/licenses/by/3.0/ CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "cell_phone": {
+        "url": "https://sketchfab.com/models/56abf3a79ad848a5a23a23919538667b", 
+        "creator": "Microsoft", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY 4.0", 
+        "changes_made": true
+    }, 
+    "cube_large": {
+        "url": "https://www.tinkercad.com/things/6jx9h1I9qAT-minecraft-simple-magma-cube-minecraft#/", 
+        "creator": "Advacardo", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "cube_medium": {
+        "url": "https://www.tinkercad.com/things/6jx9h1I9qAT-minecraft-simple-magma-cube-minecraft#/", 
+        "creator": "Advacardo", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "cube_small": {
+        "url": "https://www.tinkercad.com/things/6jx9h1I9qAT-minecraft-simple-magma-cube-minecraft#/", 
+        "creator": "Advacardo", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "cup": {
+        "url": "https://www.thingiverse.com/thing:87437", 
+        "creator": "Ablapo", 
+        "license": "https://creativecommons.org/licenses/by/3.0/ CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "cylinder_large": {
+        "url": "https://www.tinkercad.com/things/bT758xJkfXb-quest-of-cylinder-earrings-quest#/", 
+        "creator": "Shawn W", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "cylinder_medium": {
+        "url": "https://www.tinkercad.com/things/bT758xJkfXb-quest-of-cylinder-earrings-quest#/", 
+        "creator": "Shawn W", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "cylinder_small": {
+        "url": "https://www.tinkercad.com/things/bT758xJkfXb-quest-of-cylinder-earrings-quest#/", 
+        "creator": "Shawn W", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "door_knob": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/simple-drawer-knob and https://www.tinkercad.com/things/fEmiKTXadP9-rectangle-flag-kindergarten-ss#/", 
+        "creator": "Michael Spivey and stemfuse", 
+        "license": "https://creativecommons.org/licenses/by/3.0/ and https://creativecommons.org/licenses/by-sa/3.0/ CC BY 3.0 & CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "elephant": {
+        "url": "https://www.thingiverse.com/thing:516938", 
+        "creator": "Peter Shook", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "eyeglasses": {
+        "url": "https://pinshape.com/items/22004-3d-printed-clark-kent-glasses-frames", 
+        "creator": "casualkoru", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY 4.0", 
+        "changes_made": true
+    }, 
+    "flashlight": {
+        "url": "https://open3dmodel.com/3d-models/flashlight_6775.html", 
+        "creator": "user submit", 
+        "license": "Free for personal use", 
+        "changes_made": true
+    }, 
+    "flute": {
+        "url": "http://3dsha.re/product/folk-flute-in-tenor-alto-and-soprano-8-sizes/", 
+        "creator": "CC0 Bot", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY 4.0", 
+        "changes_made": true
+    }, 
+    "hammer": {
+        "url": "https://sketchfab.com/models/480dee0b497a47768bce4b828f700bae", 
+        "creator": "Microsoft", 
+        "license": "https://creativecommons.org/licenses/by/4.0/ CC BY 4.0", 
+        "changes_made": true
+    }, 
+    "hand": {
+        "url": "https://www.youmagine.com/designs/human-hand", 
+        "creator": "Peter", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "headphones": {
+        "url": "https://www.tinkercad.com/things/ksogdAA2VvK-headphones", 
+        "creator": "thymen woldhuis", 
+        "license": "https://creativecommons.org/licenses/by-nc/3.0/ CC BY-NC 3.0", 
+        "changes_made": true
+    }, 
+    "knife": {
+        "url": "https://www.models-resource.com/pc_computer/falloutnewvegas/model/7932/", 
+        "creator": "sutinoer", 
+        "license": "https://www.models-resource.com/page/about/ (Personal projects and non-commercial work)", 
+        "changes_made": true
+    }, 
+    "light_bulb": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/ceiling-fan-light-pull", 
+        "creator": "Michael Spivey", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0/ CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "mouse": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/adam's-mouse", 
+        "creator": "Michael Spivey", 
+        "license": "https://creativecommons.org/licenses/by/3.0/ CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "mug": {
+        "url": "https://www.myminifactory.com/object/drink-mug-36266", 
+        "creator": "Ryan Smith", 
+        "license": "https://www.myminifactory.com/object-licensing (credit, remix, non-commercial)", 
+        "changes_made": true
+    }, 
+    "pan": {
+        "url": "Pet Golob", 
+        "creator": "https://archive3d.net/?a=download&id=2da12176", 
+        "license": "Free 3D Model", 
+        "changes_made": true
+    }, 
+    "piggy_bank": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/piggybank", 
+        "creator": "Michael Spivey", 
+        "license": "https://creativecommons.org/licenses/by/3.0/ CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "ps_controller": {
+        "url": "https://cults3d.com/en/3d-model/home/controller-ps", 
+        "creator": "FENRIRFROST", 
+        "license": "https://cults3d.com/en/questions (non commercial)", 
+        "changes_made": true
+    }, 
+    "pyramid_large": {
+        "url": "https://pinshape.com/items/8511-3d-printed-pyramid-power-iot-led-light", 
+        "creator": "richard_swika", 
+        "license": "https://creativecommons.org/licenses/by-nc-sa/4.0 CC BY-NC-SA 4.0", 
+        "changes_made": true
+    }, 
+    "pyramid_medium": {
+        "url": "https://pinshape.com/items/8511-3d-printed-pyramid-power-iot-led-light", 
+        "creator": "richard_swika", 
+        "license": "https://creativecommons.org/licenses/by-nc-sa/4.0 CC BY-NC-SA 4.0", 
+        "changes_made": true
+    }, 
+    "pyramid_small": {
+        "url": "https://pinshape.com/items/8511-3d-printed-pyramid-power-iot-led-light", 
+        "creator": "richard_swika", 
+        "license": "https://creativecommons.org/licenses/by-nc-sa/4.0 CC BY-NC-SA 4.0", 
+        "changes_made": true
+    }, 
+    "rubber_duck": {
+        "url": "https://www.thingiverse.com/thing:139894", 
+        "creator": "willie", 
+        "license": "https://creativecommons.org/publicdomain/zero/1.0/ CC0 1.0", 
+        "changes_made": true
+    }, 
+    "scissors": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/toddler-scissors", 
+        "creator": "Michael Spivey", 
+        "license": "CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "sphere_large": {
+        "url": "https://www.youmagine.com/designs/cannon-ball-game", 
+        "creator": "Lius Cordoba", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "sphere_medium": {
+        "url": "https://www.youmagine.com/designs/cannon-ball-game", 
+        "creator": "Lius Cordoba", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "sphere_small": {
+        "url": "https://www.youmagine.com/designs/cannon-ball-game", 
+        "creator": "Luis Cordoba", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "stanford_bunny": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/high-resolution-stanford-bunny", 
+        "creator": "Michael Spivey", 
+        "license": "https://creativecommons.org/licenses/by/3.0 CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "stapler": {
+        "url": "https://www.cgtrader.com/free-3d-models/plant/conifer/stapler-f2951164f35d5af60fed3dcfab4a85f5", 
+        "creator": "martinh", 
+        "license": "https://www.cgtrader.com/pages/terms-and-conditions#general-terms-of-licensing", 
+        "changes_made": true
+    }, 
+    "toothbrush": {
+        "url": "http://www.sharecg.com/v/58010/related/", 
+        "creator": "kratzdistel", 
+        "license": "commercial renders OK, contents not for redistribution", 
+        "changes_made": true
+    }, 
+    "toothpaste": {
+        "url": "https://free3d.com/3d-model/tooth-paste-brush-model-81794.html", 
+        "creator": "animatedheaven", 
+        "license": "personal use license", 
+        "changes_made": true
+    }, 
+    "torus_large": {
+        "url": "https://www.youmagine.com/designs/juego-de-construccion", 
+        "creator": "Joan Duatis", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "torus_medium": {
+        "url": "https://www.youmagine.com/designs/juego-de-construccion", 
+        "creator": "Joan Duatis", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "torus_small": {
+        "url": "https://www.youmagine.com/designs/juego-de-construccion", 
+        "creator": "Joan Duatis", 
+        "license": "https://creativecommons.org/licenses/by-sa/3.0 CC BY-SA 3.0", 
+        "changes_made": true
+    }, 
+    "train": {
+        "url": "https://clara.io/view/4522a7fe-4402-470a-89d4-5ca93ceb3869", 
+        "creator": "Jason Shoumar", 
+        "license": "public domain", 
+        "changes_made": true
+    }, 
+    "utah_teapot": {
+        "url": "https://www.thingiverse.com/thing:918", 
+        "creator": "unfold", 
+        "license": "https://creativecommons.org/licenses/by-nc-sa/3.0 CC BY-NC-SA 3.0", 
+        "changes_made": true
+    }, 
+    "water_bottle": {
+        "url": "https://www.thingiverse.com/thing:24620", 
+        "creator": "badger", 
+        "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html GNU GPL v2", 
+        "changes_made": true
+    }, 
+    "wine_glass": {
+        "url": "http://www.3dprintmakers.com/collection/3d-print/item/miniature-wine-glass", 
+        "creator": "Michael Spivey", 
+        "license": "https://creativecommons.org/licenses/by/3.0 CC BY 3.0", 
+        "changes_made": true
+    }, 
+    "wristwatch": {
+        "url": "https://sketchfab.com/models/47ee398673c14fff9603536158a8e3c4", 
+        "creator": "ReVault", 
+        "license": "https://creativecommons.org/licenses/by/4.0 CC BY 4.0", 
+        "changes_made": true
+    }
+}
