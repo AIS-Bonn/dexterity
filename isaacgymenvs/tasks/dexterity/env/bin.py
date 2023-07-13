@@ -35,21 +35,18 @@ Configuration defined in DexterityEnvBin.yaml. Asset info defined in
 asset_info_object_sets.yaml.
 """
 
-import glob
-from typing import List, Union
 import hydra
 import numpy as np
 import os
 import torch
 from typing import *
+from isaacgym.torch_utils import *
 import random
-
 from isaacgym import gymapi, gymtorch, torch_utils, gymutil
 from isaacgymenvs.tasks.dexterity.env.schema_config_env import \
     DexteritySchemaConfigEnv
-
-
-from isaacgymenvs.tasks.dexterity.env.object import DexterityObject, DexterityEnvObject
+from isaacgymenvs.tasks.dexterity.env.object import DexterityEnvObject
+from scipy.spatial.transform import Rotation as R
 
 
 class DexterityEnvBin(DexterityEnvObject):
@@ -233,10 +230,7 @@ class DexterityEnvBin(DexterityEnvObject):
 
     def _acquire_env_tensors(self):
         """Acquire and wrap tensors. Create views."""
-        self.object_pos = self.root_pos[:, self.object_actor_id_env, 0:3]
-        self.object_quat = self.root_quat[:, self.object_actor_id_env, 0:4]
-        self.object_linvel = self.root_linvel[:, self.object_actor_id_env, 0:3]
-        self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
+        super()._acquire_env_tensors()
 
         # Init tensors for initial object positions that will be overwritten
         # after objects have been dropped
@@ -245,7 +239,43 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_quat_initial = \
             self.root_quat[:, self.object_actor_id_env, 0:4].detach().clone()
 
-        self._acquire_pointcloud_tensors()
+    def _acquire_object_bounding_box(self) -> None:
+        # Init tensors for object bounding boxes.
+        self.object_bounding_box = torch.zeros((self.num_envs, self.cfg_env['env']['num_objects'], 10)).to(self.device)  # [pos, quat, extents] with shape (num_envs, num_objects_per_bin, 10)
+        self.target_object_bounding_box = torch.zeros((self.num_envs, 10)).to(self.device)  # [pos, quat, extents] with shape (num_envs, 10)
+        
+        # Retrieve bounding box pose and extents for each object.
+        object_bounding_box_extents = torch.zeros((len(self.objects), 3)).to(self.device)
+        object_bounding_box_from_origin_pos = torch.zeros((len(self.objects), 3)).to(self.device)
+        object_bounding_box_from_origin_quat = torch.zeros((len(self.objects), 4)).to(self.device)
+        for i, obj in enumerate(self.objects):
+            to_origin, extents = obj.find_bounding_box_from_mesh()
+            from_origin = np.linalg.inv(to_origin)
+            from_origin_pos = from_origin[0:3, 3]
+            from_origin_quat = R.from_matrix(from_origin[0:3, 0:3]).as_quat()
+            object_bounding_box_from_origin_pos[i] = torch.from_numpy(from_origin_pos)
+            object_bounding_box_from_origin_quat[i] = torch.from_numpy(from_origin_quat)
+            object_bounding_box_extents[i] = torch.from_numpy(extents)
+
+        # Gather with linear indices avoids for-loop over the environments.
+        self.object_bounding_box_from_origin_pos = object_bounding_box_from_origin_pos.view(-1).gather(
+            0, (self.object_ids_in_each_bin.unsqueeze(-1).expand(-1, -1, 3) * 3 + torch.arange(3, device=self.device)).reshape(-1)).view(
+            self.num_envs, self.cfg_env['env']['num_objects'], 3)
+        self.object_bounding_box_from_origin_quat = object_bounding_box_from_origin_quat.view(-1).gather(
+            0, (self.object_ids_in_each_bin.unsqueeze(-1).expand(-1, -1, 4) * 4 + torch.arange(4, device=self.device)).reshape(-1)).view(
+            self.num_envs, self.cfg_env['env']['num_objects'], 4)
+        self.object_bounding_box[..., 7:10] = object_bounding_box_extents.view(-1).gather(
+            0, (self.object_ids_in_each_bin.unsqueeze(-1).expand(-1, -1, 3) * 3 + torch.arange(3, device=self.device)).reshape(-1)).view(
+            self.num_envs, self.cfg_env['env']['num_objects'], 3)
+
+    def _refresh_object_bounding_box(self) -> None:
+        # Update bounding box position.
+        self.object_bounding_box[:, :, 0:3] = self.object_pos + quat_apply(
+            self.object_quat, self.object_bounding_box_from_origin_pos)
+        # Update bounding box quaternion.
+        self.object_bounding_box[:, :, 3:7] = quat_mul(self.object_quat, self.object_bounding_box_from_origin_quat)
+        # Update target object bounding box.
+        self.target_object_bounding_box[:] = self.object_bounding_box.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 10)).squeeze(1)
 
     def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
         self.object_mesh_samples_pos = torch.zeros((len(self.objects), self.max_num_points_padded, 4)).to(self.device)
@@ -294,7 +324,7 @@ class DexterityEnvBin(DexterityEnvObject):
         self.target_object_linvel = self.object_linvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
         self.target_object_angvel = self.object_angvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
 
-        self._refresh_pointcloud_tensors()
+        super().refresh_env_tensors()
 
     def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
                                       mesh_samples_name: str = 'object_mesh_samples') -> None:
@@ -344,6 +374,36 @@ class DexterityEnvBin(DexterityEnvObject):
             self.gym.simulate(self.sim)
             self.render()
 
+    def _env_observation_num(self, observation: str) -> int:
+
+        # Different versions of point-clouds going from fastest to most accurate.
+        # 1. Synthetic point-clouds: Run without rendering and are hence extremely fast, but do not account for occlusions and viewpoint.
+        # 2. Rendered point-clouds: Run using Isaac Gym camera sensors and ground truth segmentations making them slower. But they account for occlusions and viewpoint.
+        # 3. Detected point-clouds: Run using an instance segmentation pipeline on visual observations. As neither object-meshes nor ground truth segmentations are available in the real-world, this is the observation-type used for transfer.
+
+        if observation.startswith('synthetic_pointcloud'):
+            split_observation = observation.split('_')
+            if split_observation[-1].isdigit():
+                self.synthetic_pointcloud_dimension = int(split_observation[-1])
+            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+
+        elif observation.startswith('rendered_pointcloud'):
+            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+
+        elif observation.startswith('detected_pointcloud'):
+            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+        
+        elif observation == 'target_object_bounding_box':
+            num_observations = 10  # (pos, quat, extents)
+
+        elif observation == 'object_bounding_box':
+            num_observations = 10 * self.cfg_env['env']['num_objects']
+
+        else:
+            raise NotImplementedError
+        
+        return num_observations
+    
     def visualize_object_pose(self, env_id: int, axis_length: float = 0.3
                               ) -> None:
         """Visualizes the poses of all objects (called by adding 'object_pose'
@@ -356,6 +416,9 @@ class DexterityEnvBin(DexterityEnvObject):
         """Visualizes the pose of the target objects (called by adding
         'target_object_pose' to the visualizations in DexterityBase.yaml."""
         self.visualize_body_pose("target_object", env_id, axis_length)
+
+    def visualize_target_object_bounding_box(self, env_id: int) -> None:
+        self.visualize_bounding_boxes(env_id, 'target_object_bounding_box')
 
     def visualize_bin_extent(self, env_id) -> None:
         extent = torch.tensor(self.bin_info['extent'])

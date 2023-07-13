@@ -122,7 +122,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
         self._compute_object_lifting_success_rate(object_pos, object_pos_initial, log_object_wise_success)
         
-    def _compute_object_lifting_success_rate(self, object_pos, object_pos_initial, log_object_wise_success: bool = True):
+    def _compute_object_lifting_success_rate(self, object_pos, object_pos_initial, log_object_wise_success: bool = True, log_consecutive_successes: bool = True):
         # Success is defined as lifting the object above the target height in the course of the episode.
         object_height = object_pos[:, 2]
         object_height_initial = object_pos_initial[:, 2]
@@ -164,6 +164,17 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                                     self, obj.name + "_success_rate_ewma"))
                             self.log({"success_rate_ewma/" + obj.name: getattr(
                                 self, obj.name + "_success_rate_ewma")})
+                            
+                if log_consecutive_successes:
+                    if not hasattr(self, "consecutive_successes"):
+                        self.consecutive_successes = torch.zeros(self.num_envs, dtype=torch.int, device=self.device)
+
+                    # Where environments have been reset and the object has been lifted, increment the consecutive successes.
+                    self.consecutive_successes = torch.where(torch.logical_and(self.reset_buf, self.object_lifted), self.consecutive_successes + 1, self.consecutive_successes)
+                    # Where environments have been reset and the object has not been lifted, reset the consecutive successes.
+                    self.consecutive_successes = torch.where(torch.logical_and(self.reset_buf, torch.logical_not(self.object_lifted)), torch.zeros_like(self.consecutive_successes), self.consecutive_successes)
+
+                    self.log({"consecutive_successes": self.consecutive_successes.float().mean().item()})
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
@@ -242,9 +253,9 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                                self.cfg_task.rl.lift_off_height, c=0.02, pow=1)
                 reward = torch.clamp(reward, min=0)
 
-            # Reward the height progress of the object towards target height
-            elif reward_term == 'object_target_reward':
-                reward = scale * (object_height - object_height_initial)
+            # Reward the height progress of the object towards target height after lift-off.
+            elif reward_term == 'object_height_reward':
+                reward = scale * torch.clamp(object_height - (object_height_initial + self.cfg_task.rl.lift_off_height), min=0)
 
             # Reward reaching the target height
             elif reward_term == 'success_bonus':

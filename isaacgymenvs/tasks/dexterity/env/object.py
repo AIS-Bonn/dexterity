@@ -256,7 +256,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
         self._acquire_pointcloud_tensors()
-        if "object_bounding_box" in self.cfg["env"]["observations"]:
+        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]):
             self._acquire_object_bounding_box()
 
     def _acquire_object_bounding_box(self) -> None:
@@ -820,7 +820,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
         self._refresh_pointcloud_tensors()
-        if "object_bounding_box" in self.cfg["env"]["observations"]:
+        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]):
             self._refresh_object_bounding_box()
 
     def _refresh_pointcloud_tensors(self):
@@ -942,14 +942,20 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                         self.visualization_detected_unpadded_pointclouds.append(unpadded_pointcloud)
                 self.visualize_pos(self.visualization_detected_unpadded_pointclouds, env_id, color=(1, 0, 1))
 
-    def visualize_object_bounding_box(self, env_id: int) -> None:
-        bbox_pos = self.object_bounding_box[env_id, 0:3]
-        bbox_quat = self.object_bounding_box[env_id, 3:7]
-        bbox_extent = self.object_bounding_box[env_id, 7:10]
-        bbox_range = torch.stack([-0.5 * bbox_extent, 0.5 * bbox_extent], dim=0)
+    def visualize_bounding_boxes(self, env_id: int, name: str, color: Tuple[float, float, float] = (1, 0, 1)) -> None:
+        bboxes = getattr(self, name)[env_id]
+        if len(bboxes.shape) < 2:
+            bboxes = bboxes.unsqueeze(0)
+        for bbox in bboxes:
+            bbox_pos = bbox[0:3]
+            bbox_quat = bbox[3:7]
+            bbox_extent = bbox[7:10]
+            bbox_range = torch.stack([-0.5 * bbox_extent, 0.5 * bbox_extent], dim=0)
+            bbox_geom = gymutil.WireframeBBoxGeometry(bbox_range, pose=gymapi.Transform(gymapi.Vec3(*bbox_pos), gymapi.Quat(*bbox_quat)), color=color)
+            gymutil.draw_lines(bbox_geom, self.gym, self.viewer, self.env_ptrs[env_id], gymapi.Transform())
 
-        bbox_geom = gymutil.WireframeBBoxGeometry(bbox_range, pose=gymapi.Transform(gymapi.Vec3(*bbox_pos), gymapi.Quat(*bbox_quat)))
-        gymutil.draw_lines(bbox_geom, self.gym, self.viewer, self.env_ptrs[env_id], gymapi.Transform())
+    def visualize_object_bounding_box(self, env_id: int) -> None:
+        self.visualize_bounding_boxes(env_id, 'object_bounding_box')
 
     def visualize_real_robot_table(self, env_id: int) -> None:
         extent = torch.tensor([[-0.07, -0.17, 0.], [0.63, 0.83, 0.]])
