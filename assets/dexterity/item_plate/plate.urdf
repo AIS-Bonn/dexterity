@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot name="item_plate">
+  <material name="black">
+    <color rgba="0.0 0.0 0.0 1.0"/>
+  </material>
+  <material name="white">
+    <color rgba="0.9 0.9 0.9 1.0"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="assets/middle.stl"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  <link name="top">
+    <visual>
+      <geometry>
+        <mesh filename="assets/top.stl"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+  <link name="bottom">
+    <visual>
+      <geometry>
+        <mesh filename="assets/bottom.stl"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+  <joint name="middle_to_top" type="fixed">
+    <parent link="base_link"/>
+    <child link="top"/>
+  </joint>
+  <joint name="middle_to_bottom" type="fixed">
+    <parent link="base_link"/>
+    <child link="bottom"/>
+  </joint>
+</robot>
