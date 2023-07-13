@@ -68,9 +68,13 @@ class DexterityEnvBin(DexterityEnvObject):
         self.cfg_env = hydra.compose(config_name=config_path)
         self.cfg_env = self.cfg_env['task']  # strip superfluous nesting
 
-        bin_info_path = f'../../assets/dexterity/{self.cfg_env["env"]["bin_asset"]}/bin_info.yaml'  # relative to Gym's Hydra search path (cfg dir)
-        self.bin_info = hydra.compose(config_name=bin_info_path)
-        self.bin_info = self.bin_info['']['']['']['']['']['']['assets']['dexterity'][self.cfg_env["env"]["bin_asset"]]  # strip superfluous nesting
+        
+        if self.cfg_env["env"]["bin_asset"] == 'no_bin':
+            self.bin_info = {"extent": [[-0.15, -0.15, 0.0], [0.15, 0.15, 0.15]]}
+        else:
+            bin_info_path = f'../../assets/dexterity/{self.cfg_env["env"]["bin_asset"]}/bin_info.yaml'  # relative to Gym's Hydra search path (cfg dir)
+            self.bin_info = hydra.compose(config_name=bin_info_path)
+            self.bin_info = self.bin_info['']['']['']['']['']['']['assets']['dexterity'][self.cfg_env["env"]["bin_asset"]]  # strip superfluous nesting
 
         self.object_sets_asset_root = os.path.normpath(os.path.join(
             os.path.dirname(__file__),
@@ -81,19 +85,22 @@ class DexterityEnvBin(DexterityEnvObject):
         # Import objects assets like in the single object task
         object_assets = super()._import_env_assets()
 
-        # Import bin asset
-        bin_asset_root = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), '..', '..', '..', '..',
-                         'assets', 'dexterity', self.cfg_env['env']['bin_asset']))
-        bin_asset_file = 'bin.urdf'
-        bin_options = gymapi.AssetOptions()
-        bin_options.fix_base_link = True
-        bin_options.use_mesh_materials = True
-        bin_options.vhacd_enabled = True  # Enable convex decomposition
-        bin_options.vhacd_params = gymapi.VhacdParams()
-        bin_options.vhacd_params.resolution = 1000000
-        bin_asset = self.gym.load_asset(self.sim, bin_asset_root,
-                                        bin_asset_file, bin_options)
+        if self.cfg_env["env"]["bin_asset"] == 'no_bin':
+            bin_asset = None
+        else:   
+            # Import bin asset
+            bin_asset_root = os.path.normpath(
+                os.path.join(os.path.dirname(__file__), '..', '..', '..', '..',
+                                'assets', 'dexterity', self.cfg_env['env']['bin_asset']))
+            bin_asset_file = 'bin.urdf'
+            bin_options = gymapi.AssetOptions()
+            bin_options.fix_base_link = True
+            bin_options.use_mesh_materials = True
+            bin_options.vhacd_enabled = True  # Enable convex decomposition
+            bin_options.vhacd_params = gymapi.VhacdParams()
+            bin_options.vhacd_params.resolution = 1000000
+            bin_asset = self.gym.load_asset(self.sim, bin_asset_root,
+                                            bin_asset_file, bin_options)
         return (object_assets, bin_asset)
 
     def _create_actors(self, lower: gymapi.Vec3, upper: gymapi.Vec3,
@@ -120,7 +127,6 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_handles = [[] for _ in range(self.num_envs)]
         self.bin_handles = []
         self.object_actor_ids_sim = [[] for _ in range(self.num_envs)]  # within-sim indices
-        self.bin_actor_ids_sim = []  # within-sim indices
 
         self.object_ids_in_each_bin = []
         self.object_names_in_each_bin = [[] for _ in range(self.num_envs)]
@@ -147,10 +153,14 @@ class DexterityEnvBin(DexterityEnvObject):
                  objects_idx]])
 
             # Get rigid body and shape count for bin asset
-            bin_rigid_body_count = self.gym.get_asset_rigid_body_count(
-                bin_asset)
-            bin_rigid_shape_count = self.gym.get_asset_rigid_shape_count(
-                bin_asset)
+            if bin_asset is not None:
+                bin_rigid_body_count = self.gym.get_asset_rigid_body_count(
+                    bin_asset)
+                bin_rigid_shape_count = self.gym.get_asset_rigid_shape_count(
+                    bin_asset)
+            else:
+                bin_rigid_body_count = 0
+                bin_rigid_shape_count = 0
 
             # Aggregate all actors
             if self.cfg_base.sim.aggregate_mode > 1:
@@ -180,11 +190,11 @@ class DexterityEnvBin(DexterityEnvObject):
                                          max_rigid_shapes, True)
 
             # Create bin actor
-            bin_handle = self.gym.create_actor(
-                env_ptr, bin_asset, bin_pose, 'bin', i, 0, 2)
-            self.bin_actor_ids_sim.append(actor_count)
-            self.bin_handles.append(bin_handle)
-            actor_count += 1
+            if bin_asset is not None:
+                bin_handle = self.gym.create_actor(
+                    env_ptr, bin_asset, bin_pose, 'bin', i, 0, 2)
+                self.bin_handles.append(bin_handle)
+                actor_count += 1
 
             # Create object actors
             for id, object_idx in enumerate(objects_idx):
