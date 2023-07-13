@@ -1,13 +1,13 @@
 params:
   seed: ${...seed}
   algo:
-    name: a2c_pointcloud_continuous
+    name: a2c_continuous
 
   model:
     name: continuous_a2c_logstd
 
   network:
-    name: pointcloud_actor_critic
+    name: actor_critic
     separate: False
 
     space:
@@ -21,7 +21,7 @@ params:
           val: 0
         fixed_sigma: True
     mlp:
-      units: [512, 256, 256]
+      units: [256, 128, 128] #[512, 256, 256]
       activation: elu
       d2rl: False
 
@@ -42,15 +42,15 @@ params:
     mixed_precision: False
     normalize_input: True
     normalize_value: True
-    value_bootstrap: False
+    value_bootstrap: True
     num_actors: ${....task.env.numEnvs}
     reward_shaper:
-      scale_value: 1.0
+      scale_value: 0.01
     normalize_advantage: True
-    gamma: 0.998
+    gamma: 0.99
     tau: 0.95
     learning_rate: 3e-4
-    lr_schedule: None
+    lr_schedule: adaptive
     schedule_type: standard
     kl_threshold: 0.016
     score_to_win: 1e6
@@ -61,8 +61,8 @@ params:
     grad_norm: 1.0
     entropy_coef: 0.002
     truncate_grads: True
-    e_clip: 0.2
-    horizon_length: 8
+    e_clip: 0.15
+    horizon_length: 16
     minibatch_size: 32768
     mini_epochs: 6
     critic_coef: 4
