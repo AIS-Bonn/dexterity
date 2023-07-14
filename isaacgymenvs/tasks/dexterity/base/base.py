@@ -292,10 +292,14 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
         # Create assets for robot and table
         robot_asset = self.robot.as_asset(self.gym, self.sim, robot_options)
-        table_asset = self.gym.create_box(
-            self.sim, self.asset_info_franka_table.table_depth,
-            self.asset_info_franka_table.table_width,
-            self.cfg_base.env.table_height, table_options)
+        asset_root = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), '../..', '..', '..',
+                         'assets', 'dexterity'))
+        table_asset = self.gym.load_asset(self.sim, asset_root, 'item_plate/plate.urdf', table_options)
+        #table_asset = self.gym.create_box(
+        #    self.sim, self.asset_info_franka_table.table_depth,
+        #    self.asset_info_franka_table.table_width,
+        #    self.cfg_base.env.table_height, table_options)
 
         return robot_asset, table_asset
 
@@ -356,16 +360,16 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.table_actor_ids_sim.append(actor_count)
 
         # Set table shape properties
-        table_shape_props = self.gym.get_actor_rigid_shape_properties(
-            env_ptr, table_handle)
-        table_shape_props[0].friction = self.cfg_base.env.table_friction
-        table_shape_props[0].rolling_friction = 0.0  # default = 0.0
-        table_shape_props[0].torsion_friction = 0.0  # default = 0.0
-        table_shape_props[0].restitution = 0.0  # default = 0.0
-        table_shape_props[0].compliance = 0.0  # default = 0.0
-        table_shape_props[0].thickness = 0.0  # default = 0.0
-        self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
-                                                  table_shape_props)
+        #table_shape_props = self.gym.get_actor_rigid_shape_properties(
+        #    env_ptr, table_handle)
+        #table_shape_props[0].friction = self.cfg_base.env.table_friction
+        #table_shape_props[0].rolling_friction = 0.0  # default = 0.0
+        #table_shape_props[0].torsion_friction = 0.0  # default = 0.0
+        #table_shape_props[0].restitution = 0.0  # default = 0.0
+        #table_shape_props[0].compliance = 0.0  # default = 0.0
+        #table_shape_props[0].thickness = 0.0  # default = 0.0
+        #self.gym.set_actor_rigid_shape_properties(env_ptr, table_handle,
+        #                                          table_shape_props)
         self.table_handles.append(table_handle)
 
     def acquire_base_tensors(self):
@@ -586,13 +590,14 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             self.gym.clear_lines(self.viewer)
             self.draw_visualizations(self.cfg_base.debug.visualize)
 
-        if self.cfg_base.debug.save_videos:
-            self.save_videos()
+        if self.cfg_base.debug.camera.save_recordings:
+            if self.cfg_base.debug.camera.write_frames_every == 'step':
+                self.write_frames()
+            self.release_recordings_on_reset()
 
     def compute_observations(self):
         """Compute observations."""
         pass
-        
 
     def compute_reward(self):
         """Detect successes and failures. Update reward and reset buffers."""

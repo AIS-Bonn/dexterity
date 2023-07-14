@@ -346,6 +346,19 @@ class VecTask(Env):
         for i in range(self.control_freq_inv):
             if self.force_render:
                 self.render()
+            if hasattr(self, "cfg_base") and self.cfg_base.debug.camera.save_recordings and self.cfg_base.debug.camera.write_frames_every == 'dt':
+                self._compute_visual_observations()
+                self.refresh_base_tensors()
+                self.refresh_env_tensors()
+                self._refresh_task_tensors()
+                self.gym.fetch_results(self.sim, True)
+                self._compute_state_observations()
+                if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
+                    self.gym.clear_lines(self.viewer)
+                    self.draw_visualizations(self.cfg_base.debug.visualize)
+                self.write_frames()
+                self.release_recordings_on_reset()
+                
             self.gym.simulate(self.sim)
 
         if hasattr(self, "cfg_base") and (self.cfg_base.ros_activate or self.cfg_task['test']) and self.viewer is None:

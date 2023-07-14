@@ -1047,7 +1047,7 @@ class DexterityBaseCameras:
                     actor_count)
                 actor_count += 1
 
-    def save_videos(self, max_recording_depth: float = 3.0) -> None:
+    def write_frames(self, max_recording_depth: float = 3.0) -> None:
         """Saves videos of the Isaac Gym cameras to file.
 
         Args:
@@ -1134,6 +1134,11 @@ class DexterityBaseCameras:
                     #f"{self._camera_dict[camera_name].image_type} yet."
                 self._videos[camera_name][env_id].write(np_image)
 
+    def release_recordings_on_reset(self) -> None:
+        if "image" not in self.obs_dict.keys():
+            return
+        image_dict = self.obs_dict["image"]
+        
         done_env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         if len(done_env_ids) > 0:
             for done_env_id in done_env_ids:
@@ -1157,6 +1162,12 @@ class DexterityBaseCameras:
     def _create_video_writers(
             self, camera_name: str, env_ids: List[int]
     ) -> Union[cv2.VideoWriter, List[cv2.VideoWriter]]:
+        if self.cfg_base.debug.camera.write_frames_every == 'dt':
+            fps = 1 / self.cfg['sim']['dt']
+        elif self.cfg_base.debug.camera.write_frames_every == 'step':
+            fps = 1 / (self.cfg['sim']['dt'] * self.cfg['env']['controlFrequencyInv'])
+        else:
+            assert False
 
         # Point cloud image is created by renderer in dimensions defined in
         # the DexterityVideoRecordingProperties.
@@ -1177,9 +1188,7 @@ class DexterityBaseCameras:
                 self.videos_dir,
                 f"{camera_name}_env_{env_id}_episode_"
                 f"{self._episodes[env_id]}.mp4"),
-            self.fourcc,
-            1 / (self.cfg['sim']['dt'] * self.cfg['env']['controlFrequencyInv']),
-            (width, height)) for env_id in env_ids_list]
+            self.fourcc, fps, (width, height)) for env_id in env_ids_list]
         if not isinstance(env_ids, List):
             return video_writers[0]
         else:

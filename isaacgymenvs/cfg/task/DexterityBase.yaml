@@ -81,6 +81,10 @@ ctrl:
     relative_residual_target_change_scale: 10.0
 
 debug:
+    camera:
+        save_recordings: False
+        write_frames_every: 'dt'  # should be in ['dt', 'step'], to either write recordings at the simulation time-step dt or at the control step.
+
     override_target_pose: False
     # target poses are specified as [[x, y, z], [x, y, z, w], duration (ts)]
     target_poses: [
@@ -117,10 +121,8 @@ debug:
         [[1, -1., 1., 0., 0.], 200]
     ]
 
-    save_videos: False  # Saves all camera observations to mp4 if cameras are used in the environment
-
     verbose: True
-    visualize: [] #['synthetic_pointcloud', 'robot_contact_forces'] #['ik_body_workspace', 'ctrl_target_ik_body_pose']
+    visualize: []
 
 # Specifies data to be logged in addition the data logged by default through
 # rl-games. dexterity environments check for the keys in logging (e.g.
