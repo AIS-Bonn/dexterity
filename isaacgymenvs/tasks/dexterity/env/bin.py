@@ -238,17 +238,6 @@ class DexterityEnvBin(DexterityEnvObject):
         self.target_object_actor_id_env = torch.zeros(
             self.num_envs, dtype=torch.int64, device=self.device)
 
-    def _acquire_env_tensors(self):
-        """Acquire and wrap tensors. Create views."""
-        super()._acquire_env_tensors()
-
-        # Init tensors for initial object positions that will be overwritten
-        # after objects have been dropped
-        self.object_pos_initial = \
-            self.root_pos[:, self.object_actor_id_env, 0:3].detach().clone()
-        self.object_quat_initial = \
-            self.root_quat[:, self.object_actor_id_env, 0:4].detach().clone()
-
     def _acquire_object_bounding_box(self) -> None:
         # Init tensors for object bounding boxes.
         self.object_bounding_box = torch.zeros((self.num_envs, self.cfg_env['env']['num_objects'], 10)).to(self.device)  # [pos, quat, extents] with shape (num_envs, num_objects_per_bin, 10)
@@ -277,6 +266,19 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_bounding_box[..., 7:10] = object_bounding_box_extents.view(-1).gather(
             0, (self.object_ids_in_each_bin.unsqueeze(-1).expand(-1, -1, 3) * 3 + torch.arange(3, device=self.device)).reshape(-1)).view(
             self.num_envs, self.cfg_env['env']['num_objects'], 3)
+        
+        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.bounding_box_to_points = torch.tensor(
+                [[[[-0.5, -0.5, -0.5],
+                   [-0.5, -0.5,  0.5],
+                   [-0.5,  0.5, -0.5],
+                   [-0.5,  0.5,  0.5],
+                   [ 0.5, -0.5, -0.5],
+                   [ 0.5, -0.5,  0.5],
+                   [ 0.5,  0.5, -0.5],
+                   [ 0.5,  0.5,  0.5]]]], device=self.device).repeat(self.num_envs, self.cfg_env['env']['num_objects'], 1, 1)
+            self.object_bounding_box_as_points = torch.zeros((self.num_envs, self.cfg_env['env']['num_objects'], 8, 3)).to(self.device)
+            self.target_object_bounding_box_as_points = torch.zeros((self.num_envs, 8, 3)).to(self.device)
 
     def _refresh_object_bounding_box(self) -> None:
         # Update bounding box position.
@@ -284,8 +286,16 @@ class DexterityEnvBin(DexterityEnvObject):
             self.object_quat, self.object_bounding_box_from_origin_pos)
         # Update bounding box quaternion.
         self.object_bounding_box[:, :, 3:7] = quat_mul(self.object_quat, self.object_bounding_box_from_origin_quat)
-        # Update target object bounding box.
+
+        # Select target object bounding box.
         self.target_object_bounding_box[:] = self.object_bounding_box.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 10)).squeeze(1)
+
+    
+        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.object_bounding_box_as_points[:] = self.object_bounding_box[:, :, 0:3].unsqueeze(2).repeat(1, 1, 8, 1) + quat_apply(self.object_bounding_box[:, :, 3:7].unsqueeze(2).repeat(1, 1, 8, 1), self.bounding_box_to_points * self.object_bounding_box[:, :, 7:10].unsqueeze(2).repeat(1, 1, 8, 1))
+
+            # Select target object bounding box in points format.
+            self.target_object_bounding_box_as_points[:] = self.object_bounding_box_as_points.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).unsqueeze(3).repeat(1, 1, 8, 3)).squeeze(1)
 
     def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
         self.object_mesh_samples_pos = torch.zeros((len(self.objects), self.max_num_points_padded, 4)).to(self.device)
@@ -315,26 +325,32 @@ class DexterityEnvBin(DexterityEnvObject):
 
     def refresh_env_tensors(self):
         """Refresh tensors."""
-        # NOTE: Tensor refresh functions should be called once per step, before
-        # setters.
-        # NOTE: Since the object_pos, object_quat etc. are obtained from the
-        # root state tensor through advanced slicing, they are separate tensors
-        # and hence have to be updated separately.
 
-        # Refresh pose and velocities of all objects
+        # Refresh pose and velocities of all objects (since object_pos, object_quat, etc. are obtained from the root state tensor through advanced slicing, they are separate tensors and have to be updated separately).
         self.object_pos[:] = self.root_pos[:, self.object_actor_id_env, 0:3]
         self.object_quat[:] = self.root_quat[:, self.object_actor_id_env, 0:4]
         self.object_linvel[:] = self.root_linvel[:, self.object_actor_id_env, 0:3]
         self.object_angvel[:] = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
-        # Refresh pose and velocities of target object
+        # Refresh additional required tensors such as bounding boxes and point-clouds.
+        super().refresh_env_tensors()
+
+        # Subsample target object from updated observations.
         self.target_object_pos = self.object_pos.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
-        self.target_object_pos_initial = self.object_pos_initial.gather( 1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
         self.target_object_quat = self.object_quat.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 4)).squeeze(1)
         self.target_object_linvel = self.object_linvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
         self.target_object_angvel = self.object_angvel.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
 
-        super().refresh_env_tensors()
+        if any("position_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) and hasattr(self, 'object_pos_initial'):
+            self.target_object_pos_initial = self.object_pos_initial.gather( 1, self.target_object_id.unsqueeze(1).unsqueeze(2).repeat(1, 1, 3)).squeeze(1)
+
+        if any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) and hasattr(self, 'object_bounding_box_as_points_initial'):
+            self.target_object_bounding_box_as_points_initial = self.object_bounding_box_as_points_initial.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).unsqueeze(3).repeat(1, 1, 8, 3)).squeeze(1)
+        
+        if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            raise NotImplementedError
+
+        
 
     def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
                                       mesh_samples_name: str = 'object_mesh_samples') -> None:
@@ -409,6 +425,12 @@ class DexterityEnvBin(DexterityEnvObject):
         elif observation == 'object_bounding_box':
             num_observations = 10 * self.cfg_env['env']['num_objects']
 
+        elif observation == 'target_object_bounding_box_as_points':
+            num_observations = 24
+        
+        elif observation == 'object_bounding_box_as_points':
+            num_observations = 24 * self.cfg_env['env']['num_objects']
+
         else:
             raise NotImplementedError
         
@@ -429,6 +451,12 @@ class DexterityEnvBin(DexterityEnvObject):
 
     def visualize_target_object_bounding_box(self, env_id: int) -> None:
         self.visualize_bounding_boxes(env_id, 'target_object_bounding_box')
+
+    def visualize_object_bounding_box_as_points(self, env_id: int) -> None:
+        self.visualize_pos(self.object_bounding_box_as_points.flatten(1, 2), env_id, color=(1, 1, 0))
+
+    def visualize_target_object_bounding_box_as_points(self, env_id: int) -> None:
+        self.visualize_pos(self.target_object_bounding_box_as_points, env_id, color=(1, 1, 0))
 
     def visualize_bin_extent(self, env_id) -> None:
         extent = torch.tensor(self.bin_info['extent'])

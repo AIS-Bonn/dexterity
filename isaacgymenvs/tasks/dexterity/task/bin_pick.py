@@ -105,13 +105,11 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
 
     def _update_reset_buf(self):
         """Assign environments for reset if successful or failed."""
-        self._compute_object_lifting_reset(self.target_object_pos,
-                                           self.target_object_pos_initial, log_object_wise_success=False)
+        self._compute_object_lifting_reset("target_object", log_object_wise_success=False)
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
-        self._compute_object_lifting_reward(
-            self.target_object_pos, self.target_object_pos_initial)
+        self._compute_object_lifting_reward("target_object")
 
     def reset_idx(self, env_ids):
         """Reset specified environments."""
@@ -125,6 +123,9 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
                 env_ids,
                 sim_steps=self.cfg_task.randomize.num_object_drop_steps)
             self.objects_dropped = True
+
+            if self.cfg_base.ros_activate:
+                self._disable_robot_collisions()
 
         self._reset_goal(env_ids)
         self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
@@ -159,7 +160,7 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
         objects_dropped_successfully = torch.zeros(
             (self.num_envs, self.cfg_env.env.num_objects),
             dtype=torch.bool, device=self.device)
-
+        
         # Init buffers for the initial pose object will be reset to
         self.object_pos_initial = self.root_pos[
                                   :, self.object_actor_id_env].detach().clone()
@@ -216,13 +217,67 @@ class DexterityTaskBinPick(DexterityEnvBin, DexterityTaskObjectLift):
                             self.gym.clear_lines(self.viewer)
                             self.draw_visualizations(self.cfg_base.debug.visualize)
 
-            # Refresh tensor and set initial object poses
+            if self.cfg_task.randomize.centering_force:
+                force_env_ids = torch.masked_select(all_env_ids, torch.any(~objects_dropped_successfully, dim=-1))
+                print("applying centering force to envs:", force_env_ids)
+                if self.cfg_task.sim_device == 'cpu':
+                    print("WARNING: Centering force not supported on CPU as 'apply_rigid_body_force_tensors' does not work properly.")
+                else:
+                    # For rigid_body handles of the objects.
+                    object_rigid_body_indices = [self.gym.get_actor_rigid_body_index(self.env_ptrs[0], object_handle, 0, gymapi.DOMAIN_ENV) for object_handle in self.object_handles[0]]
+                    
+                    # Apply centering force.
+                    self.enable_gravity(0.1)
+                    # TODO: Use object masses  
+                    for ts in range(sim_steps):
+                        force_tensor = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device)
+                        p = 2.5
+                        d = 1
+                        forces_pd = p * (torch.Tensor(self.object_pos_drop[0:2] + [0.,]).unsqueeze(0).unsqueeze(1).repeat(self.num_envs, self.cfg_env['env']['num_objects'], 1).to(self.device) - self.object_pos) - d * self.object_linvel
+                        #print("force_tensor[force_env_ids][:, object_rigid_body_indices, 0:2].shape:", force_tensor[force_env_ids][:, object_rigid_body_indices, 0:2].shape)
+                        #print("torch.clamp(forces_pd, min=-10, max=10)[force_env_ids].shape:", torch.clamp(forces_pd, min=-10, max=10)[force_env_ids].shape)
+                        #print("force_pd.shape:", forces_pd.shape)
+                        #print("forces_pd:", forces_pd)
+                        force_tensor[force_env_ids[:, None], object_rigid_body_indices] = torch.clamp(forces_pd, min=-10, max=10)[force_env_ids]
+                        #print("force_tensor:", force_tensor)
+                        self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(force_tensor))
+
+                        self.gym.simulate(self.sim)
+                        self.render()
+                        self.refresh_base_tensors()
+                        self.refresh_env_tensors()
+                        if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
+                            self.gym.clear_lines(self.viewer)
+                            self.draw_visualizations(self.cfg_base.debug.visualize)
+
+                    # Let the scene settle.
+                    self.enable_gravity(9.81)
+                    for ts in range(sim_steps):
+                        self.gym.simulate(self.sim)
+                        self.render()
+                        self.refresh_base_tensors()
+                        self.refresh_env_tensors()
+                        if len(self.cfg_base.debug.visualize) > 0 and not self.cfg['headless']:
+                            self.gym.clear_lines(self.viewer)
+                            self.draw_visualizations(self.cfg_base.debug.visualize)
+
+            # Refresh tensor and save initial object poses.
             self.refresh_base_tensors()
             self.refresh_env_tensors()
             self.object_pos_initial[:] = self.object_pos.detach().clone()
             self.object_quat_initial[:] = self.object_quat.detach().clone()
+            
             objects_dropped_successfully = self._object_in_bin(self.object_pos_initial)
             initial_dropping_sequence = False
+
+        if any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.object_bounding_box_as_points_initial = self.object_bounding_box_as_points.detach().clone()
+    
+        if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            raise NotImplementedError
+
+
+            
 
     def _reset_goal(self, env_ids):
         """Choose new target object to be picked."""

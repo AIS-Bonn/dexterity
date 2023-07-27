@@ -229,7 +229,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         
         elif observation == 'object_bounding_box':
             num_observations = 10
-
+        
+        elif observation == 'object_bounding_box_as_points':
+            num_observations = 24
         else:
             raise NotImplementedError
         
@@ -256,8 +258,16 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
         self._acquire_pointcloud_tensors()
-        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]):
+        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._acquire_object_bounding_box()
+
+
+    def _acquire_object_shape_embedding(self, num_samples: int = 512) -> None:
+        for i, obj in enumerate(self.objects):
+            object_mesh_samples_pos = torch.from_numpy(obj.sample_points_from_mesh(num_samples=num_samples)).to(self.device, dtype=torch.float32)
+
+            # WIP ...
+
 
     def _acquire_object_bounding_box(self) -> None:
         self.object_bounding_box_from_origin_pos = torch.zeros((len(self.objects), 3)).to(self.device)
@@ -279,6 +289,20 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_bounding_box_from_origin_quat = self.object_bounding_box_from_origin_quat.repeat(num_repeats, 1)[:self.num_envs]
         self.object_bounding_box[:, 7:10] = self.object_bounding_box_extents.repeat(num_repeats, 1)[:self.num_envs]
 
+
+        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.bounding_box_to_points = torch.tensor(
+                [[[-0.5, -0.5, -0.5],
+                  [-0.5, -0.5,  0.5],
+                  [-0.5,  0.5, -0.5],
+                  [-0.5,  0.5,  0.5],
+                  [ 0.5, -0.5, -0.5],
+                  [ 0.5, -0.5,  0.5],
+                  [ 0.5,  0.5, -0.5],
+                  [ 0.5,  0.5,  0.5]]], device=self.device).repeat(self.num_envs, 1, 1)
+            self.object_bounding_box_as_points = torch.zeros((self.num_envs, 8, 3)).to(self.device)
+
+
     def _refresh_object_bounding_box(self) -> None:
         # Update bounding box position.
         self.object_bounding_box[:, 0:3] = self.object_pos + quat_apply(
@@ -286,36 +310,38 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # Update bounding box quaternion.
         self.object_bounding_box[:, 3:7] = quat_mul(self.object_quat, self.object_bounding_box_from_origin_quat)
 
+        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.object_bounding_box_as_points[:] = self.object_bounding_box[:, 0:3].unsqueeze(1).repeat(1, 8, 1) + quat_apply(self.object_bounding_box[:, 3:7].unsqueeze(1).repeat(1, 8, 1), self.bounding_box_to_points * self.object_bounding_box[:, 7:10].unsqueeze(1).repeat(1, 8, 1))
+
     def _acquire_pointcloud_tensors(self) -> None:
         # Synthetic point-clouds.
-        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]):
+        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]) or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
             self.synthetic_pointcloud_ordered = self._acquire_synthetic_pointcloud()
 
-        self.rendered_pointcloud_camera_names = []
-        self.detected_pointcloud_camera_names = []
         for obs in self.cfg["env"]["observations"]:
             # Rendered point-clouds.
             if obs.startswith("rendered_pointcloud"):
-                camera_name = obs[len("rendered_pointcloud_"):]
-                assert camera_name in self.cfg["env"]["observations"], \
-                    f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
-                assert self._camera_dict[camera_name].image_type == 'pc_seg', \
-                    f"The image type of the camera '{camera_name}' used in '{obs}' must be 'pc_seg', but found '{self._camera_dict[camera_name].image_type}' instead."
-                self._acquire_rendered_pointcloud(camera_name)
-                self.rendered_pointcloud_camera_names.append(camera_name)
-            # Detected point-clouds.
-            if obs.startswith("detected_pointcloud"):
-                camera_name = obs[len("detected_pointcloud_"):]
-                assert camera_name in self.cfg["env"]["observations"], \
-                    f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
-                if self.pick_detections:
-                    assert self._camera_dict[camera_name].image_type.startswith('rgbxyz'), \
-                        f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyz', but found '{self._camera_dict[camera_name].image_type}' instead."
-                else:
+                camera_names = obs[len("rendered_pointcloud_"):].split('_')
+                for camera_name in camera_names:
+                    assert camera_name in self.cfg["env"]["observations"], \
+                        f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
                     assert self._camera_dict[camera_name].image_type == 'rgbxyzseg', \
                         f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyzseg', but found '{self._camera_dict[camera_name].image_type}' instead."
-                self._acquire_detected_pointcloud(camera_name)
-                self.detected_pointcloud_camera_names.append(camera_name)
+                self._acquire_rendered_pointcloud(camera_names)
+
+            # Detected point-clouds.
+            if obs.startswith("detected_pointcloud"):
+                camera_names = obs[len("detected_pointcloud_"):].split('_')
+                for camera_name in camera_names:
+                    assert camera_name in self.cfg["env"]["observations"], \
+                        f"Cannot use observation '{obs}' if camera {camera_name} is not part of the observations."
+                    if self.pick_detections:
+                        assert self._camera_dict[camera_name].image_type.startswith('rgbxyz'), \
+                            f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyz', but found '{self._camera_dict[camera_name].image_type}' instead."
+                    else:
+                        assert self._camera_dict[camera_name].image_type == 'rgbxyzseg', \
+                            f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyzseg', but found '{self._camera_dict[camera_name].image_type}' instead."
+                self._acquire_detected_pointcloud(camera_names)
 
     def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
         """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a
@@ -345,13 +371,15 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         object_synthetic_pointcloud_pos = self.object_mesh_samples_pos.detach().clone()
         return object_synthetic_pointcloud_pos
     
-    def _acquire_rendered_pointcloud(self, camera_name: str):
-        setattr(self, f'rendered_pointcloud_{camera_name}', torch.zeros((self.num_envs, self.max_num_points_padded, 4)).to(self.device))
+    def _acquire_rendered_pointcloud(self, camera_names: List[str]) -> None:
+        self.rendered_pointcloud_camera_names = camera_names
+        setattr(self, f'rendered_pointcloud_{"_".join(camera_names)}', torch.zeros((self.num_envs, self.max_num_points_padded, 4)).to(self.device))
 
-    def _acquire_detected_pointcloud(self, camera_name: str):
+    def _acquire_detected_pointcloud(self, camera_names: List[str]) -> None:
         """Detected point-clouds are stored in a list over environments for each camera because they have varying
         sizes/numbers of points."""
-        setattr(self, f'detected_pointcloud_{camera_name}', torch.zeros((self.num_envs, self.max_num_points_padded, 4)).to(self.device))
+        self.detected_pointcloud_camera_names = camera_names
+        setattr(self, f'detected_pointcloud_{"_".join(camera_names)}', torch.zeros((self.num_envs, self.max_num_points_padded, 4)).to(self.device))
 
     def create_envs(self):
         """Set env options. Import assets. Create actors."""
@@ -427,10 +455,10 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         robot_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         table_pose = gymapi.Transform()
-        table_pose.p.x = 0.0
-        table_pose.p.y = 0.0
-        table_pose.p.z = self.cfg_base.env.table_height * 0.5
-        table_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+        table_pose.p.x = 0.2675
+        table_pose.p.y = 0.33
+        table_pose.p.z = 0.002  # 2mm above ground for 4mm Item plate
+        table_pose.r = gymapi.Quat(0.0, 0.0, -0.707, 0.707)
 
         self.env_ptrs = []
         self.object_handles = []  # Isaac Gym actors
@@ -532,50 +560,52 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.gym.clear_lines(self.viewer)
             image_dict = self.get_images()
 
+        xyz, segmentation_ids = [], []
         for camera_name in self.rendered_pointcloud_camera_names:
-            xyz = image_dict[camera_name][..., 0:3]
-            xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz
-            segmentation_ids = image_dict[camera_name][..., 3]
-
-
-            rendered_pointclouds = []
-            for i in range(self.num_envs):
-                mask = segmentation_ids[i] == target_segmentation_id[i]
-                points_on_object = xyz_1[i, mask].clone().detach()
-                # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
-                if points_on_object.shape[0] > self.max_num_points_padded:
-                    perm = torch.randperm(points_on_object.shape[0])
-                    sub_idx = perm[:self.max_num_points_padded]
-                    points_on_object = points_on_object[sub_idx]
-                # Fewer points than the padded point-cloud tensor. Pad with zeros.
-                else:
-                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
-                rendered_pointclouds.append(points_on_object)
-            getattr(self, f'rendered_pointcloud_{camera_name}')[:] = torch.stack(rendered_pointclouds, dim=0)
+            xyz.append(image_dict[camera_name][..., 3:6].flatten(1, 2))  # Flatten width and height dimensions to get number-of-points dimension.
+            segmentation_ids.append(image_dict[camera_name][..., 6].flatten(1, 2))
+        xyz = torch.stack(xyz, dim=1)  # Aggregate point-clouds from all cameras along number-of-points dimension.
+        xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz.
+        segmentation_ids = torch.stack(segmentation_ids, dim=1)  # Aggregate segmentation ids from all cameras along number-of-points dimension.
+        
+        rendered_pointclouds = []
+        for i in range(self.num_envs):
+            mask = segmentation_ids[i] == target_segmentation_id[i]
+            points_on_object = xyz_1[i, mask].clone().detach()
+            # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
+            if points_on_object.shape[0] > self.max_num_points_padded:
+                perm = torch.randperm(points_on_object.shape[0])
+                sub_idx = perm[:self.max_num_points_padded]
+                points_on_object = points_on_object[sub_idx]
+            # Fewer points than the padded point-cloud tensor. Pad with zeros.
+            else:
+                points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
+            rendered_pointclouds.append(points_on_object)
+        getattr(self, f'rendered_pointcloud_{"_".join(self.rendered_pointcloud_camera_names)}')[:] = torch.stack(rendered_pointclouds, dim=0)
                     
-            if draw_debug_visualization:
-                max_envs_to_show = 4
-                    # Initialize figure.
-                if not hasattr(self, "rendered_pointcloud_fig"):
-                    self.rendered_pointcloud_fig = plt.figure()
-                    self.rendered_pointcloud_axs = []
-                    for env_id in range(min(self.num_envs, max_envs_to_show)):
-                        self.rendered_pointcloud_axs.append(self.rendered_pointcloud_fig.add_subplot(2, 2, env_id + 1, projection='3d'))
-                    plt.show(block=False)
-
-                # Update figure.
+        if draw_debug_visualization:
+            max_envs_to_show = 4
+                # Initialize figure.
+            if not hasattr(self, "rendered_pointcloud_fig"):
+                self.rendered_pointcloud_fig = plt.figure()
+                self.rendered_pointcloud_axs = []
                 for env_id in range(min(self.num_envs, max_envs_to_show)):
-                    self.rendered_pointcloud_axs[env_id].cla()
-                    self.rendered_pointcloud_axs[env_id].set_ylim(0.38, 0.78)
-                    self.rendered_pointcloud_axs[env_id].set_xlim(0.0, 0.5)
-                    self.rendered_pointcloud_axs[env_id].set_zlim(0., 0.5)
-                    self.rendered_pointcloud_axs[env_id].set_box_aspect([ub - lb for lb, ub in (getattr(self.rendered_pointcloud_axs[env_id], f'get_{a}lim')() for a in 'xyz')])
-                    self.rendered_pointcloud_axs[env_id].set_title(f'env_id: {env_id}')
-                    self.rendered_pointcloud_axs[env_id].scatter(getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 0].cpu(), 
-                                                                 getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 1].cpu(), 
-                                                                 getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 2].cpu())
-                self.rendered_pointcloud_fig.canvas.draw()
-                plt.pause(0.01)
+                    self.rendered_pointcloud_axs.append(self.rendered_pointcloud_fig.add_subplot(2, 2, env_id + 1, projection='3d'))
+                plt.show(block=False)
+
+            # Update figure.
+            for env_id in range(min(self.num_envs, max_envs_to_show)):
+                self.rendered_pointcloud_axs[env_id].cla()
+                self.rendered_pointcloud_axs[env_id].set_ylim(0.38, 0.78)
+                self.rendered_pointcloud_axs[env_id].set_xlim(0.0, 0.5)
+                self.rendered_pointcloud_axs[env_id].set_zlim(0., 0.5)
+                self.rendered_pointcloud_axs[env_id].set_box_aspect([ub - lb for lb, ub in (getattr(self.rendered_pointcloud_axs[env_id], f'get_{a}lim')() for a in 'xyz')])
+                self.rendered_pointcloud_axs[env_id].set_title(f'env_id: {env_id}')
+                self.rendered_pointcloud_axs[env_id].scatter(getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 0].cpu(), 
+                                                                getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 1].cpu(), 
+                                                                getattr(self, f"rendered_pointcloud_{camera_name}")[env_id, :, 2].cpu())
+            self.rendered_pointcloud_fig.canvas.draw()
+            plt.pause(0.01)
 
     def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = False) -> None:
         if not hasattr(self, 'segtrackers'):
@@ -588,11 +618,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.gym.clear_lines(self.viewer)
             image_dict = self.get_images()
 
+        points_on_object_per_camera = [[] for _ in range(self.num_envs)]
         for camera_name in self.detected_pointcloud_camera_names:
             xyz = image_dict[camera_name][..., 3:6].flatten(1, 2)
             xyz_1 = torch.cat([xyz, torch.ones_like(xyz[..., :1])], dim=-1)  # Add valid value id to xyz
 
-            detected_pointclouds = []
             for env_id in range(self.num_envs):
                 color_image_numpy = (image_dict[camera_name][env_id].detach().cpu().numpy()[..., 0:3] * 255).astype(
                     np.uint8)
@@ -607,41 +637,47 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     trans, rot = self.tf_sub.lookupTransform('base_link', self._camera_dict[camera_name].xyz_sub.image.header.frame_id, rospy.Time(0))
                     tm = torch.from_numpy(self.tf_sub.fromTranslationRotation(trans, rot)).float().to(self.device)
                     points_on_object = torch.matmul(tm, points_on_object.t()).t()
-                    
 
-                # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
-                if points_on_object.shape[0] > self.max_num_points_padded:
-                    perm = torch.randperm(points_on_object.shape[0])
-                    sub_idx = perm[:self.max_num_points_padded]
-                    points_on_object = points_on_object[sub_idx]
-                # Fewer points than the padded point-cloud tensor. Pad with zeros.
-                else:
-                    points_on_object = torch.cat([points_on_object, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
-                detected_pointclouds.append(points_on_object)
-            getattr(self, f'detected_pointcloud_{camera_name}')[:] = torch.stack(detected_pointclouds, dim=0)
+                points_on_object_per_camera[env_id].append(points_on_object)  # Flatten width and height dimensions to get number-of-points dimension.
 
-            if draw_debug_visualization or self.cfg_base.debug.save_videos:
-                tracked_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=False)
+                if draw_debug_visualization or self.cfg_base.debug.camera.save_recordings:
+                    tracked_segmentation = draw_mask(color_image_numpy.copy(), self.pred_mask, id_countour=False)
 
-                if self.cfg_base.debug.save_videos:
-                    self._segmented_frames[camera_name][env_id].append(tracked_segmentation)
-                    self._original_frames[camera_name][env_id].append(color_image_numpy)
+                    if self.cfg_base.debug.camera.save_recordings:
+                        self._segmented_frames[camera_name][env_id].append(tracked_segmentation)
+                        self._original_frames[camera_name][env_id].append(color_image_numpy)
 
-                if draw_debug_visualization:
-                    if self.progress_buf[0] == 1:
-                        self.segm_fig[camera_name][env_id] = plt.figure()
-                        ax = self.segm_fig[camera_name][env_id].add_subplot(111)
-                        ax.cla()
-                        ax.set_title(
-                            f"Tracked target object for camera '{camera_name}' on env {env_id}.")
-                        self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
-                        plt.axis('off')
-                        plt.show(block=False)
-                    else:
-                        self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
-                        self.segm_fig[camera_name][env_id].canvas.draw()
-                        plt.pause(0.01)
+                    if draw_debug_visualization:
+                        if self.progress_buf[0] == 1:
+                            self.segm_fig[camera_name][env_id] = plt.figure()
+                            ax = self.segm_fig[camera_name][env_id].add_subplot(111)
+                            ax.cla()
+                            ax.set_title(
+                                f"Tracked target object for camera '{camera_name}' on env {env_id}.")
+                            self.tracked_image_debug[camera_name][env_id] = ax.imshow(tracked_segmentation)
+                            plt.axis('off')
+                            plt.show(block=False)
+                        else:
+                            self.tracked_image_debug[camera_name][env_id].set_data(tracked_segmentation)
+                            self.segm_fig[camera_name][env_id].canvas.draw()
+                            plt.pause(0.01)
+        
+        detected_pointclouds = []
+        for env_id in range(self.num_envs):
+            detected_points = torch.cat(points_on_object_per_camera[env_id], dim=0)  # Concatenate points from all cameras along number-of-points dimension.
+            # More points are on the object than can fit into the padded point-cloud tensor. Subsample points.
+            if detected_points.shape[0] > self.max_num_points_padded:
+                perm = torch.randperm(detected_points.shape[0])
+                sub_idx = perm[:self.max_num_points_padded]
+                detected_points = detected_points[sub_idx]
+            # Fewer points than the padded point-cloud tensor. Pad with zeros.
+            else:
+                detected_points = torch.cat([detected_points, torch.zeros(self.max_num_points_padded - points_on_object.shape[0], 4, device=self.device)], dim=0)
 
+            detected_pointclouds.append(detected_points)
+    
+        getattr(self, f'detected_pointcloud_{"_".join(self.detected_pointcloud_camera_names)}')[:] = torch.stack(detected_pointclouds, dim=0)
+    
     def _reset_segmentation_tracking(self, env_ids, target_segmentation_id: Union[int, List[int]] = 2, draw_debug_visualization: bool = False):
         if isinstance(target_segmentation_id, int):
             target_segmentation_id = [target_segmentation_id] * self.num_envs
@@ -820,11 +856,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
         self._refresh_pointcloud_tensors()
-        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]):
+        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._refresh_object_bounding_box()
 
     def _refresh_pointcloud_tensors(self):
-        if "synthetic_pointcloud" in self.cfg["env"]["observations"]:
+        if "synthetic_pointcloud" in self.cfg["env"]["observations"] or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._refresh_synthetic_pointcloud()
         
         if any(obs.startswith("rendered_pointcloud") for obs in self.cfg["env"]["observations"]):
@@ -884,8 +920,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                 self.env_ptrs[env_id], actor_handle)
             for shape_id in range(len(actor_shape_props)):
                 actor_shape_props[shape_id].filter = collision_filter
-                self.gym.set_actor_rigid_shape_properties(
-                    self.env_ptrs[env_id], actor_handle, actor_shape_props)
+            self.gym.set_actor_rigid_shape_properties(
+                self.env_ptrs[env_id], actor_handle, actor_shape_props)
 
         # No tensor API to set actor rigid shape props, so a loop is required
         for env_id in range(self.num_envs):
@@ -894,6 +930,19 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     set_collision_filter(env_id, self.object_handles[env_id][object_id], collision_filter)
             else:
                 set_collision_filter(env_id, self.object_handles[env_id], collision_filter)
+
+    def _disable_robot_collisions(self) -> None:
+        self._set_robot_collisions(collision_filter=-1)
+
+    def _enable_robot_collisions(self) -> None:
+        self._set_robot_collisions(collision_filter=0)
+
+    def _set_robot_collisions(self, collision_filter: int):
+        for env_id in range(self.num_envs):
+            robot_shape_props = self.gym.get_actor_rigid_shape_properties(self.env_ptrs[env_id], self.robot_handles[env_id])
+            for shape_id in range(len(robot_shape_props)):
+                robot_shape_props[shape_id].filter = collision_filter
+            self.gym.set_actor_rigid_shape_properties(self.env_ptrs[env_id], self.robot_handles[env_id], robot_shape_props)
 
     def visualize_workspace_xy(self, env_id: int) -> None:
         # Set extent in z-direction to 0
@@ -919,24 +968,24 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.visualize_pos(unpadded_pointclouds, env_id, color=(1, 0, 1))
 
     def visualize_rendered_pointcloud(self, env_id: int) -> None:
-        for camera_name in self._camera_dict.keys():
-            if hasattr(self, f'rendered_pointcloud_{camera_name}'):
+        for obs in self.cfg["env"]["observations"]:
+            if obs.startswith("rendered_pointcloud"):
                 if env_id == 0:
                     self.visualization_rendered_unpadded_pointclouds = []
                     for i in range(self.num_envs):
-                        rendered_pointcloud = getattr(self, f'rendered_pointcloud_{camera_name}')[i].detach().clone()
+                        rendered_pointcloud = getattr(self, obs)[i].detach().clone()
                         mask = rendered_pointcloud[:, 3] > 0
                         unpadded_pointcloud = rendered_pointcloud[mask, 0:3]
                         self.visualization_rendered_unpadded_pointclouds.append(unpadded_pointcloud)
                 self.visualize_pos(self.visualization_rendered_unpadded_pointclouds, env_id, color=(1, 0, 1))
 
     def visualize_detected_pointcloud(self, env_id: int) -> None:
-        for camera_name in self._camera_dict.keys():
-            if hasattr(self, f'detected_pointcloud_{camera_name}'):
+        for obs in self.cfg["env"]["observations"]:
+            if obs.startswith("detected_pointcloud"):
                 if env_id == 0:
                     self.visualization_detected_unpadded_pointclouds = []
                     for i in range(self.num_envs):
-                        detected_pointcloud = getattr(self, f'detected_pointcloud_{camera_name}')[i]
+                        detected_pointcloud = getattr(self, obs)[i]
                         mask = detected_pointcloud[:, 3] > 0
                         unpadded_pointcloud = detected_pointcloud[mask, 0:3]
                         self.visualization_detected_unpadded_pointclouds.append(unpadded_pointcloud)
@@ -956,6 +1005,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
 
     def visualize_object_bounding_box(self, env_id: int) -> None:
         self.visualize_bounding_boxes(env_id, 'object_bounding_box')
+
+    def visualize_object_bounding_box_as_points(self, env_id: int) -> None:
+        self.visualize_pos(self.object_bounding_box_as_points, env_id, color=(1, 1, 0))
 
     def visualize_real_robot_table(self, env_id: int) -> None:
         extent = torch.tensor([[-0.07, -0.17, 0.], [0.63, 0.83, 0.]])

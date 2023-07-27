@@ -111,25 +111,24 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
     def _update_reset_buf(self):
         """Assign environments for reset if successful or failed."""
-        self._compute_object_lifting_reset(self.object_pos, self.object_pos_initial)
+        self._compute_object_lifting_reset()
 
-    def _compute_object_lifting_reset(self, object_pos, object_pos_initial, log_object_wise_success: bool = True):
+    def _compute_object_lifting_reset(self, name: str = 'object', log_object_wise_success: bool = True):
         # If max episode length has been reached
         self.reset_buf[:] = torch.where(
             self.progress_buf[:] >= self.max_episode_length - 1,
             torch.ones_like(self.reset_buf),
             self.reset_buf)
 
-        self._compute_object_lifting_success_rate(object_pos, object_pos_initial, log_object_wise_success)
+        self._compute_object_lifting_success_rate(name, log_object_wise_success)
         
-    def _compute_object_lifting_success_rate(self, object_pos, object_pos_initial, log_object_wise_success: bool = True, log_consecutive_successes: bool = True):
-        # Success is defined as lifting the object above the target height in the course of the episode.
-        object_height = object_pos[:, 2]
-        object_height_initial = object_pos_initial[:, 2]
-        object_lifted = (object_height - object_height_initial) > \
-                        self.cfg_task.rl.target_height
+    def _compute_object_lifting_success_rate(self, name: str = 'object', log_object_wise_success: bool = True, log_consecutive_successes: bool = True):
+        if not hasattr(self, "object_target_pos"):
+            self.object_target_pos = torch.Tensor(self.cfg_task.rl.target_pos).unsqueeze(0).repeat(self.num_envs, 1).to(self.device)
+        
+        delta_target_pos = torch.norm(self.object_target_pos - getattr(self, name + '_pos'), dim=-1)
+        object_lifted = delta_target_pos < self.cfg_task.rl.target_threshold
         self.object_lifted[:] = torch.logical_or(object_lifted, self.object_lifted)                      
-        
 
         # Log exponentially weighted moving average (EWMA) of the success rate
         if "success_rate_ewma" in self.cfg_base.logging.keys():
@@ -178,23 +177,41 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
     def _update_rew_buf(self):
         """Compute reward at current timestep."""
-        self._compute_object_lifting_reward(
-            self.object_pos, self.object_pos_initial)
+        self._compute_object_lifting_reward()
 
-    def _compute_object_lifting_reward(self, object_pos, object_pos_initial):
+    def _compute_object_lifting_reward(self, name: str = 'object') -> None:
         """Compute object lifting reward at current timestep."""
-        self.rew_buf[:] = 0.
-        object_height = object_pos[:, 2]
-        object_height_initial = object_pos_initial[:, 2]
+        if not hasattr(self, "object_target_pos"):
+            self.object_target_pos = torch.Tensor(self.cfg_task.rl.target_pos).unsqueeze(0).repeat(self.num_envs, 1).to(self.device)
 
-        delta_target_height = torch.clamp(
-            self.cfg_task.rl.target_height -
-            (object_height - object_height_initial), min=0)
-        delta_lift_off_height = torch.clamp(
-            self.cfg_task.rl.lift_off_height -
-            (object_height - object_height_initial), min=0)
-        object_lifted = (object_height - object_height_initial) > \
-                        self.cfg_task.rl.target_height
+        # Reset reward buffer.
+        self.rew_buf[:] = 0.
+
+        # Acquire object position.
+        object_pos = getattr(self, name + '_pos')
+
+        # Compute distance to target and success criterion.
+        delta_target_pos = torch.norm(self.object_target_pos - object_pos, dim=-1)
+        object_lifted = delta_target_pos < self.cfg_task.rl.target_threshold
+
+        # Compute object clearances.
+        if any("position_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            object_height = object_pos[:, 2]
+            object_height_initial = getattr(self, name + '_pos_initial')[:, 2]
+            delta_liftoff_position_clearance = torch.clamp(
+                self.cfg_task.rl.liftoff_height - (object_height - object_height_initial), min=0)
+        
+        if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            object_lowest_point = torch.min(torch.where(self.synthetic_pointcloud[..., 3] < 1.0, 10 * torch.ones_like(synthetic_pointcloud[..., 2]), synthetic_pointcloud[..., 2]), dim=1)[0]
+            object_lowest_point_initial = torch.min(torch.where(self.synthetic_pointcloud_initial[..., 3] < 1.0, 10 * torch.ones_like(synthetic_pointcloud_initial[..., 2]), synthetic_pointcloud_initial[..., 2]), dim=1)[0]
+            delta_liftoff_pointcloud_clearance = torch.clamp(
+                self.cfg_task.rl.liftoff_height - (object_lowest_point - object_lowest_point_initial), min=0)
+        
+        if any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            object_lowest_point = torch.min(getattr(self, name + '_bounding_box_as_points')[..., 2], dim=1)[0]
+            object_lowest_point_initial = torch.min(getattr(self, name + '_bounding_box_as_points_initial')[..., 2], dim=1)[0]
+            delta_liftoff_bounding_box_clearance = torch.clamp(
+                self.cfg_task.rl.liftoff_height - (object_lowest_point - object_lowest_point_initial), min=0)
 
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
@@ -220,13 +237,22 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                         keypoint_pos - object_pos_expanded, dim=-1).mean(dim=-1)
                     in_proximity = keypoint_dist < 0.15
                     reward = torch.where(in_proximity, 0. * keypoint_dist, -scale * keypoint_dist)
+
+                elif reward_term.endswith('_closeness'):
+                    keypoint_group_name = reward_term[:-len('_proximity')]
+                    keypoint_pos = getattr(self, keypoint_group_name + '_pos')
+                    object_pos_expanded = object_pos.unsqueeze(1).repeat(
+                        1, keypoint_pos.shape[1], 1)
+                    keypoint_dist = torch.norm(
+                        keypoint_pos - object_pos_expanded, dim=-1).sum(dim=-1)
+                    keypoint_dist_squared = keypoint_dist.pow(2)
+                    reward = -scale * keypoint_dist_squared
                 else:
                     assert False
 
             # Penalize large actions.
             elif reward_term == 'action_penalty':
-                squared_action_norm = torch.linalg.norm(
-                    self.actions, dim=-1)
+                squared_action_norm = torch.linalg.norm(self.actions, dim=-1)
                 reward = - squared_action_norm * scale
 
             # Penalize large contact forces.
@@ -234,30 +260,30 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 contact_force_mag = torch.linalg.norm(self.contact_force, dim=-1)
                 if reward_term.startswith('arm'):
                     contact_force_mag = contact_force_mag[:, :self.robot_arm_rigid_body_count].sum(dim=-1)
+                    contact_force_mag = torch.clamp(contact_force_mag, max=10.0)
                 elif reward_term.startswith('manipulator'):
                     allowed_manipulator_force = 5.0
-                    contact_force_mag = torch.clamp(contact_force_mag[:, self.robot_arm_rigid_body_count:].sum(dim=-1) - allowed_manipulator_force, min=0.0)
+                    contact_force_mag = torch.clamp(torch.max(contact_force_mag[:, self.robot_arm_rigid_body_count:], dim=-1)[0] - allowed_manipulator_force, min=0.0)
+                    contact_force_mag = contact_force_mag.pow(2)
+                    contact_force_mag = torch.clamp(contact_force_mag, max=25.0)
                 elif reward_term.startswith('robot'):
                     contact_force_mag = contact_force_mag.sum(dim=-1)
                 else:
                     assert False
-                reward = - torch.clamp(contact_force_mag, max=10.) * scale
-            
-            # Reward the height progress of the object towards lift-off
-            elif reward_term == 'object_lift_off_reward':
-                reward = \
-                    hyperbole_rew(
-                        scale, delta_lift_off_height, c=0.02, pow=1) - \
-                    hyperbole_rew(
-                        scale, torch.ones_like(delta_lift_off_height) *
-                               self.cfg_task.rl.lift_off_height, c=0.02, pow=1)
+                reward = - contact_force_mag * scale
+
+            # Reward initial liftoff of the object.
+            elif reward_term.startswith('liftoff'):
+                clearance_type = reward_term[len('liftoff_'):]
+                delta_liftoff_clearance = locals()['delta_liftoff_' + clearance_type]
+                reward = hyperbole_rew(scale, delta_liftoff_clearance, c=0.02, pow=1) - hyperbole_rew(scale, torch.ones_like(delta_liftoff_clearance) * self.cfg_task.rl.liftoff_height, c=0.02, pow=1)
                 reward = torch.clamp(reward, min=0)
 
-            # Reward the height progress of the object towards target height after lift-off.
-            elif reward_term == 'object_height_reward':
-                reward = scale * torch.clamp(object_height - (object_height_initial + self.cfg_task.rl.lift_off_height), min=0)
+            elif reward_term == 'task_progression':
+                liftoff_achieved = delta_liftoff_clearance < 0.01
+                reward = liftoff_achieved * hyperbole_rew(scale, delta_target_pos, c=0.04, pow=1)
 
-            # Reward reaching the target height
+            # Reward for lifting the object to the target position.
             elif reward_term == 'success_bonus':
                 reward = float(scale) * object_lifted
 
@@ -269,7 +295,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
             #print(reward_terms)
-
+        
     def reset_idx(self, env_ids):
         """Reset specified environments."""
 
@@ -286,6 +312,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             # Disable collisions with simulated objects if the policy is executed on the real robot.
             if self.cfg_base.ros_activate:
                 self._disable_object_collisions()
+                self._disable_robot_collisions()
 
         self._reset_robot(env_ids, reset_to=self.cfg_env.env.setup + '_initial')
 
@@ -358,17 +385,23 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                     self.gym.clear_lines(self.viewer)
                     self.draw_visualizations(self.cfg_base.debug.visualize)
 
-            # Refresh tensor and set initial object poses
+            # Refresh tensor and save initial object poses.
             self.refresh_base_tensors()
+            self.refresh_env_tensors()
             self.object_pos_initial[env_ids] = self.root_pos[
                 env_ids, self.object_actor_id_env].detach().clone()
             self.object_quat_initial[env_ids] = self.root_quat[
                 env_ids, self.object_actor_id_env].detach().clone()
-
+            
+            # Check whether object has been dropped successfully (landed in the workspace).
             object_dropped_successfully = self._object_in_workspace(
                 self.object_pos_initial)
-
-
+            
+        if any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.object_bounding_box_as_points_initial = self.object_bounding_box_as_points.detach().clone()
+        
+        if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+            self.synthetic_pointcloud_initial = self.synthetic_pointcloud.detach().clone()
 
     def _randomize_ik_body_pose(self, env_ids, sim_steps: int) -> None:
         """Move ik_body to random pose."""
@@ -455,3 +488,6 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 'headless']:
                 self.gym.clear_lines(self.viewer)
                 self.draw_visualizations(self.cfg_base.debug.visualize)
+
+def parametrized_sigmoid(x: torch.Tensor, max: float, steepness: float, offset: float) -> torch.Tensor:
+    return max / (1 + torch.exp(-steepness * (x - offset)))

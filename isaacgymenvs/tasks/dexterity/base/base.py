@@ -346,7 +346,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
                             robot_asset, robot_pose) -> None:
         # collision_filter=-1 to use asset collision filters in XML model
         robot_handle = self.gym.create_actor(
-            env_ptr, robot_asset, robot_pose, 'robot', i, -1, 1)
+            env_ptr, robot_asset, robot_pose, 'robot', i, 0, 1)
         self.robot_actor_ids_sim.append(actor_count)
         self.robot_handles.append(robot_handle)
         # Enable force sensors for robot
@@ -864,6 +864,38 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         """
         assert len(env_ids) == self.num_envs, \
             "All environments should be reset simultaneously."
+        
+        if "adr" in self.cfg_base.keys():
+            print("Applying automatic domain randomization.")
+            self.adr_stages = {}
+            if hasattr(self, "success_rate_ewma"):
+                current_success_rate = self.success_rate_ewma
+            else:
+                current_success_rate = 0.0
+
+            for sim_param in self.cfg_base.adr:
+                self.log({"self.sim_params.gravity.z": self.sim_params.gravity.z})
+                if sim_param not in self.adr_stages.keys():
+                    self.adr_stages[sim_param] = 0
+
+                # increase curriculum.
+                if current_success_rate > 0.95 and self.adr_stages[sim_param] < len(self.cfg_base.adr[sim_param]['linspace']) - 1:
+                    self.adr_stages[sim_param] += 1
+
+                if sim_param == "gravity":
+                    linspace = np.linspace(*self.cfg_base.adr[sim_param]['linspace'])
+                    print("gravity linspace:", linspace)
+                    current_value = linspace[self.adr_stages[sim_param]]
+
+                    print("setting gravity to:", current_value)
+                    self.sim_params.gravity.z = current_value
+                
+                print("sim_param:", sim_param)
+
+            print("self.sim_params:", self.sim_params)
+
+            self.gym.set_sim_params(self.sim, self.sim_params)
+
 
         reset_dof_pos = getattr(self.robot.model, reset_to + "_dof_pos")
 
@@ -912,6 +944,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             ctrl_target_dof_pos = torch.zeros((self.num_envs, self.num_dofs),
                                               device=self.device)
             ctrl_target_dof_pos[:, :self.robot_dof_count] = self.ctrl_target_dof_pos
+
             self.gym.set_dof_position_target_tensor_indexed(
                 self.sim,
                 gymtorch.unwrap_tensor(ctrl_target_dof_pos),
@@ -1105,10 +1138,12 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
 
     def _randomize_ik_body_pose(self, env_ids, sim_steps: int) -> None:
         """Move ik_body to random pose."""
-
+        ctrl_target_dof_pos = torch.zeros((self.num_envs, self.num_dofs),
+                                              device=self.device)
+        ctrl_target_dof_pos[:, :self.robot_dof_count] = self.ctrl_target_dof_pos
         self.gym.set_dof_position_target_tensor_indexed(
             self.sim,
-            gymtorch.unwrap_tensor(self.ctrl_target_dof_pos),
+            gymtorch.unwrap_tensor(ctrl_target_dof_pos),
             gymtorch.unwrap_tensor(self.robot_actor_ids_sim),
             len(self.robot_actor_ids_sim))
 
