@@ -314,8 +314,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.object_bounding_box_as_points[:] = self.object_bounding_box[:, 0:3].unsqueeze(1).repeat(1, 8, 1) + quat_apply(self.object_bounding_box[:, 3:7].unsqueeze(1).repeat(1, 8, 1), self.bounding_box_to_points * self.object_bounding_box[:, 7:10].unsqueeze(1).repeat(1, 8, 1))
 
     def _acquire_pointcloud_tensors(self) -> None:
-        # Synthetic point-clouds.
-        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]) or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+        # Synthetic point-clouds (Needed either as an observation, to compute the clearance of the lowest point or to compute a visibility-ratio).
+        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]) or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
             self.synthetic_pointcloud_ordered = self._acquire_synthetic_pointcloud()
 
         for obs in self.cfg["env"]["observations"]:
@@ -349,6 +349,11 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         by _refresh_object_synthetic_pointcloud().
         """
         self.object_mesh_samples_pos = torch.zeros((len(self.objects), self.max_num_points_padded, 4)).to(self.device)
+
+        if any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
+            print("Using sythetic pointclouds to compute visibility-ratio. Enforcing uniform size of max_num_points_padded.")
+            sample_mode = 'uniform'
+            num_samples = self.max_num_points_padded
 
         if sample_mode == 'uniform':
             num_samples = [num_samples, ] * len(self.objects)
@@ -860,7 +865,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self._refresh_object_bounding_box()
 
     def _refresh_pointcloud_tensors(self):
-        if "synthetic_pointcloud" in self.cfg["env"]["observations"] or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+        if "synthetic_pointcloud" in self.cfg["env"]["observations"] or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._refresh_synthetic_pointcloud()
         
         if any(obs.startswith("rendered_pointcloud") for obs in self.cfg["env"]["observations"]):

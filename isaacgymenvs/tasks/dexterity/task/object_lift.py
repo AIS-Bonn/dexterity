@@ -37,6 +37,7 @@ import omegaconf
 
 from isaacgym import gymapi, gymtorch, torch_utils
 from isaacgym.torch_utils import *
+from isaacgymenvs.tasks.dexterity.base.base_cameras import xyz_to_image
 from isaacgymenvs.tasks.dexterity.env.object import DexterityEnvObject
 from isaacgymenvs.tasks.dexterity.task.schema_class_task import DexterityABCTask
 from isaacgymenvs.tasks.dexterity.task.schema_config_task import DexteritySchemaConfigTask
@@ -287,6 +288,64 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             elif reward_term == 'success_bonus':
                 reward = float(scale) * object_lifted
 
+            # Reward the visibility of the target object, i.e. avoid occluding it.
+            elif reward_term == 'visibility_ratio':
+                target_segmentation_id = 2
+
+                reward = torch.zeros(self.num_envs).to(self.device)
+                # Compute visibility ratio for each camera.
+                #for camera_name in self._camera_dict.keys():  # Use this to show visibility-ratio for all cameras depite rendered point-cloud not being used in the observation.
+                for camera_name in self.rendered_pointcloud_camera_names:
+                    camera = self._camera_dict[camera_name]
+
+                    # Acquire ground truth segmentation mask.
+                    segmentation_mask = self.obs_dict["image"][camera_name][..., 6]
+
+                    # Project synthetic pointcloud into camera frame.
+                    view_matrix = camera.compute_view_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
+                    projection_matrix = camera.compute_projection_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
+                    syn_pc_in_camera_frame = xyz_to_image(self.synthetic_pointcloud[..., 0:3], projection_matrix, view_matrix, camera.width, camera.height)
+
+                    # Compute visibility ratio.
+                    env_indices = torch.arange(self.num_envs)[:, None].to(self.device)
+                    in_mask = segmentation_mask[env_indices, syn_pc_in_camera_frame[..., 0].long(), syn_pc_in_camera_frame[..., 1].long()] == target_segmentation_id
+                    visibility_ratio = in_mask.float().mean(dim=-1)
+
+                    # The way it is implemented right now, the reward for the visibility-ratio of all cameras is added together.
+                    reward += scale * visibility_ratio
+
+                    draw_debug_visualization = True
+                    if draw_debug_visualization:
+                        import matplotlib.pyplot as plt
+
+                        num_envs_to_show = min(4, self.num_envs)
+                        if not hasattr(self, f"visibility_ratio_{camera_name}_fig"):
+                            fig, axs = plt.subplots(1, num_envs_to_show, figsize=(num_envs_to_show * 5, 5))
+                            setattr(self, f"visibility_ratio_{camera_name}_fig", fig)
+                            setattr(self, f"visibility_ratio_{camera_name}_axs", axs)
+                            for i in range(num_envs_to_show):
+                                axs[i].set_title(f"Env {i}")
+                                axs[i].imshow(segmentation_mask[i].cpu().numpy())
+                                axs[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
+                                for projected_point in syn_pc_in_camera_frame[i]:
+                                    visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                    axs[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+
+                            plt.show(block=False)
+                        else:
+                            for i in range(num_envs_to_show):
+                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].cla()
+                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_title(f"Env {i}")
+                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].imshow(segmentation_mask[i].cpu().numpy())
+                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
+                                for projected_point in syn_pc_in_camera_frame[i]:
+                                    visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+
+                            getattr(self, f"visibility_ratio_{camera_name}_fig").canvas.draw()
+                            plt.pause(0.01)
+
+                    
             else:
                 assert False, f"Unknown reward term {reward_term}."
 
@@ -294,7 +353,6 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             reward_terms["reward_terms/" + reward_term] = reward.mean()
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
-            #print(reward_terms)
         
     def reset_idx(self, env_ids):
         """Reset specified environments."""
