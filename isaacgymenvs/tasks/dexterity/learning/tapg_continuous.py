@@ -13,13 +13,56 @@ from rl_games.common.a2c_common import A2CBase
 import os
 import gym
 import numpy as np
+from typing import *
 
 
-def tapg_loss_func(old_action_neglog_probs_batch, action_neglog_probs, teacher_action_neglog_probs, advantage, teacher_advantage, is_ppo, curr_e_clip):
+class TeacherDataset:
+    def __init__(self, capacity: int) -> None:
+        super().__init__()
+        self._full = False
+        self._idx = 0
+        self._capacity = int(capacity)
+        self._storage_initialized = False
+
+    def __len__(self) -> int:
+        return self._capacity if self._full else self._idx
+    
+    def add(self, data: Tuple[torch.Tensor, ...]) -> None:
+        if not self._storage_initialized:
+            self._initialize_storage(data)
+        assert all(d.shape[0] == data[0].shape[0] for d in data), "Data must have uniform batch_size."
+        assert all(d.shape[1:] == s.shape[1:] for d, s in zip(data, self._storage)), "Data shape must match storage."
+        assert all(d.dtype == s.dtype for d, s in zip(data, self._storage)), "Data dtype must match storage."
+        self._add_to_storage(data)
+    
+    def _initialize_storage(self, data: Tuple[torch.Tensor, ...]) -> None:
+        self._storage = [torch.empty((self._capacity, *d.shape[1:]), dtype=d.dtype, device=d.device) for d in data]
+        self._storage_initialized = True
+
+    def _add_to_storage(self, data: Tuple[torch.Tensor, ...]) -> None:
+        batch_size = data[0].shape[0]
+        remaining_capacity = min(self._capacity - self._idx, batch_size)
+        overflow = batch_size - remaining_capacity
+        self._full = self._full or remaining_capacity < batch_size
+        
+        for i, d in enumerate(data):
+            # Put overflow data at the beginning of the buffer.
+            if remaining_capacity < batch_size:
+                self._storage[i][0:overflow] = d[-overflow:]
+            self._storage[i][self._idx:self._idx+remaining_capacity] = d[:remaining_capacity]
+        self._idx = (self._idx + remaining_capacity) % self._capacity
+
+    def sample(self, batch_size: int) -> Tuple[torch.Tensor, ...]:
+        assert len(self) >= batch_size, "Not enough data in buffer."
+        sample_idxs = torch.randint(0, len(self), (batch_size,), device=self._storage[0].device)
+        return tuple(d[sample_idxs] for d in self._storage)
+
+
+def tapg_loss_func(old_action_neglog_probs_batch, action_neglog_probs, old_teacher_action_neglog_probs_batch, teacher_action_neglog_probs, advantage, teacher_advantage, is_ppo, curr_e_clip):
     # Concatenate neglog probs and advantages
     all_action_neglog_probs = torch.cat([action_neglog_probs, teacher_action_neglog_probs])
     all_advantage = torch.cat([advantage, teacher_advantage])
-    all_old_action_neglog_probs = torch.cat([old_action_neglog_probs_batch, old_action_neglog_probs_batch])
+    all_old_action_neglog_probs = torch.cat([old_action_neglog_probs_batch, old_teacher_action_neglog_probs_batch])
 
     if is_ppo:
         ratio = torch.exp(all_old_action_neglog_probs - all_action_neglog_probs)
@@ -35,17 +78,15 @@ class TAPGExperienceBuffer(ExperienceBuffer):
     def _init_from_env_info(self, env_info):
         super()._init_from_env_info(env_info)
         obs_base_shape = self.obs_base_shape
-        self.tensor_dict['teacher_obses'] = self._create_tensor_from_space(env_info['teacher_observation_space'], self.obs_base_shape)
+        self.tensor_dict['replayed_obses'] = self._create_tensor_from_space(env_info['observation_space'], self.obs_base_shape)
 
         val_space = gym.spaces.Box(low=0, high=1,shape=(env_info.get('value_size',1),))
         self.tensor_dict['teacher_values'] = self._create_tensor_from_space(val_space, obs_base_shape)
-        self.tensor_dict['teacher_neglogpacs'] = self._create_tensor_from_space(gym.spaces.Box(low=0, high=1,shape=(), dtype=np.float32), obs_base_shape)
+        self.tensor_dict['replayed_values'] = self._create_tensor_from_space(val_space, obs_base_shape)
+        self.tensor_dict['replayed_neglogpacs'] = self._create_tensor_from_space(gym.spaces.Box(low=0, high=1,shape=(), dtype=np.float32), obs_base_shape)
 
         if self.is_continuous:
             self.tensor_dict['teacher_actions'] = self._create_tensor_from_space(gym.spaces.Box(low=0, high=1,shape=self.actions_shape, dtype=np.float32), obs_base_shape)
-            self.tensor_dict['teacher_mus'] = self._create_tensor_from_space(gym.spaces.Box(low=0, high=1,shape=self.actions_shape, dtype=np.float32), obs_base_shape)
-            self.tensor_dict['teacher_sigmas'] = self._create_tensor_from_space(gym.spaces.Box(low=0, high=1,shape=self.actions_shape, dtype=np.float32), obs_base_shape)
-
 
 
 class TAPGAgent(A2CDictObsAgent):
@@ -155,27 +196,34 @@ class TAPGAgent(A2CDictObsAgent):
         self.teacher.restore(self.teacher_cfg['checkpoint'])
         self.teacher.has_batch_dimension = True
 
-    def get_pg_coef(self, advantages):
-        const = self.student_cfg['pg_coef']['init'] * self.student_cfg['pg_coef']['decay'] ** self.epoch_num
 
+        if self.teacher_cfg['aggregate_data']:
+            self.teacher_dataset = TeacherDataset(capacity=self.teacher_cfg['dataset_size'])
+
+    @property
+    def pg_coef_scale_factor(self) -> float:
+        return self.student_cfg['pg_coef']['init'] * self.student_cfg['pg_coef']['decay'] ** self.epoch_num
+    
+    @property
+    def bc_coef_scale_factor(self) -> float:
+        return self.student_cfg['bc_coef']['init'] * self.student_cfg['bc_coef']['decay'] ** self.epoch_num
+    
+    def get_pg_coef(self, advantages):
         if self.student_cfg['pg_coef']['type'] == 'advantage':
-            return const * advantages
+            return self.pg_coef_scale_factor * advantages
         elif self.student_cfg['pg_coef']['type'] == 'constant':
-            return const * torch.ones_like(advantages)
+            return self.pg_coef_scale_factor * torch.ones_like(advantages)
         else:
             assert False
     
     def get_bc_coef(self, teacher_advantages):
-        const = self.student_cfg['bc_coef']['init'] * self.student_cfg['bc_coef']['decay'] ** self.epoch_num
-
         if self.student_cfg['bc_coef']['type'] == 'advantage':
-            return const * teacher_advantages
+            return self.bc_coef_scale_factor * teacher_advantages
         elif self.student_cfg['bc_coef']['type'] == 'constant':
-            return const * torch.ones_like(teacher_advantages)
+            return self.bc_coef_scale_factor * torch.ones_like(teacher_advantages)
         else:
             assert False
 
-    
     def init_tensors(self):
         super().init_tensors()
         algo_info = {
@@ -187,40 +235,59 @@ class TAPGAgent(A2CDictObsAgent):
 
         # Overwrite default experience buffer.
         self.experience_buffer = TAPGExperienceBuffer(self.env_info, algo_info, self.ppo_device)
-        self.tensor_list += ['teacher_obses', 'teacher_actions', 'teacher_mus', 'teacher_sigmas', 'teacher_values']
+        self.tensor_list += ['teacher_actions', 'teacher_values', 'replayed_obses', 'replayed_neglogpacs', 'replayed_values']
 
     def play_steps(self):
         update_list = self.update_list
         step_time = 0.0
 
         for n in range(self.horizon_length):
+            # Query teacher for actions on the current observations.
+            teacher_res_dict = self.teacher.model({'is_train': False, 'prev_actions': None, 'obs' : self.obs['teacher_obs'], 'states': self.teacher.states})
+
+            # Add observation and teacher_actions to teacher_dataset.
+            if self.teacher_cfg['aggregate_data']:
+                self.teacher_dataset.add((self.obs['obs'], teacher_res_dict['actions'], teacher_res_dict['values']))
+
+            # Sample observations of equal size to the regular observations.
+            replayed_obs, replayed_teacher_action, replayed_teacher_values = self.teacher_dataset.sample(self.obs['obs'].shape[0]) if self.teacher_cfg['aggregate_data'] else self.obs['obs']
+
+            # Concatenate current and sampled observations to only query the policy once.
+            all_obs = {'obs': torch.cat((self.obs['obs'], replayed_obs), dim=0)}
+
+            # The policy is queried on double the amount of observations. The first half is the on-policy data just collected and used for policy gradient optimization. The second half is data sampled from an aggregated dataset used for behavioral cloning/DAgger.
             if self.use_action_masks:
+                assert False
                 masks = self.vec_env.get_action_masks()
                 res_dict = self.get_masked_action_values(self.obs, masks)
             else:
-                res_dict = self.get_action_values(self.obs)
+                res_dict = self.get_action_values(all_obs)
 
-            teacher_res_dict = self.teacher.model({'is_train': False, 'prev_actions': None, 'obs' : self.obs['teacher_obs'], 'states': self.teacher.states})
             self.experience_buffer.update_data('obses', n, self.obs['obs'])
-            self.experience_buffer.update_data('teacher_obses', n, self.obs['teacher_obs'])  # Added to store teacher observations.
+            self.experience_buffer.update_data('replayed_obses', n, replayed_obs)
+            #self.experience_buffer.update_data('teacher_obses', n, self.obs['teacher_obs'])  # Added to store teacher observations.
             self.experience_buffer.update_data('dones', n, self.dones)
 
+            self.experience_buffer.update_data('teacher_actions', n, replayed_teacher_action)  # Added to store teacher actions.
+            self.experience_buffer.update_data('teacher_values', n, replayed_teacher_values)  # Added to store teacher values.
+
             for k in update_list:
-                self.experience_buffer.update_data(k, n, res_dict[k]) 
-                if 'teacher_' + k in self.tensor_list:
-                    self.experience_buffer.update_data('teacher_' + k, n, teacher_res_dict[k])  # Added to store teacher actions, values, and neglogpacs.
+                self.experience_buffer.update_data(k, n, res_dict[k][0:self.obs['obs'].shape[0]]) # Store results of on-policy data.
+                if 'replayed_' + k in self.tensor_list:
+                    self.experience_buffer.update_data('replayed_' + k, n, res_dict[k][self.obs['obs'].shape[0]:])  # Store results of replayed data.
+
             if self.has_central_value:
                 self.experience_buffer.update_data('states', n, self.obs['states'])
 
             step_time_start = time.time()
-            self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+            self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'][0:self.obs['obs'].shape[0]])
             step_time_end = time.time()
 
             step_time += (step_time_end - step_time_start)
 
             shaped_rewards = self.rewards_shaper(rewards)
             if self.value_bootstrap and 'time_outs' in infos:
-                shaped_rewards += self.gamma * res_dict['values'] * self.cast_obs(infos['time_outs']).unsqueeze(1).float()
+                shaped_rewards += self.gamma * res_dict['values'][0:self.obs['obs'].shape[0]] * self.cast_obs(infos['time_outs']).unsqueeze(1).float()
 
             self.experience_buffer.update_data('rewards', n, shaped_rewards)
 
@@ -266,18 +333,19 @@ class TAPGAgent(A2CDictObsAgent):
         rnn_states = batch_dict.get('rnn_states', None)
         rnn_masks = batch_dict.get('rnn_masks', None)
 
-        teacher_obses = batch_dict['teacher_obses']
-        teacher_values = batch_dict['teacher_values']
         teacher_actions = batch_dict['teacher_actions']
-        teacher_mus = batch_dict['teacher_mus']
-        teacher_sigmas = batch_dict['teacher_sigmas']
+        teacher_values = batch_dict['teacher_values']
+
+        replayed_obses = batch_dict['replayed_obses']
+        replayed_neglogpacs = batch_dict['replayed_neglogpacs']
+        replayed_values = batch_dict['replayed_values']
 
 
         advantages = returns - values
 
-        teacher_advantages = teacher_values - values
+        replayed_advantages = torch.clamp(teacher_values - replayed_values, min=0)
 
-        all_advantages = torch.cat([advantages, teacher_advantages], dim=0)
+        all_advantages = torch.cat([advantages, replayed_advantages], dim=0)
 
         if self.normalize_value:
             self.value_mean_std.train()
@@ -302,12 +370,12 @@ class TAPGAgent(A2CDictObsAgent):
                     all_advantages = (all_advantages - all_advantages.mean()) / (all_advantages.std() + 1e-8)
 
             advantages = all_advantages[:advantages.shape[0]]
-            teacher_advantages = all_advantages[advantages.shape[0]:]
+            replayed_advantages = all_advantages[advantages.shape[0]:]
 
         # Update advantages based of bc_coef and pg_coef
 
         advantages = self.get_pg_coef(advantages)
-        teacher_advantages = self.get_bc_coef(teacher_advantages)       
+        replayed_advantages = self.get_bc_coef(replayed_advantages)       
 
         dataset_dict = {}
         dataset_dict['old_values'] = values
@@ -322,11 +390,12 @@ class TAPGAgent(A2CDictObsAgent):
         dataset_dict['mu'] = mus
         dataset_dict['sigma'] = sigmas
 
-        dataset_dict['teacher_obs'] = teacher_obses
         dataset_dict['teacher_actions'] = teacher_actions
-        dataset_dict['teacher_mus'] = teacher_mus
-        dataset_dict['teacher_sigmas'] = teacher_sigmas
-        dataset_dict['teacher_advantages'] = teacher_advantages
+        dataset_dict['old_teacher_values'] = teacher_values
+
+        dataset_dict['replayed_obses'] = replayed_obses
+        dataset_dict['replayed_old_logp_actions'] = replayed_neglogpacs
+        dataset_dict['replayed_advantages'] = replayed_advantages
 
         self.dataset.update_values_dict(dataset_dict)
 
@@ -350,26 +419,28 @@ class TAPGAgent(A2CDictObsAgent):
         return_batch = input_dict['returns']
         actions_batch = input_dict['actions']
         obs_batch = input_dict['obs']
-        teacher_obs_batch = input_dict['teacher_obs']
         obs_batch = self._preproc_obs(obs_batch)
-        teacher_obs_batch = self._preproc_obs(teacher_obs_batch)
-
+        
         teacher_actions = input_dict['teacher_actions']
-        teacher_mu = input_dict['teacher_mus']
-        teacher_sigma = input_dict['teacher_sigmas']
-        teacher_advantage = input_dict['teacher_advantages']
+        teacher_value_preds_batch = input_dict['old_teacher_values']
+
+        replayed_obs_batch = input_dict['replayed_obses']
+        replayed_obs_batch = self._preproc_obs(replayed_obs_batch)
+        replayed_old_action_log_probs_batch = input_dict['replayed_old_logp_actions']
+        replayed_advantage = input_dict['replayed_advantages']
 
         lr_mul = 1.0
         curr_e_clip = self.e_clip
 
         batch_dict = {
             'is_train': True,
-            'prev_actions': actions_batch, 
-            'obs' : obs_batch,
+            'prev_actions': torch.cat([actions_batch, teacher_actions], dim=0),
+            'obs' : torch.cat([obs_batch, replayed_obs_batch], dim=0)
         }
 
         rnn_masks = None
         if self.is_rnn:
+            assert False
             rnn_masks = input_dict['rnn_masks']
             batch_dict['rnn_states'] = input_dict['rnn_states']
             batch_dict['seq_length'] = self.seq_len
@@ -377,19 +448,16 @@ class TAPGAgent(A2CDictObsAgent):
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
             res_dict = self.model(batch_dict)
             action_log_probs = res_dict['prev_neglogp']
-            values = res_dict['values']
-            entropy = res_dict['entropy']
-            mu = res_dict['mus']
-            sigma = res_dict['sigmas']
+            values = res_dict['values'][0:obs_batch.shape[0]]
+            entropy = res_dict['entropy'][0:obs_batch.shape[0]]
+            mu = res_dict['mus'][0:obs_batch.shape[0]]
+            sigma = res_dict['sigmas'][0:obs_batch.shape[0]]
 
-            distr = torch.distributions.Normal(mu, sigma)
-            teacher_action_log_probs = -distr.log_prob(teacher_actions).sum(dim=1)
+            a_loss = self.actor_loss_func(torch.cat([old_action_log_probs_batch, replayed_old_action_log_probs_batch]), action_log_probs, torch.cat([advantage, replayed_advantage]), self.ppo, curr_e_clip)
             
             # Compute distance between student and teacher actions.
-            student_teacher_action_kl = torch_ext.policy_kl(mu.detach(), sigma.detach(), teacher_mu.detach(), teacher_sigma.detach(), reduce=True)
-            student_teacher_action_mse = torch.nn.functional.mse_loss(mu.detach(), teacher_mu.detach())
-
-            a_loss = tapg_loss_func(old_action_log_probs_batch, action_log_probs, teacher_action_log_probs,  advantage, teacher_advantage, self.ppo, curr_e_clip)
+            student_teacher_action_kl = torch.Tensor([0.]) #torch_ext.policy_kl(mu.detach(), sigma.detach(), teacher_mu.detach(), teacher_sigma.detach(), reduce=True)
+            student_teacher_action_mse = torch.nn.functional.mse_loss(mu.detach(), teacher_actions.detach())
 
             if self.has_value_loss:
                 c_loss = common_losses.critic_loss(value_preds_batch, values, curr_e_clip, return_batch, self.clip_value)
@@ -432,7 +500,7 @@ class TAPGAgent(A2CDictObsAgent):
         }, curr_e_clip, 0)      
 
         self.train_result = (a_loss, c_loss, entropy, \
-            kl_dist, student_teacher_action_kl, student_teacher_action_mse, self.last_lr, lr_mul, \
+            kl_dist, student_teacher_action_kl, student_teacher_action_mse, advantage, replayed_advantage, value_preds_batch.detach().mean(), teacher_value_preds_batch.detach().mean(), self.last_lr, lr_mul, \
             mu.detach(), sigma.detach(), b_loss)
         
     def train_epoch(self):
@@ -464,17 +532,25 @@ class TAPGAgent(A2CDictObsAgent):
         kls = []
         student_teacher_action_kls = []
         student_teacher_action_mses = []
+        advantages = []
+        teacher_advantages = []
+        values = []
+        teacher_values = []
 
         for mini_ep in range(0, self.mini_epochs_num):
             ep_kls = []
             for i in range(len(self.dataset)):
-                a_loss, c_loss, entropy, kl, student_teacher_action_kl, student_teacher_action_mse, last_lr, lr_mul, cmu, csigma, b_loss = self.train_actor_critic(self.dataset[i])
+                a_loss, c_loss, entropy, kl, student_teacher_action_kl, student_teacher_action_mse, advantage, teacher_advantage, value, teacher_value, last_lr, lr_mul, cmu, csigma, b_loss = self.train_actor_critic(self.dataset[i])
                 a_losses.append(a_loss)
                 c_losses.append(c_loss)
                 ep_kls.append(kl)
                 entropies.append(entropy)
                 student_teacher_action_kls.append(student_teacher_action_kl)
                 student_teacher_action_mses.append(student_teacher_action_mse)
+                advantages.append(advantage)
+                teacher_advantages.append(teacher_advantage)
+                values.append(value)
+                teacher_values.append(teacher_value)
                 if self.bounds_loss_coef is not None:
                     b_losses.append(b_loss)
 
@@ -505,7 +581,7 @@ class TAPGAgent(A2CDictObsAgent):
         update_time = update_time_end - update_time_start
         total_time = update_time_end - play_time_start
 
-        return batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, last_lr, lr_mul
+        return batch_dict['step_time'], play_time, update_time, total_time, a_losses, c_losses, b_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, advantages, teacher_advantages, values, teacher_values, last_lr, lr_mul
 
     def train(self):
         self.init_tensors()
@@ -524,7 +600,7 @@ class TAPGAgent(A2CDictObsAgent):
 
         while True:
             epoch_num = self.update_epoch()
-            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, last_lr, lr_mul = self.train_epoch()
+            step_time, play_time, update_time, sum_time, a_losses, c_losses, b_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, advantages, teacher_advantages, values, teacher_values, last_lr, lr_mul = self.train_epoch()
             total_time += sum_time
             frame = self.frame // self.num_agents
 
@@ -547,7 +623,7 @@ class TAPGAgent(A2CDictObsAgent):
                     fps_total = curr_frames / scaled_time
                     print(f'fps step: {fps_step:.0f} fps step and policy inference: {fps_step_inference:.0f} fps total: {fps_total:.0f} epoch: {epoch_num}/{self.max_epochs}')
 
-                self.write_stats(total_time, epoch_num, step_time, play_time, update_time, a_losses, c_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, last_lr, lr_mul, frame, scaled_time, scaled_play_time, curr_frames)
+                self.write_stats(total_time, epoch_num, step_time, play_time, update_time, a_losses, c_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, advantages, teacher_advantages, values, teacher_values, last_lr, lr_mul, frame, scaled_time, scaled_play_time, curr_frames)
                 if len(b_losses) > 0:
                     self.writer.add_scalar('losses/bounds_loss', torch_ext.mean_list(b_losses).item(), frame)
 
@@ -609,8 +685,16 @@ class TAPGAgent(A2CDictObsAgent):
             if should_exit:
                 return self.last_mean_rewards, epoch_num
             
-    def write_stats(self, total_time, epoch_num, step_time, play_time, update_time, a_losses, c_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, last_lr, lr_mul, frame, scaled_time, scaled_play_time, curr_frames):
+    def write_stats(self, total_time, epoch_num, step_time, play_time, update_time, a_losses, c_losses, entropies, kls, student_teacher_action_kls, student_teacher_action_mses, advantages, teacher_advantages, values, teacher_values, last_lr, lr_mul, frame, scaled_time, scaled_play_time, curr_frames):
         self.writer.add_scalar('info/student_teacher_action_kl', torch_ext.mean_list(student_teacher_action_kls).item(), frame)
         self.writer.add_scalar('info/student_teacher_action_mse', torch_ext.mean_list(student_teacher_action_mses).item(), frame)
+        self.writer.add_scalar('info/advantage', torch_ext.mean_list(advantages).item(), frame)
+        self.writer.add_scalar('info/teacher_advantage', torch_ext.mean_list(teacher_advantages).item(), frame)
+        self.writer.add_scalar('info/value', torch_ext.mean_list(values).item(), frame)
+        self.writer.add_scalar('info/teacher_value', torch_ext.mean_list(teacher_values).item(), frame)
+        self.writer.add_scalar('info/bc_coef_scale_factor', self.bc_coef_scale_factor, frame)
+        self.writer.add_scalar('info/pg_coef_scale_factor', self.pg_coef_scale_factor, frame)
+        if self.teacher_cfg['aggregate_data']:
+            self.writer.add_scalar('info/teacher_dataset_size', len(self.teacher_dataset), frame)
         super().write_stats(total_time, epoch_num, step_time, play_time, update_time, a_losses, c_losses, entropies, kls, last_lr, lr_mul, frame, scaled_time, scaled_play_time, curr_frames)
         
