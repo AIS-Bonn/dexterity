@@ -1,0 +1,47 @@
+defaults: 
+  - DexterityTaskObjectLiftPPO
+
+
+
+params:
+  algo:
+    name: tapg_continuous
+  # Overwrite rl-games minibatch_size.
+  config:
+    minibatch_size: 8192  #${....task.env.numEnvs}
+    #mini_epochs: 6  # Might make sense to increase this as multiple miniepochs on a large teacher dataset are beneficial instead of just collecting more data.
+
+    learning_rate: 1e-4
+    lr_schedule: None
+
+  # Build PointNet-like encoders for observations that include pointclouds.
+  network:
+    name: pointnet_actor_critic
+
+
+  student:
+    # bc_coef and pg_coef scale the RL and BC parts of the loss L = L_{BC} + L_{PG}, leading to the following cases:
+    # 1. bc_coef = 0, pg_coef.type == 'advantage': Regular policy gradient
+    # 2. bc_coef = const, pg_coef == 0: Regular behavioral cloning
+    # 3. bc_coef = const, pg_coef.type == 'advantage': Demo-augmented PG, where the static demonstration dataset is replaced by querying the teacher policy
+    # 4. bc_coef.type == 'advantage', pg_coef.type == 'advantage': Demo-augmented PG, where the static demonstration dataset is replaced by querying the teacher policy and the influence of the teacher depends on its advantage over the student
+
+    bc_coef:  # L_{BC} = E [log(pi^{Student}(a^{Teacher}_t | s_t) * bc_coef]
+      type: 'constant'  # Should be in ['constant', 'advantage']. 'advantage' means that bc_coef = V^{Teacher}(s_t) - V^{Student}(s_t)
+      init: 10.0
+      decay: 0.975
+
+    pg_coef:  #L_{PG} = E [log(pi^{Student}(a_t | s_t)) * pg_coef]
+      type: 'advantage'  # Should be in ['constant', 'advantage']. 'advantage' means that pg_coef = A^{Student}(s_t, a_t)
+      init: 1.0
+      decay: 1.0
+    
+    ppo: False  # Whether the PPO loss function should be applied to the behavior cloning loss. 
+    e_clip: 0.5  # Clipping parameter for the PPO loss function applied to behavior cloning loss.
+
+  teacher:
+    checkpoint: ${....teacher_checkpoint}
+    minibatch_size: 1024
+    dataset_size: 1e6
+    gated_advantage: True  # Whether to use 1(V^{Teacher}(s_t) - V^{Student}(s_t)) instead of V^{Teacher}(s_t) - V^{Student}(s_t) as the teacher advantage.
+    normalize_advantages_together: False

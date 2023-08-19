@@ -26,8 +26,10 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos', 'object_quat', 'object_linvel', 'object_angvel']
-    #teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'object_pos']
+    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points', 'highsideview' ]
+    #observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'synthetic_pointcloud' ]
+    #observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points', 'highsideview' ]
+    teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points' ]
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -38,12 +40,12 @@ env:
 randomize:
     observations:
         pointcloud:
-            noise_prob: 0.25
+            noise_prob: 0.0
             noise_std: 0.001
 
     # ik_body start pose.
     ik_body_pos_initial:  # initial position of ik_body
-        default: [0.6, 0., 0.3]
+        default: [0.6, 0., 0.5]
         real_robot: [0.28, 0.58, 0.5]
     ik_body_euler_initial:  # initial rotation of ik_body
         default: [0., 0., 0.]
@@ -70,12 +72,17 @@ randomize:
 
 rl:
     reward:
-        #action_penalty: 0.001  # scale on action penalty
-        manipulator_contact_penalty: 1.0
+        action_penalty: 0.001  # scale on action penalty
+        #manipulator_contact_penalty: 1.0
         arm_contact_penalty: 1.0
-        fingertips_dist_penalty: 1.0
-        object_lift_off_reward: 0.5  # scale on object lift-off progress reward
-        success_bonus: 100.  # reward received upon reaching target height
-    lift_off_height: 0.05  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
-    target_height: 0.2  # target height for the object in meters
+        fingertips_closeness: 0.1
+        liftoff_pointcloud_clearance: 25.0
+        task_progression: 1.0
+        success_bonus: 50.0
+        visibility_ratio: 10.0
+
+
+    liftoff_height: 0.02  # height added to the object's position in meters to count as lifted. Makes dense feedback easier
+    target_pos: [0.28, 0.58, 0.25]
+    target_threshold: 0.05
     max_episode_length: 75
