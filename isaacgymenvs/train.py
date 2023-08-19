@@ -58,11 +58,13 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.learning import amp_network_builder
 
 
-    from isaacgymenvs.tasks.dexterity.learning import aid_continuous
-    from isaacgymenvs.tasks.dexterity.learning import aid_network_builder
-    from isaacgymenvs.tasks.dexterity.learning import pointnet_agent
+    #from isaacgymenvs.tasks.dexterity.learning import pd_continuous
+    #from isaacgymenvs.tasks.dexterity.learning import pd_network_builder
     from isaacgymenvs.tasks.dexterity.learning import pointnet_network_builder
-    from isaacgymenvs.tasks.dexterity.learning import pointnet_player
+    from isaacgymenvs.tasks.dexterity.learning import dictobs_continuous
+    from isaacgymenvs.tasks.dexterity.learning import dictobs_player
+    from isaacgymenvs.tasks.dexterity.learning import dagger_continuous
+    from isaacgymenvs.tasks.dexterity.learning import tapg_continuous
     import isaacgymenvs
 
     time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -146,12 +148,18 @@ def launch_rlg_hydra(cfg: DictConfig):
         model_builder.register_model('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
         model_builder.register_network('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
 
-        runner.algo_factory.register_builder('aid_continuous', lambda **kwargs : aid_continuous.AIDAgent(**kwargs))
-        runner.player_factory.register_builder('aid_continuous', lambda **kwargs : aid_continuous.AIDPlayerContinuous(**kwargs))
-        model_builder.register_network('aid_actor_critic', lambda **kwargs : aid_network_builder.AIDBuilder())
+        #runner.algo_factory.register_builder('dagger_continuous', lambda **kwargs : dagger_continuous.DAggerAgent(**kwargs))
+        #runner.player_factory.register_builder('dagger_continuous', lambda **kwargs : dictobs_player.PpoDictObsPlayerContinuous(**kwargs))
 
-        runner.algo_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : pointnet_agent.A2CPointNetAgent(**kwargs))
-        runner.player_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : pointnet_player.PpoPointNetPlayerContinuous(**kwargs))
+        runner.algo_factory.register_builder('dictobs_a2c_continuous', lambda **kwargs : dictobs_continuous.A2CDictObsAgent(**kwargs))
+        runner.player_factory.register_builder('dictobs_a2c_continuous', lambda **kwargs : dictobs_player.PpoDictObsPlayerContinuous(**kwargs))
+        runner.algo_factory.register_builder('tapg_continuous', lambda **kwargs : tapg_continuous.TAPGAgent(**kwargs))
+        runner.player_factory.register_builder('tapg_continuous', lambda **kwargs : dictobs_player.PpoDictObsPlayerContinuous(**kwargs))
+        #model_builder.register_network('pd_actor_critic', lambda **kwargs : pd_network_builder.PDBuilder())
+        #runner.algo_factory.register_builder('dr_a2c_continuous', lambda **kwargs : dr_a2c_continuous.DRA2CAgent(**kwargs))
+
+        #runner.algo_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : pointnet_agent.A2CPointNetAgent(**kwargs))
+        #runner.player_factory.register_builder('a2c_continuous_pointnet', lambda **kwargs : dictobs_player.PpoDictObsPlayerContinuous(**kwargs))
         model_builder.register_network('pointnet_actor_critic', lambda **kwargs : pointnet_network_builder.A2CPointNetBuilder())
         return runner
 
