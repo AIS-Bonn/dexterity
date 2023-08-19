@@ -342,8 +342,14 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                         assert self._camera_dict[camera_name].image_type == 'rgbxyzseg', \
                             f"The image type of the camera '{camera_name}' used in '{obs}' must be 'rgbxyzseg', but found '{self._camera_dict[camera_name].image_type}' instead."
                 self._acquire_detected_pointcloud(camera_names)
-
-    def _acquire_synthetic_pointcloud(self, num_samples: int = 64, sample_mode: str = 'area') -> torch.Tensor:
+        
+        if "visibility_ratio" in self.cfg["rl"]["reward"]:
+            for camera_name in self._camera_dict.keys():
+                assert len(self._camera_dict.keys()) == 1, "Visibility-ratio can only be computed for a single camera."
+                if not hasattr(self, f'rendered_pointcloud_{camera_name}'):
+                    self._acquire_rendered_pointcloud([camera_name, ])
+        
+    def _acquire_synthetic_pointcloud(self, num_samples: int = 128, sample_mode: str = 'uniform') -> torch.Tensor:
         """Acquire position of the points relative to the mesh origin (object_mesh_sample_pos) and return a
         placeholder for the absolute position of the points in space (object_synthetic_pointcloud_pos) to be updated
         by _refresh_object_synthetic_pointcloud().
@@ -1020,7 +1026,16 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                                              color=(0.8, 0.35, 0.))
         gymutil.draw_lines(bbox, self.gym, self.viewer, self.env_ptrs[env_id],
                            pose=gymapi.Transform())
-
+        
+    def visualize_pointcloud_clearance(self, env_id: int) -> None:
+        object_lowest_point_idx = torch.argmin(torch.where(self.synthetic_pointcloud[env_id, :, 3] < 1.0, 10 * torch.ones_like(self.synthetic_pointcloud[env_id, :, 2]), self.synthetic_pointcloud[env_id, :, 2]))
+        print("object_lowest_point_idx:", object_lowest_point_idx)
+        object_lowest_point = self.synthetic_pointcloud[env_id, object_lowest_point_idx, 0:3]
+        #object_lowest_point_initial = torch.min(torch.where(self.synthetic_pointcloud_initial[..., 3] < 1.0, 10 * torch.ones_like(self.synthetic_pointcloud_initial[..., 2]), self.synthetic_pointcloud_initial[..., 2]), dim=1)[0]
+        print("object_lowest_point:", object_lowest_point)
+        object_lowest_point = gymapi.Vec3(*object_lowest_point)
+        floor_point = gymapi.Vec3(object_lowest_point.x, object_lowest_point.y, 0.0)
+        gymutil.draw_line(object_lowest_point, floor_point, gymapi.Vec3(1, 0, 0), self.gym, self.viewer, self.env_ptrs[env_id])
 
 @torch.jit.script
 def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):

@@ -199,20 +199,17 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
         if any("position_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
             object_height = object_pos[:, 2]
             object_height_initial = getattr(self, name + '_pos_initial')[:, 2]
-            delta_liftoff_position_clearance = torch.clamp(
-                self.cfg_task.rl.liftoff_height - (object_height - object_height_initial), min=0)
+            delta_liftoff_position_clearance = self.cfg_task.rl.liftoff_height - torch.clamp(object_lowest_point - object_lowest_point_initial, min=0, max=self.cfg_task.rl.liftoff_height)
         
         if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
-            object_lowest_point = torch.min(torch.where(self.synthetic_pointcloud[..., 3] < 1.0, 10 * torch.ones_like(synthetic_pointcloud[..., 2]), synthetic_pointcloud[..., 2]), dim=1)[0]
-            object_lowest_point_initial = torch.min(torch.where(self.synthetic_pointcloud_initial[..., 3] < 1.0, 10 * torch.ones_like(synthetic_pointcloud_initial[..., 2]), synthetic_pointcloud_initial[..., 2]), dim=1)[0]
-            delta_liftoff_pointcloud_clearance = torch.clamp(
-                self.cfg_task.rl.liftoff_height - (object_lowest_point - object_lowest_point_initial), min=0)
+            object_lowest_point = torch.min(torch.where(self.synthetic_pointcloud[..., 3] < 1.0, 10 * torch.ones_like(self.synthetic_pointcloud[..., 2]), self.synthetic_pointcloud[..., 2]), dim=1)[0]
+            object_lowest_point_initial = torch.min(torch.where(self.synthetic_pointcloud_initial[..., 3] < 1.0, 10 * torch.ones_like(self.synthetic_pointcloud_initial[..., 2]), self.synthetic_pointcloud_initial[..., 2]), dim=1)[0]
+            delta_liftoff_pointcloud_clearance = self.cfg_task.rl.liftoff_height - torch.clamp(object_lowest_point - object_lowest_point_initial, min=0, max=self.cfg_task.rl.liftoff_height)
         
         if any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
             object_lowest_point = torch.min(getattr(self, name + '_bounding_box_as_points')[..., 2], dim=1)[0]
-            object_lowest_point_initial = torch.min(getattr(self, name + '_bounding_box_as_points_initial')[..., 2], dim=1)[0]
-            delta_liftoff_bounding_box_clearance = torch.clamp(
-                self.cfg_task.rl.liftoff_height - (object_lowest_point - object_lowest_point_initial), min=0)
+            object_lowest_point_initial = torch.clamp(torch.min(getattr(self, name + '_bounding_box_as_points_initial')[..., 2], dim=1)[0], min=0.)
+            delta_liftoff_bounding_box_clearance = self.cfg_task.rl.liftoff_height - torch.clamp(object_lowest_point - object_lowest_point_initial, min=0, max=self.cfg_task.rl.liftoff_height)
 
         reward_terms = {}
         for reward_term, scale in self.cfg_task.rl.reward.items():
@@ -246,7 +243,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                         1, keypoint_pos.shape[1], 1)
                     keypoint_dist = torch.norm(
                         keypoint_pos - object_pos_expanded, dim=-1).sum(dim=-1)
-                    keypoint_dist_squared = keypoint_dist.pow(2)
+                    keypoint_dist_squared = keypoint_dist.pow(3)
                     reward = -scale * keypoint_dist_squared
                 else:
                     assert False
@@ -277,7 +274,8 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
             elif reward_term.startswith('liftoff'):
                 clearance_type = reward_term[len('liftoff_'):]
                 delta_liftoff_clearance = locals()['delta_liftoff_' + clearance_type]
-                reward = hyperbole_rew(scale, delta_liftoff_clearance, c=0.02, pow=1) - hyperbole_rew(scale, torch.ones_like(delta_liftoff_clearance) * self.cfg_task.rl.liftoff_height, c=0.02, pow=1)
+                #print("delta_liftoff_clearance:", delta_liftoff_clearance)
+                reward = hyperbole_rew(scale, delta_liftoff_clearance, c=0.25, pow=1) - hyperbole_rew(scale, torch.ones_like(delta_liftoff_clearance) * self.cfg_task.rl.liftoff_height, c=0.25, pow=1)
                 reward = torch.clamp(reward, min=0)
 
             elif reward_term == 'task_progression':
@@ -295,55 +293,70 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                 reward = torch.zeros(self.num_envs).to(self.device)
                 # Compute visibility ratio for each camera.
                 #for camera_name in self._camera_dict.keys():  # Use this to show visibility-ratio for all cameras depite rendered point-cloud not being used in the observation.
-                for camera_name in self.rendered_pointcloud_camera_names:
-                    camera = self._camera_dict[camera_name]
+                if hasattr(self, "rendered_pointcloud_camera_names"):
+                    visibility_ratio = torch.zeros(self.num_envs).to(self.device)
+                    for camera_name in self.rendered_pointcloud_camera_names:
+                        camera = self._camera_dict[camera_name]
 
-                    # Acquire ground truth segmentation mask.
-                    segmentation_mask = self.obs_dict["image"][camera_name][..., 6]
+                        # Acquire ground truth segmentation mask.
+                        segmentation_mask = self.obs_dict["image"][camera_name][..., 6]
 
-                    # Project synthetic pointcloud into camera frame.
-                    view_matrix = camera.compute_view_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
-                    projection_matrix = camera.compute_projection_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
-                    syn_pc_in_camera_frame = xyz_to_image(self.synthetic_pointcloud[..., 0:3], projection_matrix, view_matrix, camera.width, camera.height)
+                        # Project synthetic pointcloud into camera frame.
+                        view_matrix = camera.compute_view_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
+                        projection_matrix = camera.compute_projection_matrix(self.num_envs * self.synthetic_pointcloud.shape[1], self.device)
+                        syn_pc_in_camera_frame = xyz_to_image(self.synthetic_pointcloud[..., 0:3], projection_matrix, view_matrix, camera.width, camera.height)
 
-                    # Compute visibility ratio.
-                    env_indices = torch.arange(self.num_envs)[:, None].to(self.device)
-                    in_mask = segmentation_mask[env_indices, syn_pc_in_camera_frame[..., 0].long(), syn_pc_in_camera_frame[..., 1].long()] == target_segmentation_id
-                    visibility_ratio = in_mask.float().mean(dim=-1)
+                        out_of_view = torch.logical_or(syn_pc_in_camera_frame[..., 0] < 0, syn_pc_in_camera_frame[..., 0] >= camera.height) 
+                        out_of_view = torch.logical_or(out_of_view, syn_pc_in_camera_frame[..., 1] < 0)
+                        out_of_view = torch.logical_or(out_of_view, syn_pc_in_camera_frame[..., 1] >= camera.width)
 
-                    # The way it is implemented right now, the reward for the visibility-ratio of all cameras is added together.
-                    reward += scale * visibility_ratio
+                        # Clamp projected points to image dimensions. (As we have already checked for out-of-view points, we can safely clamp to the image dimensions for indexing without corrupting the final visibility ratio.)
+                        syn_pc_in_camera_frame[..., 0] = torch.clamp(syn_pc_in_camera_frame[..., 0], min=0, max=camera.height - 1)
+                        syn_pc_in_camera_frame[..., 1] = torch.clamp(syn_pc_in_camera_frame[..., 1], min=0, max=camera.width - 1)
 
-                    draw_debug_visualization = True
-                    if draw_debug_visualization:
-                        import matplotlib.pyplot as plt
+                        # Compute visibility ratio.
+                        env_indices = torch.arange(self.num_envs)[:, None].to(self.device)
+                        in_mask = segmentation_mask[env_indices, syn_pc_in_camera_frame[..., 0].long(), syn_pc_in_camera_frame[..., 1].long()] == target_segmentation_id
+                        in_mask[out_of_view] = False  # Adjust for points that are projected to a view outside of the camera's field of view.
+                        visibility_ratio = in_mask.float().mean(dim=-1)
 
-                        num_envs_to_show = min(4, self.num_envs)
-                        if not hasattr(self, f"visibility_ratio_{camera_name}_fig"):
-                            fig, axs = plt.subplots(1, num_envs_to_show, figsize=(num_envs_to_show * 5, 5))
-                            setattr(self, f"visibility_ratio_{camera_name}_fig", fig)
-                            setattr(self, f"visibility_ratio_{camera_name}_axs", axs)
-                            for i in range(num_envs_to_show):
-                                axs[i].set_title(f"Env {i}")
-                                axs[i].imshow(segmentation_mask[i].cpu().numpy())
-                                axs[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
-                                for projected_point in syn_pc_in_camera_frame[i]:
-                                    visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
-                                    axs[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+                        # The way it is implemented right now, the reward for the visibility-ratio of all cameras is added together.
+                        alpha = 10.0
+                        reward += liftoff_achieved * 0.5 * scale * (visibility_ratio > 0.33) + liftoff_achieved * 0.5 * scale * (visibility_ratio > 0.66)
+                        #visibility_ratio += scale * torch.exp(alpha * (visibility_ratio - 1.0))
 
-                            plt.show(block=False)
-                        else:
-                            for i in range(num_envs_to_show):
-                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].cla()
-                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_title(f"Env {i}")
-                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].imshow(segmentation_mask[i].cpu().numpy())
-                                getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
-                                for projected_point in syn_pc_in_camera_frame[i]:
-                                    visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
-                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+                        draw_debug_visualization = False
+                        if draw_debug_visualization:
+                            import matplotlib.pyplot as plt
 
-                            getattr(self, f"visibility_ratio_{camera_name}_fig").canvas.draw()
-                            plt.pause(0.01)
+                            num_envs_to_show = min(4, self.num_envs)
+                            if not hasattr(self, f"visibility_ratio_{camera_name}_fig"):
+                                fig, axs = plt.subplots(1, num_envs_to_show, figsize=(num_envs_to_show * 5, 5))
+                                if self.num_envs == 1:
+                                    axs = [axs,]
+                                setattr(self, f"visibility_ratio_{camera_name}_fig", fig)
+                                setattr(self, f"visibility_ratio_{camera_name}_axs", axs)
+                                for i in range(num_envs_to_show):
+                                    axs[i].set_title(f"Env {i}")
+                                    axs[i].imshow(segmentation_mask[i].cpu().numpy())
+                                    axs[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
+                                    for projected_point in syn_pc_in_camera_frame[i].cpu().numpy():
+                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                        axs[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+
+                                plt.show(block=False)
+                            else:
+                                for i in range(num_envs_to_show):
+                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].cla()
+                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_title(f"Env {i}")
+                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].imshow(segmentation_mask[i].cpu().numpy())
+                                    getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
+                                    for projected_point in syn_pc_in_camera_frame[i].cpu().numpy():
+                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                        getattr(self, f"visibility_ratio_{camera_name}_axs")[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
+
+                                getattr(self, f"visibility_ratio_{camera_name}_fig").canvas.draw()
+                                plt.pause(0.01)
 
                     
             else:
@@ -351,6 +364,14 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             self.rew_buf[:] += reward
             reward_terms["reward_terms/" + reward_term] = reward.mean()
+        
+        # Perception-driven reward scales task-objective rewards.
+        #if "visibility_ratio" in locals():
+        #    self.rew_buf[:] *= visibility_ratio
+        #print("----------------------------")
+        #for k, v in reward_terms.items():
+        #    print(f"{k}: {v.item():.2f}")
+
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)
         
