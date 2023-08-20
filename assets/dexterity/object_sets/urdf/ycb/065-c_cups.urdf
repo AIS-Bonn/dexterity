@@ -2,7 +2,7 @@
 <robot name="065-c_cups">
   <link name="base_link">
     <inertial>
-      <mass value="0.08" />
+      <mass value="0.020" />
       <origin xyz="0 0 0" />
       <inertia  ixx="0.0002" ixy="0.0"  ixz="0.0"  iyy="0.0002"  iyz="0.0" izz="0.0002" />
     </inertial>

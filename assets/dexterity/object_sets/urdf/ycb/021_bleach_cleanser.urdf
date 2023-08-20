@@ -2,7 +2,7 @@
 <robot name="021_bleach_cleanser">
   <link name="base_link">
     <inertial>
-      <mass value="1.05" />
+      <mass value="0.054" />
       <origin xyz="0 0 0" />
       <inertia  ixx="0.0002" ixy="0.0"  ixz="0.0"  iyy="0.0002"  iyz="0.0" izz="0.0002" />
     </inertial>
