@@ -6,5 +6,21 @@ defaults:
 
 env:
     env_name: 'DexterityEnvDrill'
-    drills: ['canonical/canonical.urdf']
+    drills: ['black_and_decker_unknown/actuated.urdf']
     drill_target_color: [0, 1, 0]
+
+ros_cameras:
+    l515:
+        image_type: 'rgbxyz'
+
+    d455:
+        image_type: 'rgbxyz'
+
+
+cameras:
+    rgb_frontview:
+        pos: [ 1.25, 0., 0.75 ]
+        quat: [ -0.174, 0, 0.985, 0 ]
+        fovx: 87
+        resolution: [1920, 1080]
+        image_type: 'rgb'

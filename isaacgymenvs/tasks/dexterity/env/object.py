@@ -258,7 +258,9 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_angvel = self.root_angvel[:, self.object_actor_id_env, 0:3]
 
         self._acquire_pointcloud_tensors()
-        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
+
+        all_observations = self.cfg["env"]["observations"] + self.cfg["env"]["teacher_observations"] if "teacher_observations" in self.cfg["env"].keys() else self.cfg["env"]["observations"]
+        if any("object_bounding_box" in obs for obs in all_observations) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._acquire_object_bounding_box()
 
 
@@ -289,18 +291,16 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         self.object_bounding_box_from_origin_quat = self.object_bounding_box_from_origin_quat.repeat(num_repeats, 1)[:self.num_envs]
         self.object_bounding_box[:, 7:10] = self.object_bounding_box_extents.repeat(num_repeats, 1)[:self.num_envs]
 
-
-        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
-            self.bounding_box_to_points = torch.tensor(
-                [[[-0.5, -0.5, -0.5],
-                  [-0.5, -0.5,  0.5],
-                  [-0.5,  0.5, -0.5],
-                  [-0.5,  0.5,  0.5],
-                  [ 0.5, -0.5, -0.5],
-                  [ 0.5, -0.5,  0.5],
-                  [ 0.5,  0.5, -0.5],
-                  [ 0.5,  0.5,  0.5]]], device=self.device).repeat(self.num_envs, 1, 1)
-            self.object_bounding_box_as_points = torch.zeros((self.num_envs, 8, 3)).to(self.device)
+        self.bounding_box_to_points = torch.tensor(
+            [[[-0.5, -0.5, -0.5],
+                [-0.5, -0.5,  0.5],
+                [-0.5,  0.5, -0.5],
+                [-0.5,  0.5,  0.5],
+                [ 0.5, -0.5, -0.5],
+                [ 0.5, -0.5,  0.5],
+                [ 0.5,  0.5, -0.5],
+                [ 0.5,  0.5,  0.5]]], device=self.device).repeat(self.num_envs, 1, 1)
+        self.object_bounding_box_as_points = torch.zeros((self.num_envs, 8, 3)).to(self.device)
 
 
     def _refresh_object_bounding_box(self) -> None:
@@ -310,15 +310,17 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # Update bounding box quaternion.
         self.object_bounding_box[:, 3:7] = quat_mul(self.object_quat, self.object_bounding_box_from_origin_quat)
 
-        if any("object_bounding_box_as_points" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
+        all_observations = self.cfg["env"]["observations"] + self.cfg["env"]["teacher_observations"] if "teacher_observations" in self.cfg["env"].keys() else self.cfg["env"]["observations"]
+        if any("object_bounding_box_as_points" in obs for obs in all_observations) or any("bounding_box_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
             self.object_bounding_box_as_points[:] = self.object_bounding_box[:, 0:3].unsqueeze(1).repeat(1, 8, 1) + quat_apply(self.object_bounding_box[:, 3:7].unsqueeze(1).repeat(1, 8, 1), self.bounding_box_to_points * self.object_bounding_box[:, 7:10].unsqueeze(1).repeat(1, 8, 1))
 
     def _acquire_pointcloud_tensors(self) -> None:
+        all_observations = self.cfg["env"]["observations"] + self.cfg["env"]["teacher_observations"] if "teacher_observations" in self.cfg["env"].keys() else self.cfg["env"]["observations"]
         # Synthetic point-clouds (Needed either as an observation, to compute the clearance of the lowest point or to compute a visibility-ratio).
-        if any(obs.startswith("synthetic_pointcloud") for obs in self.cfg["env"]["observations"]) or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
+        if any(obs.startswith("synthetic_pointcloud") for obs in all_observations) or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
             self.synthetic_pointcloud_ordered = self._acquire_synthetic_pointcloud()
 
-        for obs in self.cfg["env"]["observations"]:
+        for obs in all_observations:
             # Rendered point-clouds.
             if obs.startswith("rendered_pointcloud"):
                 camera_names = obs[len("rendered_pointcloud_"):].split('_')
@@ -618,7 +620,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
             self.rendered_pointcloud_fig.canvas.draw()
             plt.pause(0.01)
 
-    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = False) -> None:
+    def _refresh_detected_pointcloud(self, draw_debug_visualization: bool = True) -> None:
         if not hasattr(self, 'segtrackers'):
             return
 
@@ -836,7 +838,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
                     color_image_numpy, self.pred_mask)
 
     def _acquire_segtracker(self):
-        from SegTracker import SegTracker
+        #import SegTracker
+        from sam_tracking.SegTracker import SegTracker
         from model_args import aot_args, sam_args, segtracker_args
 
         sam_args['generator_args'] = {
@@ -850,7 +853,7 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         sam_args['sam_checkpoint'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/sam_vit_b_01ec64.pth'
         aot_args['model_path'] = '/home/user/mosbach/tools/sam_tracking/sam_tracking/ckpt/R50_DeAOTL_PRE_YTB_DAV.pth'
 
-        segtracker_args['sam_gap'] = 9999   # We don't need SAM to detect newly-appearing objects.
+        #segtracker_args['sam_gap'] = 9999   # We don't need SAM to detect newly-appearing objects.
 
         # Create a tracker per camera and environment.
         self.segtrackers, self.segm_fig, self.tracked_image_debug = {}, {}, {}
@@ -867,17 +870,20 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         # root state tensor through regular slicing, they are views rather than
         # separate tensors and hence don't have to be updated separately.
         self._refresh_pointcloud_tensors()
-        if any("object_bounding_box" in obs for obs in self.cfg["env"]["observations"]) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
+
+        all_observations = self.cfg["env"]["observations"] + self.cfg["env"]["teacher_observations"] if "teacher_observations" in self.cfg["env"].keys() else self.cfg["env"]["observations"]
+        if any("object_bounding_box" in obs for obs in all_observations) or any("bounding_box" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._refresh_object_bounding_box()
 
     def _refresh_pointcloud_tensors(self):
-        if "synthetic_pointcloud" in self.cfg["env"]["observations"] or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
+        all_observations = self.cfg["env"]["observations"] + self.cfg["env"]["teacher_observations"] if "teacher_observations" in self.cfg["env"].keys() else self.cfg["env"]["observations"]
+        if "synthetic_pointcloud" in all_observations or any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']) or any("visibility_ratio" in reward_term for reward_term in self.cfg['rl']['reward']):
             self._refresh_synthetic_pointcloud()
         
-        if any(obs.startswith("rendered_pointcloud") for obs in self.cfg["env"]["observations"]):
+        if any(obs.startswith("rendered_pointcloud") for obs in all_observations):
             self._refresh_rendered_pointcloud()
 
-        if any(obs.startswith("detected_pointcloud") for obs in self.cfg["env"]["observations"]):
+        if any(obs.startswith("detected_pointcloud") for obs in all_observations):
             self._refresh_detected_pointcloud()
 
     def _get_random_drop_pos(self, env_ids) -> torch.Tensor:
@@ -961,8 +967,8 @@ class DexterityEnvObject(DexterityBase, DexterityABCEnv):
         upper = self.workspace_extent_xy[1] + [0.]
         extent = torch.tensor([lower, upper])
         drop_pose = gymapi.Transform(
-            p=gymapi.Vec3(self.cfg_task.randomize.object_pos_drop[0],
-                          self.cfg_task.randomize.object_pos_drop[1],
+            p=gymapi.Vec3(self.object_pos_drop[0],
+                          self.object_pos_drop[1],
                           0.))
         bbox = gymutil.WireframeBBoxGeometry(extent, pose=drop_pose,
                                              color=(0, 1, 1))

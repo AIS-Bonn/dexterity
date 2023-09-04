@@ -7,6 +7,7 @@ defaults:
 name: DexterityTaskDrillPickAndPlace
 physics_engine: ${..physics_engine}
 full_experiment_name: ${..experiment}
+test: ${..test}
 
 
 # needed for headless VR
@@ -23,28 +24,38 @@ sim:
 env:
     numEnvs: ${resolve_default:16384,${...num_envs}}
     numObservations: 0  # overwritten depending on observations
-    observations: ['ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'hand_bodies_demo_pos', 'hand_bodies_demo_quat']
+    observations: ['ik_body_pos', 'ik_body_quat', 'drill_pos', 'drill_quat', 'fingertips_pos', 'fingertips_quat', 'hand_bodies_pos', 'hand_bodies_quat', 'palm_pos', 'palm_quat', 'tripod_pos', 'tripod_quat', 'rgb_frontview']
     numActions: 0  # overwritten depending on robot configuration
 
 randomize:
-    drill_pos_drop: [ 0.0, 0.0, 0.5 ]  # position from which drill is dropped
+    drill_pos_drop: [ 0.7, 0.0, 0.5 ]  # position from which drill is dropped
     drill_pos_drop_noise: [ 0.05, 0.05, 0.0 ]  # noise on drill drop position
     num_drill_drop_steps: 150  # number of steps to drop drills
 
-    drill_pos_target: [ 0.0, 0.0, 0.5 ]  # position from which drill is dropped
+    drill_pos_target: [ 0.3, 0.0, -0.5 ]  # position from which drill is dropped
     drill_pos_target_noise: [ 0.05, 0.05, 0.05 ]  # noise on drill drop position
 
-    ik_body_pos_initial: [0.0, 0.0, 0.5]  # initial position of ik_body
-    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
-    ik_body_euler_initial: [0.0, 0.0, 0.0]  # initial rotation of ik_body
-    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
-    num_ik_body_initial_move_steps: 250  # number of steps to reach initial pose
+    observations:
+        pointcloud:
+            noise_prob: 0.0
+            noise_std: 0.001
 
+    # ik_body start pose.
+    ik_body_pos_initial:  # initial position of ik_body
+        [0.6, 0., 0.5]
+    ik_body_euler_initial:  # initial rotation of ik_body
+        [0., 0., 0.]
+    ik_body_euler_noise: [0.0, 0.0, 0.0]  # noise on ik_body rotation
+    ik_body_pos_noise: [0.0, 0.0, 0.0]  # noise on ik_body position
+
+    move_to_pregrasp_pose: False
+
+    num_ik_body_initial_move_steps: 2  # number of steps to reach initial pose
 rl:
     reward:
         action_penalty: 0.0  # scale on action penalty
         #fingertips_imitation_dist_penalty: 0.0  # scale on fingertips distance penalty to the pre-recorded pose.
-        hand_bodies_imitation_dist_penalty: 5.0  # scale on hand_bodies distance penalty to the pre-recorded pose.
+        #hand_bodies_imitation_dist_penalty: 5.0  # scale on hand_bodies distance penalty to the pre-recorded pose.
         target_pos_dist_penalty: 1.0  # scale on distance penalty between drill pos and drill target pos
         target_quat_dist_penalty: 1.0  # scale on min angle distance penalty between drill quat and drill target quat
         success_bonus: 1000.0  # reward received upon reaching target pose

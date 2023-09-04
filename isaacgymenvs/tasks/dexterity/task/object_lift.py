@@ -243,7 +243,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                         1, keypoint_pos.shape[1], 1)
                     keypoint_dist = torch.norm(
                         keypoint_pos - object_pos_expanded, dim=-1).sum(dim=-1)
-                    keypoint_dist_squared = keypoint_dist.pow(3)
+                    keypoint_dist_squared = torch.clamp(keypoint_dist.pow(2), max=10.0)
                     reward = -scale * keypoint_dist_squared
                 else:
                     assert False

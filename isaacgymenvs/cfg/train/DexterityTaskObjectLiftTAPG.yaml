@@ -8,16 +8,15 @@ params:
     name: tapg_continuous
   # Overwrite rl-games minibatch_size.
   config:
-    minibatch_size: 8192  #${....task.env.numEnvs}
+  #  learning_rate: 5e-4
+  #  lr_schedule: None  # Overwritten as regular scheduler does not seem to do well with TAPG.
+    horizon_length: 128
+    minibatch_size: 32768  #${....task.env.numEnvs}
     #mini_epochs: 6  # Might make sense to increase this as multiple miniepochs on a large teacher dataset are beneficial instead of just collecting more data.
-
-    learning_rate: 1e-4
-    lr_schedule: None
 
   # Build PointNet-like encoders for observations that include pointclouds.
   network:
     name: pointnet_actor_critic
-
 
   student:
     # bc_coef and pg_coef scale the RL and BC parts of the loss L = L_{BC} + L_{PG}, leading to the following cases:
@@ -28,8 +27,8 @@ params:
 
     bc_coef:  # L_{BC} = E [log(pi^{Student}(a^{Teacher}_t | s_t) * bc_coef]
       type: 'constant'  # Should be in ['constant', 'advantage']. 'advantage' means that bc_coef = V^{Teacher}(s_t) - V^{Student}(s_t)
-      init: 10.0
-      decay: 0.975
+      init: 0.0
+      decay: 0.98
 
     pg_coef:  #L_{PG} = E [log(pi^{Student}(a_t | s_t)) * pg_coef]
       type: 'advantage'  # Should be in ['constant', 'advantage']. 'advantage' means that pg_coef = A^{Student}(s_t, a_t)
@@ -41,7 +40,7 @@ params:
 
   teacher:
     checkpoint: ${....teacher_checkpoint}
-    minibatch_size: 1024
+    minibatch_size: 4096
     dataset_size: 1e6
     gated_advantage: True  # Whether to use 1(V^{Teacher}(s_t) - V^{Student}(s_t)) instead of V^{Teacher}(s_t) - V^{Student}(s_t) as the teacher advantage.
     normalize_advantages_together: False

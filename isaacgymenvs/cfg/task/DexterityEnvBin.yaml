@@ -11,9 +11,9 @@ env:
     num_objects: 3  # Number of objects dropped into each bin
     object_sets_asset_root: '../../../../assets/dexterity/object_sets'
     object_sets:
-        contactdb: ['*']
+        #contactdb: ['*']
         egad: []
-        ycb: []
+        ycb: ['005_tomato_soup_can', '007_tuna_fish_can', '008_pudding_box', '009_gelatin_box', '011_banana', '012_strawberry', '013_apple', '014_lemon', '015_peach', '016_pear', '017_orange', '018_plum', '026_sponge', '054_softball', '055_baseball', '056_tennis_ball', '057_racquetball', '058_golf_ball', '061_foam_brick', '065*', '077_rubiks_cube']
     setup: 'real_robot'  # Should be in ['default', 'real_robot']
 
     bin_asset: 'no_bin'
@@ -45,12 +45,27 @@ cameras:
         quat: [ -0.271, -0.653, 0.271, 0.653 ]  # 45 deg inclined downwards with the connector facing the wrist
         attach_to_body: 'palm'
 
+    sideview:
+        model: 'realsense_d455'
+        pos: [ -0.329, 0.645, 0.311 ]
+        # To get the right quaternion, you first have to go to the ROS coordinate system and then apply the transformation you get in tf_echo, i.e., quat_apply(ros_tf_quat, torch.Tensor([0.5, -0.5, 0.5, 0.5])).
+        quat: [0.012, 0.124, -0.024, 0.992]
+        # -90 um Y, 90 um Z
+
+    wristview:
+        model: 'realsense_d405'
+        pos: [ 0., 0.1, -0.1 ]
+        quat: [ -0.183, -0.683, 0.183, 0.683 ]
+        attach_to_body: 'palm'
+
     rgb_frontview:
         pos: [ 1.25, 0.58, 0.6 ]
         quat: [ -0.174, 0, 0.985, 0 ]
         fovx: 87
         resolution: [4096, 3072]
         image_type: 'rgb'
+
+    
 
 ros_cameras:
     l515:

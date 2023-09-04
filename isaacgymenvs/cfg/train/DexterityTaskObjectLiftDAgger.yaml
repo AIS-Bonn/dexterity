@@ -1,0 +1,29 @@
+defaults: 
+  - DexterityTaskObjectLiftPPO
+
+
+
+params:
+  algo:
+    name: dagger_continuous
+  # Overwrite rl-games minibatch_size, which is not used for DAgger, but would otherwise cause an AssertionError.
+  config:
+    minibatch_size: ${....task.env.numEnvs}
+
+    learning_rate: 5e-4
+    lr_schedule: None
+
+
+  # Build PointNet-like encoders for observations that include pointclouds.
+  network:
+    name: pointnet_actor_critic
+
+
+  student:
+    miniepochs: 5  # Number of miniepochs run to update the student parameters each time calc_gradients is called
+  teacher:
+    checkpoint: ${....teacher_checkpoint}
+    batch_size: 400  # Batch size for (obs, teacher_actions) sampled from teacher dataset
+    dataset_capacity: 1e6  # Maximum number of (obs, teacher_actions) that fit in teacher dataset
+    action_prob_init: 0.0  # Initial probability of using teacher action
+    action_prob_decay: 0.9  # Decay rate of teacher action probability.
