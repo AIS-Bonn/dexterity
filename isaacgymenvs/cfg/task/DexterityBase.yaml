@@ -70,8 +70,8 @@ ctrl:
         residual_damping: 5.0
         uniform_arm_and_hand_gains: True  # Enforces gains DoFs on the arm to be equal and the ones on the hand to be equal irrespective of where the ik body is in the kinematic chain
 
-    pos_action_scale: [0.2, 0.2, 0.2] #[0.25, 0.25, 0.25]  #[ 0.025, 0.025, 0.025 ]
-    rot_action_scale: [0.3, 0.3, 0.3]  #[ 0.1, 0.1, 0.1 ]
+    pos_action_scale: [0.15, 0.15, 0.15] #[0.25, 0.25, 0.25]  #[ 0.025, 0.025, 0.025 ]
+    rot_action_scale: [0.1, 0.1, 0.5] #[0.1, 0.1, 0.5]  #[ 0.1, 0.1, 0.1 ]
     #torque_action_scale: [ 1.0, 1.0, 1.0 ]
 
     clamp_rot: True

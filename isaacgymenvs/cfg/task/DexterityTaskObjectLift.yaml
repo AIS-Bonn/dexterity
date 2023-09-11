@@ -26,10 +26,10 @@ env:
     numActions: 0  # overwritten depending on robot configuration
 
     # Observations specified here will be available to the agent in the obs_dict under the key 'obs' for regular proprioceptive observations such as poses, under the key 'image' for observations coming from image sensors, such as RGB or depth images.
-    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points', 'frontview']
+    observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points']
     #observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'synthetic_pointcloud' ]
     #observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'frontview']
-    teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points' ]
+    #teacher_observations: ['ctrl_target_ik_body_pos', 'ctrl_target_ik_body_quat', 'ctrl_target_residual_actuated_dof_pos', 'ik_body_pos', 'ik_body_quat', 'fingertips_pos', 'object_pos', 'object_linvel', 'object_bounding_box_as_points' ]
 
     # If obs_as_dict is True, the observation is returned as a dictionary instead of a single vector.
     obs_as_dict: False
@@ -77,9 +77,10 @@ rl:
         arm_contact_penalty: 1.0
         fingertips_closeness: 0.1
         liftoff_pointcloud_clearance: 25.0
-        task_progression: 1.0
+        task_progression: 5.0
         success_bonus: 50.0
-        visibility_ratio: 20.0
+        synthetic_visibility: 1.0
+        #visibility_ratio: 20.0
 
 
     liftoff_height: 0.02  # height added to the object's position in meters to count as lifted. Makes dense feedback easier

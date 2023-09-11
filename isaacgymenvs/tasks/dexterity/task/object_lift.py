@@ -280,7 +280,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             elif reward_term == 'task_progression':
                 liftoff_achieved = delta_liftoff_clearance < 0.01
-                reward = liftoff_achieved * hyperbole_rew(scale, delta_target_pos, c=0.04, pow=1)
+                reward = liftoff_achieved * hyperbole_rew(scale, delta_target_pos, c=0.075, pow=1)
 
             # Reward for lifting the object to the target position.
             elif reward_term == 'success_bonus':
@@ -288,6 +288,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
             # Reward the visibility of the target object, i.e. avoid occluding it.
             elif reward_term == 'visibility_ratio':
+                robot_segmentation_id = 1
                 target_segmentation_id = 2
 
                 reward = torch.zeros(self.num_envs).to(self.device)
@@ -316,13 +317,13 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
 
                         # Compute visibility ratio.
                         env_indices = torch.arange(self.num_envs)[:, None].to(self.device)
-                        in_mask = segmentation_mask[env_indices, syn_pc_in_camera_frame[..., 0].long(), syn_pc_in_camera_frame[..., 1].long()] == target_segmentation_id
+                        in_mask = segmentation_mask[env_indices, syn_pc_in_camera_frame[..., 0].long(), syn_pc_in_camera_frame[..., 1].long()] != robot_segmentation_id
                         in_mask[out_of_view] = False  # Adjust for points that are projected to a view outside of the camera's field of view.
                         visibility_ratio = in_mask.float().mean(dim=-1)
 
                         # The way it is implemented right now, the reward for the visibility-ratio of all cameras is added together.
                         alpha = 10.0
-                        reward += liftoff_achieved * 0.5 * scale * (visibility_ratio > 0.33) + liftoff_achieved * 0.5 * scale * (visibility_ratio > 0.66)
+                        reward += scale * (0.05 * visibility_ratio + 0.95 * visibility_ratio * liftoff_achieved)
                         #visibility_ratio += scale * torch.exp(alpha * (visibility_ratio - 1.0))
 
                         draw_debug_visualization = False
@@ -341,7 +342,7 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                                     axs[i].imshow(segmentation_mask[i].cpu().numpy())
                                     axs[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
                                     for projected_point in syn_pc_in_camera_frame[i].cpu().numpy():
-                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] != robot_segmentation_id
                                         axs[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
 
                                 plt.show(block=False)
@@ -352,25 +353,25 @@ class DexterityTaskObjectLift(DexterityEnvObject, DexterityABCTask, CalibrationU
                                     getattr(self, f"visibility_ratio_{camera_name}_axs")[i].imshow(segmentation_mask[i].cpu().numpy())
                                     getattr(self, f"visibility_ratio_{camera_name}_axs")[i].set_xlabel(f"Visibility ratio: {visibility_ratio[i].item():.2f}")
                                     for projected_point in syn_pc_in_camera_frame[i].cpu().numpy():
-                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] == target_segmentation_id
+                                        visible = segmentation_mask[i, int(projected_point[0]), int(projected_point[1])] != robot_segmentation_id
                                         getattr(self, f"visibility_ratio_{camera_name}_axs")[i].scatter(projected_point[1], projected_point[0], s=1, c='g' if visible else 'r')
 
                                 getattr(self, f"visibility_ratio_{camera_name}_fig").canvas.draw()
                                 plt.pause(0.01)
 
                     
+            elif reward_term == 'synthetic_visibility':
+                ik_body_yaw = torch_utils.get_euler_xyz(self.ik_body_quat)[2]
+                ik_body_yaw = torch.abs(torch.where(ik_body_yaw > np.pi, ik_body_yaw - 2 * np.pi, ik_body_yaw))
+                visibility = hyperbole_rew(scale, torch.abs(ik_body_yaw - 0.5), c=0.25, pow=1)
+                reward = 0.1 * visibility + 0.9 * visibility * liftoff_achieved
+
+
             else:
                 assert False, f"Unknown reward term {reward_term}."
 
             self.rew_buf[:] += reward
             reward_terms["reward_terms/" + reward_term] = reward.mean()
-        
-        # Perception-driven reward scales task-objective rewards.
-        #if "visibility_ratio" in locals():
-        #    self.rew_buf[:] *= visibility_ratio
-        #print("----------------------------")
-        #for k, v in reward_terms.items():
-        #    print(f"{k}: {v.item():.2f}")
 
         if "reward_terms" in self.cfg_base.logging.keys():
             self.log(reward_terms)

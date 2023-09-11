@@ -63,7 +63,6 @@ def launch_rlg_hydra(cfg: DictConfig):
     from isaacgymenvs.tasks.dexterity.learning import pointnet_network_builder
     from isaacgymenvs.tasks.dexterity.learning import dictobs_continuous
     from isaacgymenvs.tasks.dexterity.learning import dictobs_player
-    from isaacgymenvs.tasks.dexterity.learning import dagger_continuous
     from isaacgymenvs.tasks.dexterity.learning import tapg_continuous
     import isaacgymenvs
 

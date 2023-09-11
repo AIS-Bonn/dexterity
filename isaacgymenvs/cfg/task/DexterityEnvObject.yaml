@@ -24,11 +24,6 @@ cameras:
         #resolution: [1920, 1080]
         #image_type: 'rgb'
 
-    #sideview:
-    #    model: 'realsense_d455'
-    #    pos: [ -0.334, 0.634, 0.356 ]
-    #    quat: [ 0., 0.131, 0.0, 0.991 ]
-
     sideview:
         model: 'realsense_d455'
         pos: [ -0.329, 0.645, 0.311 ]
@@ -42,13 +37,6 @@ cameras:
         fovx: 87
         resolution: [1920, 1080]
         image_type: 'rgb'
-
-    topview:
-        model: 'realsense_d455'
-        pos: [ -0.05, 0.645, 0.75 ]
-        # To get the right quaternion, you first have to go to the ROS coordinate system and then apply the transformation you get in tf_echo, i.e., quat_apply(ros_tf_quat, torch.Tensor([0.5, -0.5, 0.5, 0.5])).
-        quat: [0.0, 0.5, 0.0, 0.866]
-        # -90 um Y, 90 um Z
 
     palmview:
         model: 'realsense_d405'
@@ -68,17 +56,12 @@ cameras:
         quat: [ -0.183, -0.683, 0.183, 0.683 ]
         attach_to_body: 'palm'
 
-    #topview:
-    #    model: 'realsense_d455'
-    #    pos: [ 0.572, 0.3707, 0.7785 ]
-    #    quat: [ -0.647, 0.0, 0.762, 0. ]
-
     rgb_frontview:
-        pos: [ 1.25, 0., 0.6 ]
-        quat: [ -0.174, 0, 0.985, 0 ]
+        pos: [ 0.28, 1.03, 0.4 ]
+        quat: [ 0.183, 0.183, -0.683, 0.683 ]
         fovx: 87
         resolution: [1920, 1080]
-        image_type: 'rgb'
+        image_type: 'rgb_seg'
 
 ros_cameras:
     l515:

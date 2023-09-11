@@ -1,3 +1,3 @@
 fovx: 87
-resolution: [1280, 720]
-image_type: 'rgbxyzseg'
+resolution: [320, 240] #[640, 480]
+image_type: 'rgbxyzseg' #'rgbxyzseg'

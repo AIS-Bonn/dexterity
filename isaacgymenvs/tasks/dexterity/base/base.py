@@ -296,6 +296,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             os.path.join(os.path.dirname(__file__), '../..', '..', '..',
                          'assets', 'dexterity'))
         table_asset = self.gym.load_asset(self.sim, asset_root, 'item_plate/plate.urdf', table_options)
+
+        self.table_rigid_body_count = self.gym.get_asset_rigid_shape_count(table_asset) if self.cfg_base.env.has_table else 0
+        self.table_rigid_shape_count = self.gym.get_asset_rigid_shape_count(table_asset) if self.cfg_base.env.has_table else 0
         #table_asset = self.gym.create_box(
         #    self.sim, self.asset_info_franka_table.table_depth,
         #    self.asset_info_franka_table.table_width,
@@ -900,8 +903,9 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         reset_dof_pos = getattr(self.robot.model, reset_to + "_dof_pos")
 
         if self.cfg_base.ros_activate and reset_to == "real_robot_initial":
-            print("resetting arm in the real setup")
+            print("Resetting the real robot.")
             self.ros_arm_interface.set_joint_target(reset_dof_pos[0:self.ik_body_dof_count], execution_time_secs=10, limit_max_deviation=False)
+            self.ros_manipulator_interface.set_joint_target(torch.Tensor(reset_dof_pos)[self.residual_actuated_dof_indices])
             time.sleep(10)
 
             print("Real robot:")

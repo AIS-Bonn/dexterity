@@ -13,7 +13,7 @@ class DexterityBaseProperties:
         """Returns number of rigid bodies for base components present in all
         environments, such as the robot, table and camera bodies."""
         return self.robot.rigid_body_count + \
-               int(self.cfg_base.env.has_table) + \
+               self.table_rigid_body_count + \
                self.camera_rigid_body_count
 
     @property
@@ -21,5 +21,5 @@ class DexterityBaseProperties:
         """Returns number of rigid shapes for base components present in all
         environments, such as the robot, table and camera bodies."""
         return self.robot.rigid_shape_count + \
-               int(self.cfg_base.env.has_table) + \
+               self.table_rigid_shape_count + \
                self.camera_rigid_shape_count
