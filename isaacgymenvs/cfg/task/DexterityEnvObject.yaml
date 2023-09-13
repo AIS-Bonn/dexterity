@@ -18,8 +18,8 @@ env:
 cameras:
     frontview:
         model: 'realsense_d455'
-        pos: [ 0.28, 1.03, 0.4 ]
-        quat: [ 0.271, 0.271, -0.653, 0.653 ]
+        pos: [ 0.253, 1.051, 0.33 ]
+        quat: [ 0.09, 0.1, -0.707, 0.695 ]
         #fovx: 87
         #resolution: [1920, 1080]
         #image_type: 'rgb'
@@ -57,11 +57,11 @@ cameras:
         attach_to_body: 'palm'
 
     rgb_frontview:
-        pos: [ 0.28, 1.03, 0.4 ]
-        quat: [ 0.183, 0.183, -0.683, 0.683 ]
+        pos: [ 0.253, 1.051, 0.33 ]
+        quat: [ 0.09, 0.1, -0.707, 0.695 ]
         fovx: 87
         resolution: [1920, 1080]
-        image_type: 'rgb_seg'
+        image_type: 'rgba'
 
 ros_cameras:
     l515:

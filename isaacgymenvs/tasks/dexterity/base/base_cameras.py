@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cmx
 import os
+from PIL import Image
 import ros_numpy
 import rospy
 from sensor_msgs.msg import CompressedImage, PointCloud2, CameraInfo
@@ -174,7 +175,7 @@ class DexterityCameraSensorProperties:
     and camera intrinsics."""
 
     ALLOWED_IMAGE_TYPES = ['d', 'rgb', 'rgbd', 'rgbxyz', 'rgbxyzseg', 'rgbdseg', 'seg', 'rgb_seg', 'pc', 'pc_rgb',
-                           'pc_seg']
+                           'pc_seg', 'rgba']
     CAMERA_ASSET_ROOT = os.path.join(
         os.path.dirname(__file__), '../../../../assets/dexterity/cameras')
 
@@ -434,7 +435,7 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
                 camera_tensor_depth)
             self._camera_tensors_depth.append(torch_camera_tensor_depth)
 
-        if "seg" in self._image_type:
+        if "seg" in self._image_type or self._image_type == "rgba":
             camera_tensor_segmentation = self.gym.get_camera_image_gpu_tensor(
                 self.sim, env_ptr, camera_handle, gymapi.IMAGE_SEGMENTATION)
             torch_camera_tensor_segmentation = gymtorch.wrap_tensor(
@@ -493,6 +494,15 @@ class DexterityCameraSensor(DexterityCameraSensorProperties):
             segmentation_image = self._get_segmentation_image(env_ptr, env_id)
             seg_image.append(segmentation_image)
         return torch.stack(seg_image, dim=0)
+    
+    def _get_rgba(self, env_ptrs: List, env_ids: List[int], remove_idx: Optional[int] = 0) -> torch.Tensor:
+        rgba_image = []
+        for env_ptr, env_id in zip(env_ptrs, env_ids):
+            color_image = self._get_color_image(env_ptr, env_id)[..., 0:3]
+            segmentation_image = self._get_segmentation_image(env_ptr, env_id).unsqueeze(-1)
+            alpha_image = (255 * (segmentation_image != remove_idx)).to(torch.uint8)
+            rgba_image.append(torch.cat([color_image, alpha_image], dim=-1))
+        return torch.stack(rgba_image, dim=0).to(self.device)
 
     def _get_rgb_seg(self, env_ptrs: List, env_ids: List[int],
                      keep_idx: Optional[int] = None,
@@ -1072,6 +1082,14 @@ class DexterityBaseCameras:
                         ['rgb', 'rgb_seg']:
                     np_image = image_dict[camera_name][env_id].cpu().numpy()[
                                ..., ::-1]
+                    
+                elif self._camera_dict[camera_name].image_type == 'rgba':
+                    np_image = image_dict[camera_name][env_id][..., 0:3].cpu().numpy()[..., ::-1]
+
+                    # Write image to transparent PNG for RGBA cameras.
+                    pil_image = Image.fromarray(image_dict[camera_name][env_id].cpu().numpy())
+                    pil_image.save(os.path.join(self.videos_dir, f"{camera_name}_env_{env_id}_episode_{self._episodes[env_id]}_step_{self.progress_buf[env_id]}.png"), format='PNG')
+
                 elif self._camera_dict[camera_name].image_type == 'd':
                     np_image = image_dict[camera_name][env_id].unsqueeze(
                         -1).cpu().numpy()
