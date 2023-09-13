@@ -134,7 +134,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
         self.keypoint_dict = self.robot.model.get_keypoints()
 
         # Calculate dimensionality of observations.
-        num_observations, self.observations_start_end = self._compute_observation_num(cfg['env']['observations'])
+        num_observations, self.observations_start_end = self._compute_observation_num(cfg['env']['observations'], cfg)
         cfg["env"]["numObservations"] = num_observations
 
         # Calculate dimensionality of teacher observations.
@@ -142,7 +142,7 @@ class DexterityBase(VecTask, DexterityABCBase, DexterityBaseCameras,
             num_teacher_observations, self.teacher_observations_start_end = self._compute_observation_num(cfg['env']['teacher_observations'])
             cfg["env"]["numTeacherObservations"] = num_teacher_observations
 
-    def _compute_observation_num(self, observations: List[str]) -> Tuple[int, Dict[str, Tuple[int, int]]]:
+    def _compute_observation_num(self, observations: List[str], cfg) -> Tuple[int, Dict[str, Tuple[int, int]]]:
         num_observations = 0
         observations_start_end = {}
         for observation in observations:
