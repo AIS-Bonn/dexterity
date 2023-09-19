@@ -21,7 +21,7 @@ params:
           val: 0
         fixed_sigma: True
     mlp:
-      units: [256, 128, 128] #[512, 256, 256]
+      units: [768, 512, 256]
       activation: elu
       d2rl: False
 
@@ -59,12 +59,12 @@ params:
     save_frequency: 100
     print_stats: True
     grad_norm: 1.0
-    entropy_coef: 0.0 #0.002
+    entropy_coef: 0.0
     truncate_grads: True
     e_clip: 0.15
     horizon_length: 16
     minibatch_size: 32768
-    mini_epochs: 6
+    mini_epochs: 4
     critic_coef: 4
     clip_value: True
     seq_len: 4  # only for RNN
