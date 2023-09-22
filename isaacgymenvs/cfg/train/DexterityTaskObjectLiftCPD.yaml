@@ -1,0 +1,42 @@
+# Student parameters are initialzed with default PPO parameters, but can be adjusted to differentiate the student from the teacher.
+defaults: 
+  - DexterityTaskObjectLiftPPO
+
+params:
+  algo:
+    name: dagger_continuous  # Select DAgger as the algorithm to be run.
+
+  config:
+    learning_rate: 5e-4
+    lr_schedule: None  # Learning rate scheduling is intended for RL algorithms. Use fixed learning rate for DAgger.
+    minibatch_size: ${....task.env.numEnvs}  # Irrelevant as the regular actor loss is not used.
+    horizon_length: 8  # Number of steps to run before updating the policy.
+    mini_epochs: 2  # Number of mini_epochs of updates to perform.
+
+  # Overwrite network configuration to differentiate student architecture from teacher architecture.
+  network:
+      name: actor_critic
+      separate: False
+
+      space:
+        continuous:
+          mu_activation: None
+          sigma_activation: None
+          mu_init:
+            name: default
+          sigma_init:
+            name: const_initializer
+            val: 0
+          fixed_sigma: True
+      mlp:
+        units: [234, 221, 234]
+        activation: elu
+        d2rl: False
+
+        initializer:
+          name: default
+        regularizer:
+          name: None
+
+  load_teacher_checkpoint: ${if:${...teacher_checkpoint},True,False}
+  teacher_load_path: ${...teacher_checkpoint}
