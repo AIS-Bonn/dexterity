@@ -131,6 +131,9 @@ class DexterityEnvBin(DexterityEnvObject):
         self.object_ids_in_each_bin = []
         self.object_names_in_each_bin = [[] for _ in range(self.num_envs)]
 
+        self.goal_handles = []
+        self.goal_actor_ids_sim = []
+
         actor_count = 0
         for i in range(self.num_envs):
             # Create new env
@@ -206,6 +209,17 @@ class DexterityEnvBin(DexterityEnvObject):
                 self.object_handles[i].append(object_handle)
                 self.object_names_in_each_bin[i].append(used_object.name)
                 actor_count += 1
+                
+            # Create goal actor.
+            # TODO: Fix goal for bin task.
+            if not self.headless and False:
+                if used_object.goal_asset is not None:
+                    goal_handle = self.gym.create_actor(env_ptr, used_object.goal_asset, used_object.start_pose, used_object.name + "_goal", self.num_envs, 1)
+                    self.gym.set_rigid_body_color(env_ptr, goal_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, gymapi.Vec3(0.0, 1.0, 0.0))
+                    self.goal_actor_ids_sim.append(actor_count)
+                    self.goal_handles.append(goal_handle)
+                    actor_count += 1
+            
 
             # Finish aggregation group
             if self.cfg_base.sim.aggregate_mode > 0:
@@ -316,12 +330,12 @@ class DexterityEnvBin(DexterityEnvObject):
             self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), :3] = object_mesh_samples_pos[:self.max_num_points_padded, :]
             self.object_mesh_samples_pos[i, 0:min(object_mesh_samples_pos.shape[0], self.max_num_points_padded), 3] = 1
 
-        self.object_mesh_samples_pos = self.object_mesh_samples_pos.unsqueeze(0).repeat(self.num_envs, 1, 1, 1)  # shape: (num_envs, total_num_objects, max_num_point_padded, 4)
+        self.object_mesh_samples_pos = self.object_mesh_samples_pos[self.object_ids_in_each_bin]  # shape: (num_envs, num_objects_per_bin, max_num_point_padded, 4)        
+        self.target_object_mesh_samples_pos = torch.zeros((self.num_envs, self.max_num_points_padded, 4), device=self.device)
 
-        self.target_object_mesh_samples_pos = torch.zeros((self.num_envs, self.max_num_points_padded, 4),
-                                                          device=self.device)
-        object_synthetic_pointcloud_pos = self.object_mesh_samples_pos[:, 0].detach().clone()
-        return object_synthetic_pointcloud_pos
+        #object_synthetic_pointcloud_pos = torch.zeros((self.num_envs, self.cfg_env['env']['num_objects'], self.max_num_points_padded, 4)).to(self.device)
+        self.target_synthetic_pointcloud = self.object_mesh_samples_pos[:, 0].clone()
+        return self.object_mesh_samples_pos.clone()
 
     def refresh_env_tensors(self):
         """Refresh tensors."""
@@ -348,14 +362,30 @@ class DexterityEnvBin(DexterityEnvObject):
             self.target_object_bounding_box_as_points_initial = self.object_bounding_box_as_points_initial.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).unsqueeze(3).repeat(1, 1, 8, 3)).squeeze(1)
         
         if any("pointcloud_clearance" in reward_term for reward_term in self.cfg['rl']['reward']):
-            raise NotImplementedError
+            self.target_synthetic_pointcloud_initial = self.synthetic_pointcloud.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).unsqueeze(3).repeat(1, 1, self.max_num_points_padded, 4)).squeeze(1)
 
         
 
     def _refresh_synthetic_pointcloud(self, object_name: str = 'object',
-                                      mesh_samples_name: str = 'object_mesh_samples') -> None:
-        super()._refresh_synthetic_pointcloud(object_name='target_object',
-                                              mesh_samples_name='target_object_mesh_samples')
+                                      mesh_samples_name: str = 'object_mesh_samples',
+                                      random_permutation: bool = False) -> None:
+        # Update point-cloud position.
+        object_pos_expanded = self.object_pos.unsqueeze(2).repeat(1, 1, self.max_num_points_padded, 1)
+        object_quat_expanded = self.object_quat.unsqueeze(2).repeat(1, 1, self.max_num_points_padded, 1)
+
+        self.synthetic_pointcloud_ordered[:, :, :, 0:3] = object_pos_expanded + quat_apply(object_quat_expanded, self.object_mesh_samples_pos[:, :, :, 0:3])
+
+        # Set points that are only padding to zero.
+        self.synthetic_pointcloud_ordered[..., 0:3] *= self.synthetic_pointcloud_ordered[..., 3:].repeat(1, 1, 1, 3)
+
+        if random_permutation:
+            self.synthetic_pointcloud = self.synthetic_pointcloud_ordered[:, :, torch.randperm(self.max_num_points_padded), :]
+        else:
+            self.synthetic_pointcloud = self.synthetic_pointcloud_ordered
+
+        
+
+        self.target_synthetic_pointcloud[:] = self.synthetic_pointcloud.gather(1, self.target_object_id.unsqueeze(1).unsqueeze(2).unsqueeze(3).repeat(1, 1, self.max_num_points_padded, 4)).squeeze(1)
         
     def _refresh_rendered_pointcloud(self):
         target_segmentation_id = self.target_object_id + 3
@@ -407,11 +437,11 @@ class DexterityEnvBin(DexterityEnvObject):
         # 2. Rendered point-clouds: Run using Isaac Gym camera sensors and ground truth segmentations making them slower. But they account for occlusions and viewpoint.
         # 3. Detected point-clouds: Run using an instance segmentation pipeline on visual observations. As neither object-meshes nor ground truth segmentations are available in the real-world, this is the observation-type used for transfer.
 
-        if observation.startswith('synthetic_pointcloud'):
-            split_observation = observation.split('_')
-            if split_observation[-1].isdigit():
-                self.synthetic_pointcloud_dimension = int(split_observation[-1])
-            num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+        if 'synthetic_pointcloud' in observation:
+            if observation == 'target_synthetic_pointcloud':
+                num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
+            else:
+                num_observations = 4 * self.cfg_env['env']['num_objects'] * self.max_num_points_padded  # (x, y, z, mask)
 
         elif observation.startswith('rendered_pointcloud'):
             num_observations = 4 * self.max_num_points_padded  # (x, y, z, mask)
@@ -430,6 +460,16 @@ class DexterityEnvBin(DexterityEnvObject):
         
         elif observation == 'object_bounding_box_as_points':
             num_observations = 24 * self.cfg_env['env']['num_objects']
+
+        elif observation == 'object_clearance':
+            num_observations = 1
+
+        elif observation == 'object_picked_up_before':
+            num_observations = 1
+
+        # For example closest distance of fingertips to object or object to goal achieved in this episode. Used for reward computation.
+        elif observation.endswith('closest_distance') or observation.endswith('furthest_distance'):
+            num_observations = 1
 
         else:
             raise NotImplementedError
@@ -452,6 +492,27 @@ class DexterityEnvBin(DexterityEnvObject):
     def visualize_target_object_bounding_box(self, env_id: int) -> None:
         self.visualize_bounding_boxes(env_id, 'target_object_bounding_box')
 
+    def visualize_target_synthetic_pointcloud(self, env_id: int) -> None:
+        target_synthetic_pointcloud = self.target_synthetic_pointcloud[env_id]
+        mask = target_synthetic_pointcloud[:, 3] > 0.5
+        unpadded_pointcloud = target_synthetic_pointcloud[mask, 0:3]
+        pointclouds_list = [None for _ in range(self.num_envs)]
+        pointclouds_list[env_id] = unpadded_pointcloud
+        self.visualize_pos(pointclouds_list, env_id, color=(1, 1, 0))
+
+    def visualize_synthetic_pointcloud(self, env_id: int) -> None:
+        synthetic_pointcloud = self.synthetic_pointcloud[env_id]
+
+        unpadded_pointclouds = []
+        for object_pointcloud in synthetic_pointcloud:
+            mask = object_pointcloud[:, 3] > 0.5
+            unpadded_pointclouds.append(object_pointcloud[mask, 0:3])
+        unpadded_pointclouds = torch.cat(unpadded_pointclouds)
+
+        pointclouds_list = [None for _ in range(self.num_envs)]
+        pointclouds_list[env_id] = unpadded_pointclouds
+        self.visualize_pos(pointclouds_list, env_id, color=(1, 1, 0))
+   
     def visualize_object_bounding_box_as_points(self, env_id: int) -> None:
         self.visualize_pos(self.object_bounding_box_as_points.flatten(1, 2), env_id, color=(1, 1, 0))
 
